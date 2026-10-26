@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.app.IntentService
-import android.os.SystemClock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
@@ -40,7 +39,7 @@ object TermuxCommandClient {
     private const val PROBE_MARKER = "CPPIDE_TERMUX_COMMAND_API_OK"
     private const val PROBE_TIMEOUT_MS = 20_000L
 
-    private val nextId = AtomicInteger((SystemClock.elapsedRealtime() % Int.MAX_VALUE).toInt().coerceAtLeast(1))
+    private val nextId = AtomicInteger((System.nanoTime() % Int.MAX_VALUE).toInt().coerceAtLeast(1))
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<TermuxCommandResult>>()
 
     data class Status(
