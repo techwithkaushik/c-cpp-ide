@@ -167,17 +167,18 @@ class MainActivity : ComponentActivity() {
                                                 appendLine("Compiler diagnostics:")
                                                 appendLine(outcome.compileResult.stderr)
                                             }
-                                            if (outcome.runResult != null) {
+                                            val runResult = outcome.runResult
+                                            if (runResult != null) {
                                                 appendLine()
                                                 appendLine(if (outcome.executionSucceeded) "RUN: PASS" else "RUN: FAIL")
-                                                appendLine("Exit code: ${outcome.runResult.exitCode ?: "unknown"}")
-                                                if (outcome.runResult.stdout.isNotBlank()) {
+                                                appendLine("Exit code: ${runResult.exitCode ?: "unknown"}")
+                                                if (runResult.stdout.isNotBlank()) {
                                                     appendLine("Program output:")
-                                                    appendLine(outcome.runResult.stdout)
+                                                    appendLine(runResult.stdout)
                                                 }
-                                                if (outcome.runResult.stderr.isNotBlank()) {
+                                                if (runResult.stderr.isNotBlank()) {
                                                     appendLine("Program stderr:")
-                                                    appendLine(outcome.runResult.stderr)
+                                                    appendLine(runResult.stderr)
                                                 }
                                             } else {
                                                 appendLine()
