@@ -20,6 +20,12 @@ class BootstrapArtifactTest {
     }
 
     @Test
+    fun rejectsPathTraversalInVersion() {
+        assertNotNull(valid.copy(version = "../outside").validate())
+        assertNotNull(valid.copy(version = "nested/version").validate())
+    }
+
+    @Test
     fun rejectsHttpDownload() {
         assertNotNull(valid.copy(downloadUrl = "http://example.invalid/bootstrap.zip").validate())
     }
