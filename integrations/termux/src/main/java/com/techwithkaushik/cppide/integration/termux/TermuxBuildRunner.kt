@@ -48,17 +48,14 @@ data class TermuxBuildOutcome(
  * private files from the IDE process and never constructs a shell command string.
  */
 object TermuxBuildRunner {
-    private const val TERMUX_BIN = "/data/data/com.termux/files/usr/bin"
-    private const val TERMUX_HOME = "/data/data/com.termux/files/home"
-    private const val TERMUX_TMP = "/data/data/com.termux/files/usr/tmp"
     private const val MAX_PROGRAM_ARGUMENTS = 128
     private const val MAX_PROGRAM_ARGUMENTS_TOTAL_CHARS = 64 * 1024
 
     internal fun createCompileCommand(request: TermuxBuildRequest): TermuxBuildCommand {
         validateRequest(request)
         val compiler = when (request.language) {
-            TermuxSourceLanguage.C -> "$TERMUX_BIN/clang"
-            TermuxSourceLanguage.CPP -> "$TERMUX_BIN/clang++"
+            TermuxSourceLanguage.C -> "${TermuxEnvironment.BIN}/clang"
+            TermuxSourceLanguage.CPP -> "${TermuxEnvironment.BIN}/clang++"
         }
         val standard = when (request.language) {
             TermuxSourceLanguage.C -> "c17"
@@ -132,7 +129,7 @@ object TermuxBuildRunner {
     private fun String.isAbsolutePath(): Boolean = startsWith("/") && isNotBlank()
 
     private fun String.isInsideTermuxExecutableArea(): Boolean =
-        startsWith("$TERMUX_HOME/") || startsWith("$TERMUX_TMP/")
+        startsWith("${TermuxEnvironment.HOME}/") || startsWith("${TermuxEnvironment.TMPDIR}/")
 
     private fun String.hasNoDotSegments(): Boolean =
         split('/').none { it == "." || it == ".." }
