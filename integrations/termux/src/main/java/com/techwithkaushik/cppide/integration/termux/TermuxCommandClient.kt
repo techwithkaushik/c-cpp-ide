@@ -117,7 +117,7 @@ object TermuxCommandClient {
                 appContext,
                 id,
                 callbackIntent,
-                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE
+                PendingIntent.FLAG_ONE_SHOT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
             )
 
             val command = Intent(RUN_COMMAND_ACTION).apply {
