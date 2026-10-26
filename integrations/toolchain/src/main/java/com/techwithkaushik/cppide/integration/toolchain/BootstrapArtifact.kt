@@ -27,8 +27,7 @@ data class BootstrapArtifact(
         }
         if (!sha256.matches(Regex("[a-fA-F0-9]{64}"))) return "Bootstrap SHA-256 is invalid."
         if (compressedSizeBytes !in 1..MAX_COMPRESSED_BYTES) return "Bootstrap size is outside allowed limits."
-        if (maximumExpandedBytes < compressedSizeBytes ||
-            maximumExpandedBytes > MAX_EXPANDED_BYTES) {
+        if (maximumExpandedBytes !in 1..MAX_EXPANDED_BYTES) {
             return "Expanded bootstrap size is outside allowed limits."
         }
         return null
