@@ -51,3 +51,24 @@ Use **PASS**, **FAIL**, or **NOT RUN**. A failed or unrun gate must not be descr
 - LSP, interactive terminal, and debugger must remain **unsupported / experimental** until STREAM tests prove a real persistent bidirectional session.
 - If any proposed transport requires root, SELinux changes, a localhost TCP listener, undocumented Termux internals, or direct access to Termux private files, reject it.
 - Do not mark any row PASS without device logs or a reproducible test report attached to the project issue/PR.
+
+## Current spike implementation
+
+A minimal implementation now exists in `:integrations:termux`:
+
+- `TermuxCommandClient.inspect(context)` checks package visibility, RUN_COMMAND service resolution, and whether the app has the declared permission.
+- `TermuxCommandClient.probeCommandApi(context)` dispatches only a fixed `printf` marker command and awaits a bounded result.
+- `TermuxCommandResultService` is private to the IDE app.
+- A temporary launch screen in `:app` exposes the checks for manual device testing.
+
+### Device procedure
+
+1. Install a supported Termux build and open it once.
+2. In Termux, explicitly set `allow-external-apps = true` in `~/.termux/termux.properties`; restart Termux after changing it. Do not have the IDE edit this file.
+3. Install the IDE build and grant its **Run commands in Termux environment** permission in Android App Info.
+4. Open the IDE's diagnostic screen and check the detected package, service, permission, and version.
+5. Tap **Test Termux command access**. Expected result is a PASS marker and exit code 0.
+6. Repeat with permission denied and with external-app access disabled. The app must fail clearly and must not claim the API is ready.
+7. Capture Android version/API, Termux source/version, result, and relevant sanitized logcat errors in the test report.
+
+**Important:** This code has not been built or run on a device in this task. RUN_COMMAND extra/result-key compatibility must be confirmed against the actual Termux build. The implementation deliberately accepts documented/legacy result-bundle field variants, but that is compatibility handling—not proof of runtime compatibility.
