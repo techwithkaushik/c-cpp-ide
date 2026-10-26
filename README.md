@@ -47,3 +47,10 @@ Read these architecture records before adding a Termux adapter:
 - [Termux capability spike — on-device validation matrix](docs/architecture/termux-capability-spike.md)
 
 The first spike evaluates the documented Termux command API for finite commands. Persistent clangd LSP, terminal, and debugger sessions require a separately proven, authorized bidirectional transport. They must not be implemented using an unverified cross-UID socket, localhost TCP, root, SELinux changes, or direct reads of Termux private data. Do not mark these capabilities supported until their validation gates pass.
+
+
+## Current Termux spike
+
+The current branch includes a temporary diagnostic screen and a minimal `:integrations:termux` adapter. The screen checks whether Termux is visible, whether its RUN_COMMAND service resolves, whether the IDE permission is granted, and whether a fixed harmless command returns the expected marker.
+
+This is a **capability spike, not a production compiler integration**. The adapter does not yet provide workspace synchronization, arbitrary build/run commands, persistent LSP streams, terminal PTY, or debugging. Device validation and a Gradle build are still required. See [the validation matrix](docs/architecture/termux-capability-spike.md) before treating any capability as supported.
