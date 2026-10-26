@@ -49,6 +49,11 @@ jobs:
             echo "::warning::Repository debug keystore is invalid; using a temporary runner debug key for this CI build. Fix ci/debug-keystore.b64 to enable stable signatures."
           fi
 
+      - name: Validate bootstrap archive tooling
+        run: |
+          python3 -m unittest tools/test_validate_bootstrap_archive.py -v
+          python3 tools/validate-bootstrap-archive.py --help >/dev/null
+
       - name: Check Gradle project configuration
         run: gradle --no-daemon tasks
 
