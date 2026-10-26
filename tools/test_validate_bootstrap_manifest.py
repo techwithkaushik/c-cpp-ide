@@ -23,6 +23,12 @@ class BootstrapManifestValidationTests(unittest.TestCase):
     def test_accepts_valid_manifest(self):
         self.assertIsNone(validate_manifest(manifest([artifact(), artifact("arm64-v8a")])))
 
+    def test_rejects_path_traversal_runtime_version(self):
+        value = manifest()
+        value["runtimeVersion"] = "../outside"
+        value["artifacts"][0]["version"] = "../outside"
+        self.assertIn("runtimeVersion", validate_manifest(value))
+
     def test_rejects_unknown_fields(self):
         value = manifest()
         value["unreviewed"] = True
