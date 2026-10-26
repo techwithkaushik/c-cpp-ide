@@ -20,7 +20,7 @@ def validate_manifest(manifest):
     if manifest["schemaVersion"] != 1 or isinstance(manifest["schemaVersion"], bool):
         return "schemaVersion must be 1."
     version = manifest["runtimeVersion"]
-    if not isinstance(version, str) or not version.strip() or not re.fullmatch(r"[A-Za-z0-9._+-]+", version):
+    if not isinstance(version, str) or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", version) or version in {".", ".."}:
         return "runtimeVersion is invalid."
     artifacts = manifest["artifacts"]
     if not isinstance(artifacts, list) or not artifacts:
