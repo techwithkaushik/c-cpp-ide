@@ -51,8 +51,9 @@ jobs:
 
       - name: Validate bootstrap archive tooling
         run: |
-          python3 -m unittest tools/test_validate_bootstrap_archive.py -v
+          python3 -m unittest tools/test_validate_bootstrap_archive.py tools/test_validate_bootstrap_manifest.py -v
           python3 tools/validate-bootstrap-archive.py --help >/dev/null
+          python3 tools/validate-bootstrap-manifest.py --help >/dev/null
 
       - name: Check Gradle project configuration
         run: gradle --no-daemon tasks
