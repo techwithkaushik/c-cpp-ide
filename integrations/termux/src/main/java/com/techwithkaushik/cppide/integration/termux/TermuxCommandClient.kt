@@ -109,6 +109,56 @@ object TermuxCommandClient {
      * A successful result proves the command API works, not that compiler/LSP/PTY capabilities exist.
      */
     suspend fun probeCommandApi(context: Context): TermuxCommandResult {
+        val received = executeCommand(
+            context = context,
+            executablePath = "$TERMUX_PREFIX/bin/printf",
+            arguments = listOf(PROBE_MARKER),
+            workingDirectory = TERMUX_HOME,
+            label = "C/C++ IDE Termux capability probe",
+            description = "Runs a fixed harmless command to verify authorized command execution.",
+            timeoutMs = PROBE_TIMEOUT_MS
+        )
+        if (received.termuxErrorCode != null && received.termuxErrorCode != -1) {
+            throw IllegalStateException(
+                received.termuxErrorMessage?.takeIf { it.isNotBlank() }
+                    ?: "Termux rejected the command (error ${received.termuxErrorCode})."
+            )
+        }
+        if (received.exitCode == 0 && received.stdout.contains(PROBE_MARKER)) return received
+        throw IllegalStateException(
+            received.termuxErrorMessage?.takeIf { it.isNotBlank() }
+                ?: "Termux command probe failed (exit code ${received.exitCode ?: "unknown"}). Check allow-external-apps and Termux configuration."
+        )
+    }
+
+    /**
+     * Executes one argv-based command through the documented Termux API.
+     * This is not a shell: arguments are passed as individual strings without shell expansion.
+     * Callers must only pass commands the user explicitly requested.
+     */
+    internal suspend fun executeCommand(
+        context: Context,
+        executablePath: String,
+        arguments: List<String>,
+        workingDirectory: String,
+        label: String,
+        description: String,
+        timeoutMs: Long
+    ): TermuxCommandResult {
+        require(executablePath.startsWith("/") && '\u0000' !in executablePath) {
+            "Executable path must be an absolute path."
+        }
+        require(workingDirectory.startsWith("/") && '\u0000' !in workingDirectory) {
+            "Working directory must be an absolute path."
+        }
+        require(arguments.size <= 256 && arguments.all { '\u0000' !in it && it.length <= 8_192 }) {
+            "Command arguments exceed supported limits."
+        }
+        require(arguments.sumOf { it.length.toLong() } <= 64 * 1024) {
+            "Total command arguments exceed 64 KiB."
+        }
+        require(timeoutMs in 1..120_000) { "Command timeout must be between 1 and 120 seconds." }
+
         val appContext = context.applicationContext
         val status = inspect(appContext)
         require(status.installed) { status.message }
@@ -126,17 +176,18 @@ object TermuxCommandClient {
                 appContext,
                 id,
                 callbackIntent,
-                PendingIntent.FLAG_ONE_SHOT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+                PendingIntent.FLAG_ONE_SHOT or
+                    (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
             )
 
             val command = Intent(RUN_COMMAND_ACTION).apply {
                 component = ComponentName(TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
-                putExtra("com.termux.RUN_COMMAND_PATH", "$TERMUX_PREFIX/bin/printf")
-                putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(PROBE_MARKER))
-                putExtra("com.termux.RUN_COMMAND_WORKDIR", TERMUX_HOME)
+                putExtra("com.termux.RUN_COMMAND_PATH", executablePath)
+                putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments.toTypedArray())
+                putExtra("com.termux.RUN_COMMAND_WORKDIR", workingDirectory)
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "C/C++ IDE Termux capability probe")
-                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Runs a fixed harmless command to verify authorized command execution.")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", label.take(80))
+                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", description.take(200))
                 putExtra(RESULT_SERVICE_EXTRA, callback)
             }
 
@@ -151,18 +202,7 @@ object TermuxCommandClient {
                 throw IllegalStateException("Could not start Termux RUN_COMMAND: ${e.javaClass.simpleName}.", e)
             }
 
-            val received = withTimeout(PROBE_TIMEOUT_MS) { result.await() }
-            if (received.termuxErrorCode != null && received.termuxErrorCode != -1) {
-                throw IllegalStateException(
-                    received.termuxErrorMessage?.takeIf { it.isNotBlank() }
-                        ?: "Termux rejected the command (error ${received.termuxErrorCode})."
-                )
-            }
-            if (received.exitCode == 0 && received.stdout.contains(PROBE_MARKER)) return received
-            throw IllegalStateException(
-                received.termuxErrorMessage?.takeIf { it.isNotBlank() }
-                    ?: "Termux command probe failed (exit code ${received.exitCode ?: "unknown"}). Check allow-external-apps and Termux configuration."
-            )
+            return withTimeout(timeoutMs) { result.await() }
         } finally {
             pending.remove(id)
         }
