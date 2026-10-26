@@ -52,6 +52,7 @@ object TermuxBuildRunner {
     private const val TERMUX_HOME = "/data/data/com.termux/files/home"
     private const val TERMUX_TMP = "/data/data/com.termux/files/usr/tmp"
     private const val MAX_PROGRAM_ARGUMENTS = 128
+    private const val MAX_PROGRAM_ARGUMENTS_TOTAL_CHARS = 64 * 1024
 
     internal fun createCompileCommand(request: TermuxBuildRequest): TermuxBuildCommand {
         validateRequest(request)
@@ -121,6 +122,9 @@ object TermuxBuildRunner {
         }
         require(request.programArguments.all { '\u0000' !in it && it.length <= 8_192 }) {
             "Program arguments must be NUL-free and at most 8192 characters each."
+        }
+        require(request.programArguments.sumOf { it.length.toLong() } <= MAX_PROGRAM_ARGUMENTS_TOTAL_CHARS) {
+            "Total program arguments must not exceed 64 KiB."
         }
         require(request.timeoutMs in 1..120_000) { "Timeout must be between 1 and 120 seconds." }
     }
