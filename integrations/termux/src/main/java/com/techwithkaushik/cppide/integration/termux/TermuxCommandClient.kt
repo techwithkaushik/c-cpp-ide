@@ -26,6 +26,9 @@ object TermuxCommandClient {
 
     private const val RUN_COMMAND_ACTION = "com.termux.RUN_COMMAND"
     private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
+    // RUN_COMMAND_PATH is an executable path, not a shell expression: $PREFIX is not expanded here.
+    private const val TERMUX_PREFIX = "/data/data/com.termux/files/usr"
+    private const val TERMUX_HOME = "/data/data/com.termux/files/home"
     private const val RESULT_SERVICE_EXTRA = "com.termux.RUN_COMMAND_PENDING_INTENT"
     private const val RESULT_BUNDLE_KEY = "result"
     private const val RESULT_STDOUT_KEY = "stdout"
@@ -122,9 +125,9 @@ object TermuxCommandClient {
 
             val command = Intent(RUN_COMMAND_ACTION).apply {
                 component = ComponentName(TERMUX_PACKAGE, RUN_COMMAND_SERVICE)
-                putExtra("com.termux.RUN_COMMAND_PATH", "\u0024PREFIX/bin/printf")
+                putExtra("com.termux.RUN_COMMAND_PATH", "$TERMUX_PREFIX/bin/printf")
                 putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(PROBE_MARKER))
-                putExtra("com.termux.RUN_COMMAND_WORKDIR", "~")
+                putExtra("com.termux.RUN_COMMAND_WORKDIR", TERMUX_HOME)
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
                 putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "C/C++ IDE Termux capability probe")
                 putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Runs a fixed harmless command to verify authorized command execution.")
