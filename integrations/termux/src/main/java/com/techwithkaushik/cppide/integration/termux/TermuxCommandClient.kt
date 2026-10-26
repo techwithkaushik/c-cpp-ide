@@ -27,12 +27,12 @@ object TermuxCommandClient {
     private const val RUN_COMMAND_ACTION = "com.termux.RUN_COMMAND"
     private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
     private const val RESULT_SERVICE_EXTRA = "com.termux.RUN_COMMAND_PENDING_INTENT"
-    private const val RESULT_BUNDLE_KEY = "com.termux.execute.result_bundle"
-    private const val RESULT_STDOUT_KEY = "com.termux.execute.result_bundle.stdout"
-    private const val RESULT_STDERR_KEY = "com.termux.execute.result_bundle.stderr"
-    private const val RESULT_EXIT_CODE_KEY = "com.termux.execute.result_bundle.exit_code"
-    private const val RESULT_ERROR_KEY = "com.termux.execute.result_bundle.err"
-    private const val RESULT_ERROR_MESSAGE_KEY = "com.termux.execute.result_bundle.errmsg"
+    private const val RESULT_BUNDLE_KEY = "result"
+    private const val RESULT_STDOUT_KEY = "stdout"
+    private const val RESULT_STDERR_KEY = "stderr"
+    private const val RESULT_EXIT_CODE_KEY = "exitCode"
+    private const val RESULT_ERROR_KEY = "err"
+    private const val RESULT_ERROR_MESSAGE_KEY = "errmsg"
     private const val RESULT_ID_EXTRA = "cppide.termux.execution_id"
     private const val PROBE_MARKER = "CPPIDE_TERMUX_COMMAND_API_OK"
     private const val PROBE_TIMEOUT_MS = 20_000L
@@ -126,8 +126,8 @@ object TermuxCommandClient {
                 putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(PROBE_MARKER))
                 putExtra("com.termux.RUN_COMMAND_WORKDIR", "~")
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-                putExtra("com.termux.execute.command_label", "C/C++ IDE Termux capability probe")
-                putExtra("com.termux.execute.command_description", "Runs a fixed harmless command to verify authorized command execution.")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "C/C++ IDE Termux capability probe")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Runs a fixed harmless command to verify authorized command execution.")
                 putExtra(RESULT_SERVICE_EXTRA, callback)
             }
 
