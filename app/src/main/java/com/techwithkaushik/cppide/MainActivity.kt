@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,8 +33,8 @@ import com.techwithkaushik.cppide.integration.termux.TermuxSourceLanguage
 import kotlinx.coroutines.launch
 
 /**
- * Integration milestone screen: checks Termux and can compile/run a source file accessible to
- * Termux. This is not yet the full editor/workspace UI.
+ * Termux integration screen. It probes the documented command API automatically and can compile
+ * a source file accessible to Termux. The probe does not launch Termux's terminal UI.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,13 +45,47 @@ class MainActivity : ComponentActivity() {
                     val context = LocalContext.current
                     val scope = rememberCoroutineScope()
                     var status by remember { mutableStateOf(TermuxCommandClient.inspect(context)) }
+                    var commandApiReady by remember { mutableStateOf(false) }
+                    var connecting by remember { mutableStateOf(false) }
+                    var connectionMessage by remember {
+                        mutableStateOf("Checking Termux command access…")
+                    }
                     var language by remember { mutableStateOf(TermuxSourceLanguage.C) }
                     var sourcePath by remember { mutableStateOf("/sdcard/Download/main.c") }
                     var outputPath by remember { mutableStateOf("/data/data/com.termux/files/home/cppide-main") }
                     var workingDirectory by remember { mutableStateOf("/sdcard/Download") }
                     var programArguments by remember { mutableStateOf("") }
                     var running by remember { mutableStateOf(false) }
-                    var output by remember { mutableStateOf("Choose a source file already accessible to Termux, then tap Compile & Run.") }
+                    var output by remember { mutableStateOf("Choose a source file accessible to Termux, then tap Compile & Run.") }
+
+                    fun connectToTermux() {
+                        status = TermuxCommandClient.inspect(context)
+                        if (!status.installed || !status.serviceResolvable || !status.permissionGranted) {
+                            commandApiReady = false
+                            connectionMessage = status.message
+                            return
+                        }
+                        connecting = true
+                        commandApiReady = false
+                        connectionMessage = "Connecting to Termux without opening its terminal UI…"
+                        scope.launch {
+                            try {
+                                TermuxCommandClient.probeCommandApi(context)
+                                commandApiReady = true
+                                connectionMessage = "Connected. Termux command execution is ready."
+                            } catch (error: Exception) {
+                                commandApiReady = false
+                                connectionMessage = "Connection failed: ${error.message ?: error.javaClass.simpleName}. Check Termux's allow-external-apps setting and RUN_COMMAND permission."
+                            } finally {
+                                connecting = false
+                                status = TermuxCommandClient.inspect(context)
+                            }
+                        }
+                    }
+
+                    LaunchedEffect(Unit) {
+                        connectToTermux()
+                    }
 
                     Column(
                         modifier = Modifier
@@ -60,7 +95,7 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("C/C++ IDE", style = MaterialTheme.typography.headlineMedium)
-                        Text("Compile and run through Termux's documented RUN_COMMAND API. Source files are not copied or edited by this screen.")
+                        Text("Build and run from this IDE through Termux's documented command API. You do not need to open the Termux terminal for each build. Termux must be installed and configured once.")
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier.padding(16.dp),
@@ -70,34 +105,35 @@ class MainActivity : ComponentActivity() {
                                 Text("RUN_COMMAND service: ${if (status.serviceResolvable) "available" else "unavailable"}")
                                 Text("Permission: ${if (status.permissionGranted) "granted" else "not granted"}")
                                 Text("Version: ${status.packageVersion ?: "unknown"}")
-                                Text(status.message)
+                                Text("Command API: ${if (commandApiReady) "ready" else if (connecting) "connecting…" else "not ready"}")
+                                Text(connectionMessage)
                                 Button(
-                                    enabled = !running,
-                                    onClick = { status = TermuxCommandClient.inspect(context) }
-                                ) { Text("Refresh status") }
+                                    enabled = !running && !connecting,
+                                    onClick = { connectToTermux() }
+                                ) { Text(if (connecting) "Connecting…" else "Connect / retry") }
                             }
                         }
 
                         Text("Source settings", style = MaterialTheme.typography.titleLarge)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
-                                enabled = !running && language != TermuxSourceLanguage.C,
+                                enabled = !running,
                                 onClick = {
                                     language = TermuxSourceLanguage.C
                                     if (sourcePath.endsWith(".cpp") || sourcePath.endsWith(".cc") || sourcePath.endsWith(".cxx")) {
                                         sourcePath = sourcePath.substringBeforeLast('.') + ".c"
                                     }
                                 }
-                            ) { Text("C17") }
+                            ) { Text(if (language == TermuxSourceLanguage.C) "✓ C17" else "C17") }
                             Button(
-                                enabled = !running && language != TermuxSourceLanguage.CPP,
+                                enabled = !running,
                                 onClick = {
                                     language = TermuxSourceLanguage.CPP
                                     if (sourcePath.endsWith(".c")) {
                                         sourcePath = sourcePath.substringBeforeLast('.') + ".cpp"
                                     }
                                 }
-                            ) { Text("C++20") }
+                            ) { Text(if (language == TermuxSourceLanguage.CPP) "✓ C++20" else "C++20") }
                         }
                         OutlinedTextField(
                             value = sourcePath,
@@ -131,21 +167,16 @@ class MainActivity : ComponentActivity() {
                             minLines = 2,
                             enabled = !running
                         )
-                        Text(
-                            "Note: Termux must have access to the source/work directory. On shared storage, run termux-setup-storage in Termux if needed. The output executable stays in Termux private storage to avoid noexec mounts."
-                        )
+                        Text("Termux must be able to read the source and working directory. For shared storage, one-time storage permission setup may be required. Compiled executables stay in Termux private storage to avoid noexec mounts.")
                         Button(
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = !running && status.installed && status.serviceResolvable && status.permissionGranted,
+                            enabled = !running && !connecting && commandApiReady,
                             onClick = {
                                 running = true
-                                output = "Submitting compile request to Termux…"
+                                output = "Submitting compile request…"
                                 scope.launch {
                                     output = try {
-                                        val args = programArguments
-                                            .lineSequence()
-                                            .filter { it.isNotEmpty() }
-                                            .toList()
+                                        val args = programArguments.lineSequence().filter { it.isNotEmpty() }.toList()
                                         val outcome = TermuxBuildRunner.compileAndRun(
                                             context,
                                             TermuxBuildRequest(
@@ -186,23 +217,17 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }.trim()
                                     } catch (error: Exception) {
-                                        "FAILED — ${error.message ?: error.javaClass.simpleName}\n\nA result timeout stops waiting for the result; it does not guarantee the Termux process was terminated."
+                                        "FAILED — ${error.message ?: error.javaClass.simpleName}\n\nA result timeout stops waiting; it does not guarantee the Termux process was terminated."
                                     } finally {
                                         running = false
                                         status = TermuxCommandClient.inspect(context)
                                     }
                                 }
                             }
-                        ) {
-                            Text(if (running) "Working…" else "Compile & Run")
-                        }
+                        ) { Text(if (running) "Working…" else "Compile & Run") }
                         Text("Result", style = MaterialTheme.typography.titleLarge)
                         Card(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                output,
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                            Text(output, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
