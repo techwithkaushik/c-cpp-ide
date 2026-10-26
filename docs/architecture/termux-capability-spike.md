@@ -57,7 +57,9 @@ Use **PASS**, **FAIL**, or **NOT RUN**. A failed or unrun gate must not be descr
 A minimal implementation now exists in `:integrations:termux`:
 
 - `TermuxCommandClient.inspect(context)` checks package visibility, RUN_COMMAND service resolution, and whether the app has the declared permission.
-- `TermuxCommandClient.probeCommandApi(context)` dispatches only a fixed `printf` marker command and awaits a bounded result.
+- `TermuxCommandClient.probeCommandApi(context)` dispatches a fixed `printf` marker command and awaits a bounded result.
+- `TermuxBuildRunner.compileAndRun(context, request)` now constructs shell-free argv for Termux `clang`/`clang++`, stops before execution when compilation fails, and passes program arguments as separate argv entries. The executable output must be under Termux home or `usr/tmp`; shared storage may be mounted `noexec`.
+- Command-result waiting has a timeout, but the RUN_COMMAND API does not provide a proven cancellation mechanism here. A timeout must not be treated as proof that the underlying process was terminated.
 - `TermuxCommandResultService` is private to the IDE app.
 - A temporary launch screen in `:app` exposes the checks for manual device testing.
 
