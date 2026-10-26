@@ -11,34 +11,10 @@ The **Android CI** workflow uploads the debug APK as the `cpp-ide-debug-apk` art
 
 Artifacts are retained for 14 days. A successful CI build verifies compilation and configured unit tests; it does not replace testing on a physical device.
 
-## Keep the debug signing key stable across CI runs
+## Reusable debug key stored in the repository
 
-Do **not** commit `debug.keystore` or its Base64 encoding to this public repository. Anyone who can obtain the private key could sign a different APK with the same debug identity. Instead, store the reusable key as a GitHub Actions repository secret.
+The workflow reads `ci/debug-keystore.b64`, decodes it to `$HOME/.android/debug.keystore`, and validates the alias before building. The file is intentionally a **debug/testing key**, not a release key.
 
-Create a debug keystore once on a trusted machine with JDK `keytool`:
+**Security trade-off:** this repository file is public, so anyone who can access the repository can obtain the debug private key and sign a debug APK with the same identity. This is acceptable only for development/testing builds where that risk is understood. Never reuse this key for production or release signing. If the repository or app later handles sensitive distribution, move the key to a private Actions secret or a dedicated signing service.
 
-```bash
-keytool -genkeypair -v \
-  -keystore debug.keystore \
-  -storepass android \
-  -alias androiddebugkey \
-  -keypass android \
-  -keyalg RSA -keysize 2048 -validity 10000 \
-  -dname "CN=Android Debug,O=Android,C=US"
-```
-
-Encode it as one Base64 line (Linux):
-
-```bash
-base64 -w0 debug.keystore
-```
-
-In GitHub, open **Settings → Secrets and variables → Actions → New repository secret**:
-- Name: `ANDROID_DEBUG_KEYSTORE_BASE64`
-- Value: the complete Base64 output above
-
-Keep the original keystore and its passwords private and backed up securely. Do not put the Base64 value in commits, issues, logs, or chat.
-
-The workflow restores this key to `$HOME/.android/debug.keystore` before Gradle assembles the debug APK. Once the secret is configured, future CI APKs use the same debug signing identity. Until it is configured, CI emits a warning and Gradle may generate a runner-specific key, so signatures will not be stable across runs.
-
-This is a **debug/testing** key only. Do not use it as a production release key.
+The current debug keystore uses alias `androiddebugkey` and password `android`, matching the standard Android debug signing convention. Do not rotate or regenerate this file if you want updates to remain installable over existing builds signed with this identity.
