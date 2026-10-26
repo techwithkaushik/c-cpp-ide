@@ -26,7 +26,7 @@ object TermuxCommandClient {
 
     private const val RUN_COMMAND_ACTION = "com.termux.RUN_COMMAND"
     private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
-    private const val RESULT_SERVICE_EXTRA = "pendingIntent"
+    private const val RESULT_SERVICE_EXTRA = "com.termux.RUN_COMMAND_PENDING_INTENT"
     private const val RESULT_BUNDLE_KEY = "com.termux.execute.result_bundle"
     private const val RESULT_STDOUT_KEY = "com.termux.execute.result_bundle.stdout"
     private const val RESULT_STDERR_KEY = "com.termux.execute.result_bundle.stderr"
@@ -160,13 +160,25 @@ object TermuxCommandClient {
     internal fun parseResult(intent: Intent): Pair<Int, TermuxCommandResult>? {
         val id = intent.getIntExtra(RESULT_ID_EXTRA, -1)
         if (id <= 0) return null
-        val bundle: Bundle = intent.getBundleExtra(RESULT_BUNDLE_KEY) ?: return null
+        // Prefer the current result key while accepting the legacy key used by older releases.
+        val bundle: Bundle = intent.getBundleExtra(RESULT_BUNDLE_KEY)
+            ?: intent.getBundleExtra("result")
+            ?: return null
         return id to TermuxCommandResult(
-            stdout = bundle.getString(RESULT_STDOUT_KEY).orEmpty(),
-            stderr = bundle.getString(RESULT_STDERR_KEY).orEmpty(),
-            exitCode = if (bundle.containsKey(RESULT_EXIT_CODE_KEY)) bundle.getInt(RESULT_EXIT_CODE_KEY) else null,
-            termuxErrorCode = if (bundle.containsKey(RESULT_ERROR_KEY)) bundle.getInt(RESULT_ERROR_KEY) else null,
-            termuxErrorMessage = bundle.getString(RESULT_ERROR_MESSAGE_KEY)
+            stdout = bundle.getString(RESULT_STDOUT_KEY) ?: bundle.getString("stdout").orEmpty(),
+            stderr = bundle.getString(RESULT_STDERR_KEY) ?: bundle.getString("stderr").orEmpty(),
+            exitCode = when {
+                bundle.containsKey(RESULT_EXIT_CODE_KEY) -> bundle.getInt(RESULT_EXIT_CODE_KEY)
+                bundle.containsKey("exit_code") -> bundle.getInt("exit_code")
+                bundle.containsKey("exitCode") -> bundle.getInt("exitCode")
+                else -> null
+            },
+            termuxErrorCode = when {
+                bundle.containsKey(RESULT_ERROR_KEY) -> bundle.getInt(RESULT_ERROR_KEY)
+                bundle.containsKey("err") -> bundle.getInt("err")
+                else -> null
+            },
+            termuxErrorMessage = bundle.getString(RESULT_ERROR_MESSAGE_KEY) ?: bundle.getString("errmsg")
         )
     }
 }
