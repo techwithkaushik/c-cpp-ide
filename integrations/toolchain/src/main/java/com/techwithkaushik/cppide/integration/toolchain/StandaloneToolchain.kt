@@ -127,7 +127,7 @@ object StandaloneToolchain {
                 count++
                 require(count <= MAX_ENTRIES) { "Runtime archive has too many entries." }
                 val name = entry.name
-                require(name.isNotBlank() && !name.startsWith("/") && '\\\\' !in name) {
+                require(name.isNotBlank() && !name.startsWith("/") && '\\' !in name) {
                     "Unsafe path in runtime archive."
                 }
                 val parts = name.split('/')
