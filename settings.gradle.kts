@@ -25,3 +25,5 @@ include(":core:designsystem")
 include(":feature:editor")
 include(":feature:terminal")
 include(":feature:explorer")
+
+include(":integrations:termux")
