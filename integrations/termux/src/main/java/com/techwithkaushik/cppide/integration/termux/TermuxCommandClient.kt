@@ -27,7 +27,7 @@ object TermuxCommandClient {
     private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
     // RUN_COMMAND_PATH is an executable path, not a shell expression: $PREFIX is not expanded here.
     private const val RESULT_SERVICE_EXTRA = "com.termux.RUN_COMMAND_PENDING_INTENT"
-    private const val RESULT_BUNDLE_KEY = "result"
+    // Termux owns the result-bundle key; do not assume it is the generic string "result".
     private const val RESULT_STDOUT_KEY = "stdout"
     private const val RESULT_STDERR_KEY = "stderr"
     private const val RESULT_EXIT_CODE_KEY = "exitCode"
@@ -213,7 +213,20 @@ object TermuxCommandClient {
     internal fun parseResult(intent: Intent): Pair<Int, TermuxCommandResult>? {
         val id = intent.getIntExtra(RESULT_ID_EXTRA, -1)
         if (id <= 0) return null
-        val bundle: Bundle = intent.getBundleExtra(RESULT_BUNDLE_KEY) ?: return null
+        val extras = intent.extras ?: return null
+        // RUN_COMMAND nests its result under Termux's EXTRA_PLUGIN_RESULT_BUNDLE key.
+        // That key is Termux-owned, so discover the bundle by its documented payload shape
+        // instead of assuming the key is literally "result".
+        val bundle = extras.keySet()
+            .asSequence()
+            .mapNotNull { key -> extras.get(key) as? Bundle }
+            .firstOrNull { candidate ->
+                candidate.containsKey(RESULT_STDOUT_KEY) ||
+                    candidate.containsKey(RESULT_STDERR_KEY) ||
+                    candidate.containsKey(RESULT_EXIT_CODE_KEY) ||
+                    candidate.containsKey(RESULT_ERROR_KEY) ||
+                    candidate.containsKey(RESULT_ERROR_MESSAGE_KEY)
+            } ?: return null
         val keys = listOf(
             RESULT_STDOUT_KEY,
             RESULT_STDERR_KEY,
@@ -225,8 +238,7 @@ object TermuxCommandClient {
             "stderr_original_length"
         )
         val values = keys.associateWith { key -> bundle.get(key) }
-        val parsed = parseResultValues(id, values) ?: return null
-        return parsed
+        return parseResultValues(id, values)
     }
 
     /** Pure result mapping kept separate so malformed and truncated results can be unit-tested. */
