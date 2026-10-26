@@ -49,6 +49,8 @@ data class TermuxBuildOutcome(
  */
 object TermuxBuildRunner {
     private const val TERMUX_BIN = "/data/data/com.termux/files/usr/bin"
+    private const val TERMUX_HOME = "/data/data/com.termux/files/home"
+    private const val TERMUX_TMP = "/data/data/com.termux/files/usr/tmp"
     private const val MAX_PROGRAM_ARGUMENTS = 128
 
     internal fun createCompileCommand(request: TermuxBuildRequest): TermuxBuildCommand {
@@ -99,6 +101,10 @@ object TermuxBuildRunner {
         require(request.sourcePath.isAbsolutePath()) { "Source path must be absolute." }
         require(request.outputPath.isAbsolutePath()) { "Output path must be absolute." }
         require(request.workingDirectory.isAbsolutePath()) { "Working directory must be absolute." }
+        require(request.outputPath.isInsideTermuxExecutableArea()) {
+            "Output executable must be under Termux home or Termux usr/tmp; shared storage may be mounted noexec."
+        }
+        require(request.outputPath.hasNoDotSegments()) { "Output path must not contain . or .. path segments." }
         require('\u0000' !in request.sourcePath && '\u0000' !in request.outputPath &&
             '\u0000' !in request.workingDirectory) { "Paths must not contain NUL characters." }
 
@@ -120,4 +126,10 @@ object TermuxBuildRunner {
     }
 
     private fun String.isAbsolutePath(): Boolean = startsWith("/") && isNotBlank()
+
+    private fun String.isInsideTermuxExecutableArea(): Boolean =
+        startsWith("$TERMUX_HOME/") || startsWith("$TERMUX_TMP/")
+
+    private fun String.hasNoDotSegments(): Boolean =
+        split('/').none { it == "." || it == ".." }
 }
