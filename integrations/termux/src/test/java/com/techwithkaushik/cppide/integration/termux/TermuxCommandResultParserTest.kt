@@ -41,6 +41,7 @@ class TermuxCommandResultParserTest {
             7,
             mapOf(
                 "stdout" to "output",
+                "stderr" to "xx",
                 "exit_code" to "3",
                 "err" to "5",
                 "stdout_original_length" to "10",
