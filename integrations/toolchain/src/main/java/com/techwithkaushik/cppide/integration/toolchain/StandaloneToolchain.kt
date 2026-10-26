@@ -87,6 +87,9 @@ object StandaloneToolchain {
             require(clang.setExecutable(true, true) && clangxx.setExecutable(true, true)) {
                 "Unable to mark compiler launchers executable."
             }
+            // Never activate a downloaded/bundled runtime until both language standards compile
+            // and the produced Android executables run successfully from app-private storage.
+            verifyRuntime(staging)
             finalRoot.parentFile?.mkdirs()
             val backup = File(finalRoot.parentFile, abi + ".previous")
             if (backup.exists()) backup.deleteRecursively()
@@ -109,6 +112,86 @@ object StandaloneToolchain {
                 abi, null, null, null, e.message ?: "Runtime installation failed."
             )
         } finally { zipFile.delete() }
+    }
+
+    private fun verifyRuntime(root: File) {
+        val testDir = File(root, ".runtime-smoke-test").apply {
+            require(mkdirs() || isDirectory) { "Cannot create runtime smoke-test directory." }
+        }
+        try {
+            val cSource = File(testDir, "smoke.c")
+            cSource.writeText("#include <stdio.h>\\nint main(void) { puts(\"C17_SMOKE_OK\"); return 0; }\\n")
+            val cBinary = File(testDir, "smoke-c")
+            runSmokeCommand(
+                listOf(File(root, "bin/clang").absolutePath, "-std=c17", cSource.absolutePath, "-o", cBinary.absolutePath),
+                root, "C17 compile"
+            )
+            require(cBinary.isFile && cBinary.setExecutable(true, true)) {
+                "C17 smoke compiler did not create an executable."
+            }
+            val cOutput = runSmokeCommand(listOf(cBinary.absolutePath), root, "C17 execution")
+            require(cOutput.lineSequence().any { it.trim() == "C17_SMOKE_OK" }) {
+                "C17 smoke program returned unexpected output: $cOutput"
+            }
+
+            val cppSource = File(testDir, "smoke.cpp")
+            cppSource.writeText("#include <iostream>\\nint main() { std::cout << \"CPP20_SMOKE_OK\\n\"; }\\n")
+            val cppBinary = File(testDir, "smoke-cpp")
+            runSmokeCommand(
+                listOf(File(root, "bin/clang++").absolutePath, "-std=c++20", cppSource.absolutePath, "-o", cppBinary.absolutePath),
+                root, "C++20 compile"
+            )
+            require(cppBinary.isFile && cppBinary.setExecutable(true, true)) {
+                "C++20 smoke compiler did not create an executable."
+            }
+            val cppOutput = runSmokeCommand(listOf(cppBinary.absolutePath), root, "C++20 execution")
+            require(cppOutput.lineSequence().any { it.trim() == "CPP20_SMOKE_OK" }) {
+                "C++20 smoke program returned unexpected output: $cppOutput"
+            }
+        } finally {
+            testDir.deleteRecursively()
+        }
+    }
+
+    private fun runSmokeCommand(command: List<String>, root: File, label: String): String {
+        val process = try {
+            ProcessBuilder(command)
+                .directory(root)
+                .redirectErrorStream(true)
+                .apply {
+                    environment()["HOME"] = root.absolutePath
+                    environment()["TMPDIR"] = File(root, "tmp").apply { mkdirs() }.absolutePath
+                    environment()["PATH"] = File(root, "bin").absolutePath
+                    environment()["PREFIX"] = root.absolutePath
+                    environment()["LD_LIBRARY_PATH"] = File(root, "lib").absolutePath
+                }
+                .start()
+        } catch (e: Exception) {
+            throw IllegalStateException("$label could not start: ${e.message}", e)
+        }
+        val output = StringBuilder()
+        val reader = Thread {
+            process.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { line -> synchronized(output) { output.append(line).append('\\n') } }
+            }
+        }.apply { isDaemon = true; start() }
+        val completed = try {
+            process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            process.destroyForcibly()
+            Thread.currentThread().interrupt()
+            throw IllegalStateException("$label was interrupted.", e)
+        }
+        if (!completed) {
+            process.destroy()
+            if (!process.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS)) process.destroyForcibly()
+            reader.join(500)
+            throw IllegalStateException("$label timed out after 30 seconds.")
+        }
+        reader.join(1_000)
+        val text = synchronized(output) { output.toString() }
+        require(process.exitValue() == 0) { "$label failed (exit ${process.exitValue()}): $text" }
+        return text
     }
 
     private fun supportedAbi(): String? = Build.SUPPORTED_ABIS.firstOrNull {
