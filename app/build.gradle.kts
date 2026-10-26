@@ -28,6 +28,7 @@ dependencies {
     implementation(project(":feature:terminal"))
     implementation(project(":feature:explorer"))
     implementation(project(":services:daemon"))
+    implementation(project(":integrations:termux"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
