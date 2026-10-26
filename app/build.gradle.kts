@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":feature:explorer"))
     implementation(project(":services:daemon"))
     implementation(project(":integrations:termux"))
+    implementation(project(":integrations:toolchain"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
