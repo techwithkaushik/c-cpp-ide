@@ -30,6 +30,7 @@ import com.techwithkaushik.cppide.integration.termux.TermuxBuildRequest
 import com.techwithkaushik.cppide.integration.termux.TermuxBuildRunner
 import com.techwithkaushik.cppide.integration.termux.TermuxCommandClient
 import com.techwithkaushik.cppide.integration.termux.TermuxSourceLanguage
+import com.techwithkaushik.cppide.integration.toolchain.StandaloneToolchain
 import kotlinx.coroutines.launch
 
 /**
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
                     val context = LocalContext.current
                     val scope = rememberCoroutineScope()
                     var status by remember { mutableStateOf(TermuxCommandClient.inspect(context)) }
+                    val standaloneStatus = remember(context) { StandaloneToolchain.inspect(context) }
                     var commandApiReady by remember { mutableStateOf(false) }
                     var connecting by remember { mutableStateOf(false) }
                     var connectionMessage by remember {
@@ -95,7 +97,9 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("C/C++ IDE", style = MaterialTheme.typography.headlineMedium)
-                        Text("Build and run from this IDE through Termux's documented command API. You do not need to open the Termux terminal for each build. Termux must be installed and configured once.")
+                        Text("Standalone compiler runtime: ${standaloneStatus.state}")
+                        Text(standaloneStatus.message)
+                        Text("The bundled compiler runtime is not available yet, so compile/run still uses the Termux integration. You do not need to open the Termux terminal UI for each build.")
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier.padding(16.dp),
