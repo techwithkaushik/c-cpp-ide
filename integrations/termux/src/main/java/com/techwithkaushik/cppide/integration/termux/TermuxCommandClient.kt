@@ -57,8 +57,15 @@ object TermuxCommandClient {
         val exitCode: Int?,
         val termuxErrorCode: Int?,
         val termuxErrorMessage: String?,
-        val timedOut: Boolean = false
-    )
+        val timedOut: Boolean = false,
+        val stdoutOriginalLength: Long? = null,
+        val stderrOriginalLength: Long? = null
+    ) {
+        val stdoutTruncated: Boolean
+            get() = stdoutOriginalLength?.let { it > stdout.length } ?: false
+        val stderrTruncated: Boolean
+            get() = stderrOriginalLength?.let { it > stderr.length } ?: false
+    }
 
     fun inspect(context: Context): Status {
         val appContext = context.applicationContext
@@ -146,6 +153,12 @@ object TermuxCommandClient {
             }
 
             val received = withTimeout(PROBE_TIMEOUT_MS) { result.await() }
+            if (received.termuxErrorCode != null && received.termuxErrorCode != -1) {
+                throw IllegalStateException(
+                    received.termuxErrorMessage?.takeIf { it.isNotBlank() }
+                        ?: "Termux rejected the command (error ${received.termuxErrorCode})."
+                )
+            }
             if (received.exitCode == 0 && received.stdout.contains(PROBE_MARKER)) return received
             throw IllegalStateException(
                 received.termuxErrorMessage?.takeIf { it.isNotBlank() }
@@ -163,26 +176,54 @@ object TermuxCommandClient {
     internal fun parseResult(intent: Intent): Pair<Int, TermuxCommandResult>? {
         val id = intent.getIntExtra(RESULT_ID_EXTRA, -1)
         if (id <= 0) return null
-        // Prefer the current result key while accepting the legacy key used by older releases.
-        val bundle: Bundle = intent.getBundleExtra(RESULT_BUNDLE_KEY)
-            ?: intent.getBundleExtra("result")
-            ?: return null
-        return id to TermuxCommandResult(
-            stdout = bundle.getString(RESULT_STDOUT_KEY) ?: bundle.getString("stdout").orEmpty(),
-            stderr = bundle.getString(RESULT_STDERR_KEY) ?: bundle.getString("stderr").orEmpty(),
-            exitCode = when {
-                bundle.containsKey(RESULT_EXIT_CODE_KEY) -> bundle.getInt(RESULT_EXIT_CODE_KEY)
-                bundle.containsKey("exit_code") -> bundle.getInt("exit_code")
-                bundle.containsKey("exitCode") -> bundle.getInt("exitCode")
-                else -> null
-            },
-            termuxErrorCode = when {
-                bundle.containsKey(RESULT_ERROR_KEY) -> bundle.getInt(RESULT_ERROR_KEY)
-                bundle.containsKey("err") -> bundle.getInt("err")
-                else -> null
-            },
-            termuxErrorMessage = bundle.getString(RESULT_ERROR_MESSAGE_KEY) ?: bundle.getString("errmsg")
+        val bundle: Bundle = intent.getBundleExtra(RESULT_BUNDLE_KEY) ?: return null
+        val keys = listOf(
+            RESULT_STDOUT_KEY,
+            RESULT_STDERR_KEY,
+            RESULT_EXIT_CODE_KEY,
+            "exit_code",
+            RESULT_ERROR_KEY,
+            RESULT_ERROR_MESSAGE_KEY,
+            "stdout_original_length",
+            "stderr_original_length"
         )
+        val values = keys.associateWith { key -> bundle.get(key) }
+        val parsed = parseResultValues(id, values) ?: return null
+        return parsed
+    }
+
+    /** Pure result mapping kept separate so malformed and truncated results can be unit-tested. */
+    internal fun parseResultValues(
+        id: Int,
+        values: Map<String, Any?>?
+    ): Pair<Int, TermuxCommandResult>? {
+        if (id <= 0 || values == null) return null
+        fun intValue(vararg keys: String): Int? {
+            for (key in keys) {
+                when (val value = values[key]) {
+                    is Int -> return value
+                    is Long -> if (value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return value.toInt()
+                    is String -> value.toIntOrNull()?.let { return it }
+                }
+            }
+            return null
+        }
+        fun longValue(key: String): Long? = when (val value = values[key]) {
+            is Long -> value
+            is Int -> value.toLong()
+            is String -> value.toLongOrNull()
+            else -> null
+        }
+        val result = TermuxCommandResult(
+            stdout = values[RESULT_STDOUT_KEY] as? String ?: "",
+            stderr = values[RESULT_STDERR_KEY] as? String ?: "",
+            exitCode = intValue(RESULT_EXIT_CODE_KEY, "exit_code"),
+            termuxErrorCode = intValue(RESULT_ERROR_KEY),
+            termuxErrorMessage = values[RESULT_ERROR_MESSAGE_KEY] as? String,
+            stdoutOriginalLength = longValue("stdout_original_length"),
+            stderrOriginalLength = longValue("stderr_original_length")
+        )
+        return id to result
     }
 }
 

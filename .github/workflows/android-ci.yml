@@ -36,5 +36,8 @@ jobs:
       - name: Check Gradle project configuration
         run: gradle --no-daemon tasks
 
+      - name: Run unit tests
+        run: gradle --no-daemon :integrations:termux:testDebugUnitTest
+
       - name: Assemble debug APK
         run: gradle --no-daemon :app:assembleDebug
