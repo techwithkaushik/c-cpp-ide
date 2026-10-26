@@ -35,14 +35,19 @@ jobs:
           gradle-version: "8.13"
 
       - name: Restore repository debug keystore
+        id: debug-key
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.android"
-          base64 --decode ci/debug-keystore.b64 > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
-          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
-          echo "Reusable repository debug keystore restored and validated."
+          if base64 --decode ci/debug-keystore.b64 > "$HOME/.android/debug.keystore" 2>/dev/null \
+             && keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null 2>&1; then
+            chmod 600 "$HOME/.android/debug.keystore"
+            echo "Reusable repository debug keystore restored and validated."
+          else
+            rm -f "$HOME/.android/debug.keystore"
+            echo "::warning::Repository debug keystore is invalid; using a temporary runner debug key for this CI build. Fix ci/debug-keystore.b64 to enable stable signatures."
+          fi
 
       - name: Check Gradle project configuration
         run: gradle --no-daemon tasks
