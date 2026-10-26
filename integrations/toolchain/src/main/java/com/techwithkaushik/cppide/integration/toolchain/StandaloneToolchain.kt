@@ -49,36 +49,85 @@ object StandaloneToolchain {
     }
 
     /** expectedSha256 must come from a reviewed, version-controlled runtime manifest. */
-    fun install(context: Context, expectedSha256: String): Status {
+    fun install(context: Context, expectedSha256: String): Status =
+        installArchive(context, expectedSha256, null, RUNTIME_VERSION, MAX_EXPANDED_BYTES)
+
+    /** Blocking download/install path. Call from a background thread. */
+    fun installDownloaded(context: Context, artifact: BootstrapArtifact): Status {
+        artifact.validate()?.let {
+            val abi = supportedAbi().orEmpty()
+            return Status(State.INVALID_ARCHIVE, abi, null, null, null, it)
+        }
         val abi = supportedAbi() ?: return inspect(context)
+        if (artifact.abi != abi) return Status(
+            State.ABI_UNSUPPORTED, abi, null, null, null,
+            "Bootstrap ABI ${artifact.abi} does not match device ABI $abi."
+        )
+        val downloaded = BootstrapDownloader.download(context, artifact)
+        val archive = downloaded.file ?: return Status(
+            State.INSTALL_FAILED, abi, null, null, null,
+            downloaded.error ?: "Bootstrap download failed."
+        )
+        return try {
+            installArchive(context, artifact.sha256, archive, artifact.version, artifact.maximumExpandedBytes)
+        } finally {
+            archive.delete()
+        }
+    }
+
+    private fun installArchive(
+        context: Context,
+        expectedSha256: String,
+        downloadedArchive: File?,
+        runtimeVersion: String,
+        maximumExpandedBytes: Long
+    ): Status {
+        val abi = supportedAbi() ?: return inspect(context)
+        require(maximumExpandedBytes in 1..MAX_EXPANDED_BYTES) {
+            "Expanded runtime size is outside allowed limits."
+        }
         require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) {
             "A reviewed SHA-256 digest is required."
         }
         val assetPath = ASSET_ROOT + "/" + abi + "/runtime.zip"
         val parent = File(context.noBackupFilesDir, "toolchain/.staging").apply { mkdirs() }
         val nonce = System.nanoTime().toString()
-        val staging = File(parent, RUNTIME_VERSION + "-" + abi + "-" + nonce)
-        val zipFile = File(parent, "runtime-" + nonce + ".zip")
-        val finalRoot = File(context.noBackupFilesDir, "toolchain/" + RUNTIME_VERSION + "/" + abi)
+        val staging = File(parent, runtimeVersion + "-" + abi + "-" + nonce)
+        val zipFile = downloadedArchive ?: File(parent, "runtime-" + nonce + ".zip")
+        val finalRoot = File(context.noBackupFilesDir, "toolchain/" + runtimeVersion + "/" + abi)
         try {
             val digest = MessageDigest.getInstance("SHA-256")
-            context.assets.open(assetPath).use { input ->
-                zipFile.outputStream().use { output ->
+            if (downloadedArchive == null) {
+                context.assets.open(assetPath).use { input ->
+                    zipFile.outputStream().use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var total = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= MAX_ARCHIVE_BYTES) { "Runtime archive exceeds size limit." }
+                            digest.update(buffer, 0, count)
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                }
+            } else {
+                require(zipFile.isFile && zipFile.length() in 1..MAX_ARCHIVE_BYTES) {
+                    "Runtime archive is empty or too large."
+                }
+                zipFile.inputStream().buffered().use { input ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var total = 0L
                     while (true) {
                         val count = input.read(buffer)
                         if (count < 0) break
-                        total += count
-                        require(total <= MAX_ARCHIVE_BYTES) { "Runtime archive exceeds size limit." }
                         digest.update(buffer, 0, count)
-                        output.write(buffer, 0, count)
                     }
                 }
             }
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
             require(actual.equals(expectedSha256, ignoreCase = true)) { "Runtime archive SHA-256 mismatch." }
-            extractSafely(zipFile, staging)
+            extractSafely(zipFile, staging, maximumExpandedBytes)
             val clang = File(staging, "bin/clang")
             val clangxx = File(staging, "bin/clang++")
             require(clang.isFile && clangxx.isFile && File(staging, "lib").isDirectory) {
@@ -111,7 +160,9 @@ object StandaloneToolchain {
                     State.INVALID_ARCHIVE else State.INSTALL_FAILED,
                 abi, null, null, null, e.message ?: "Runtime installation failed."
             )
-        } finally { zipFile.delete() }
+        } finally {
+            if (downloadedArchive == null) zipFile.delete()
+        }
     }
 
     private fun verifyRuntime(root: File) {
@@ -204,7 +255,7 @@ object StandaloneToolchain {
         it == "arm64-v8a" || it == "armeabi-v7a" || it == "x86_64" || it == "x86"
     }
 
-    private fun extractSafely(zipFile: File, destination: File) {
+    private fun extractSafely(zipFile: File, destination: File, maximumExpandedBytes: Long) {
         require(zipFile.length() in 1..MAX_ARCHIVE_BYTES) { "Runtime archive is empty or too large." }
         destination.mkdirs()
         var count = 0
@@ -234,7 +285,7 @@ object StandaloneToolchain {
                             val n = zip.read(buffer)
                             if (n < 0) break
                             expanded += n
-                            require(expanded <= MAX_EXPANDED_BYTES) { "Expanded runtime exceeds size limit." }
+                            require(expanded <= maximumExpandedBytes) { "Expanded runtime exceeds size limit." }
                             output.write(buffer, 0, n)
                         }
                     }
