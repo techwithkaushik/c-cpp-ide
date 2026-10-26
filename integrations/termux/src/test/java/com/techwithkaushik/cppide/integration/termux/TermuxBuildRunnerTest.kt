@@ -74,6 +74,21 @@ class TermuxBuildRunnerTest {
     }
 
     @Test
+    fun `rejects aggregate program arguments over 64 KiB`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TermuxBuildRunner.createCompileCommand(
+                TermuxBuildRequest(
+                    sourcePath = "/tmp/main.c",
+                    outputPath = "/data/data/com.termux/files/home/main",
+                    workingDirectory = "/tmp",
+                    language = TermuxSourceLanguage.C,
+                    programArguments = List(9) { "x".repeat(8_192) }
+                )
+            )
+        }
+    }
+
+    @Test
     fun `rejects NUL and oversized program arguments`() {
         assertThrows(IllegalArgumentException::class.java) {
             TermuxBuildRunner.createCompileCommand(
