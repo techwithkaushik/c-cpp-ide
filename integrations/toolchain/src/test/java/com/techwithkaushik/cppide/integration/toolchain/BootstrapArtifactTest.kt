@@ -40,7 +40,26 @@ class BootstrapArtifactTest {
     }
 
     @Test
-    fun rejectsImpossibleSizeBounds() {
-        assertNotNull(valid.copy(compressedSizeBytes = 4096, maximumExpandedBytes = 1024).validate())
+    fun allowsExpandedLimitBelowCompressedSize() {
+        assertNull(valid.copy(compressedSizeBytes = 4096, maximumExpandedBytes = 1024).validate())
+    }
+
+    @Test
+    fun rejectsZeroExpandedLimit() {
+        assertNotNull(valid.copy(maximumExpandedBytes = 0).validate())
+    }
+
+    @Test
+    fun rejectsExpandedLimitAboveHardMaximum() {
+        assertNotNull(
+            valid.copy(maximumExpandedBytes = BootstrapArtifact.MAX_EXPANDED_BYTES + 1).validate()
+        )
+    }
+
+    @Test
+    fun rejectsCompressedLimitAboveHardMaximum() {
+        assertNotNull(
+            valid.copy(compressedSizeBytes = BootstrapArtifact.MAX_COMPRESSED_BYTES + 1).validate()
+        )
     }
 }
