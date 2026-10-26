@@ -18,7 +18,7 @@ data class BootstrapArtifact(
     val maximumExpandedBytes: Long
 ) {
     fun validate(): String? {
-        if (version.isBlank()) return "Bootstrap version is missing."
+        if (!version.matches(Regex("[A-Za-z0-9._+-]{1,64}")) || version == "." || version == "..") return "Bootstrap version is invalid."
         if (abi !in SUPPORTED_ABIS) return "Unsupported bootstrap ABI: $abi"
         val uri = runCatching { URI(downloadUrl) }.getOrNull()
             ?: return "Bootstrap URL is invalid."
