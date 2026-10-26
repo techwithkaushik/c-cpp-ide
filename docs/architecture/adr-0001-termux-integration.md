@@ -69,6 +69,21 @@ Do **not** ship an abstract AF_UNIX cross-UID socket, localhost TCP listener, re
 
 If neither supported streaming option passes validation, finite build/run commands may ship first; terminal, debugger, and LSP must remain marked unsupported rather than using a fragile hidden channel.
 
+### 3a. Termux environment and path conventions
+
+Use `TermuxEnvironment` as the single source of truth for standard Termux path defaults:
+
+| Name | Default |
+|---|---|
+| `PREFIX` | `/data/data/com.termux/files/usr` |
+| `HOME` | `/data/data/com.termux/files/home` |
+| `TMPDIR` | `$PREFIX/tmp` |
+| `PATH` | `$PREFIX/bin` by default on current Android versions |
+
+Other common prefix directories include `$PREFIX/etc`, `$PREFIX/lib`, `$PREFIX/include`, and `$PREFIX/share`. Use `$PREFIX/bin` for standard Termux executables and `$PREFIX/tmp` for temporary files. Temporary files in Termux's tmp directory may be cleared when Termux restarts.
+
+These are defaults for the standard `com.termux` package, not universal facts about forks or customized environments. Do not hardcode dynamic values such as a user's custom `PATH`, locale, `PWD`, or shell options as if they were invariant. The documented `RUN_COMMAND` API does not expose a general environment-map extra; commands run in Termux's prepared environment. Do not claim `TermuxEnvironment.defaultEnvironment()` is injected into a process—it describes default values only. If a future feature needs custom environment variables, implement it only through a documented, safely structured mechanism and test it on-device.
+
 ### 4. Workspace access and file ownership
 
 - A project inside Termux's private home is not directly readable by the IDE under normal Android app isolation.
