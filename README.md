@@ -35,3 +35,15 @@ c-cpp-ide/
 ## Foundation status
 
 This commit establishes the module registry, dependency catalog, and initial compiler/LSP IPC contracts. Module implementations, Android manifests, native dependencies, and executable toolchain packaging are intentionally staged for later steps.
+
+
+## Termux integration decision
+
+Termux is intended to be the source of truth for the user's toolchain and (where access is explicitly supported) workspace. **The cross-app transport has not yet been validated on-device.** AIDL currently describes communication inside the IDE; it does not grant access to Termux's private files or implement a Termux service.
+
+Read these architecture records before adding a Termux adapter:
+
+- [ADR 0001 — Termux integration architecture](docs/architecture/adr-0001-termux-integration.md)
+- [Termux capability spike — on-device validation matrix](docs/architecture/termux-capability-spike.md)
+
+The first spike evaluates the documented Termux command API for finite commands. Persistent clangd LSP, terminal, and debugger sessions require a separately proven, authorized bidirectional transport. They must not be implemented using an unverified cross-UID socket, localhost TCP, root, SELinux changes, or direct reads of Termux private data. Do not mark these capabilities supported until their validation gates pass.
