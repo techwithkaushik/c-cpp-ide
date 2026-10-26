@@ -40,13 +40,13 @@ class TermuxBuildRunnerTest {
             outputPath = "/data/data/com.termux/files/home/demo/main",
             workingDirectory = "/data/data/com.termux/files/home/demo",
             language = TermuxSourceLanguage.CPP,
-            programArguments = listOf("two words", "; touch /tmp/not-run", "\\$HOME")
+            programArguments = listOf("two words", "; touch /tmp/not-run", "\$HOME")
         )
         val command = TermuxBuildRunner.createCompileCommand(request)
 
         assertEquals("/data/data/com.termux/files/usr/bin/clang++", command.executablePath)
         assertEquals("c++20", command.arguments.first().removePrefix("-std="))
-        assertEquals(listOf("two words", "; touch /tmp/not-run", "\\$HOME"), request.programArguments)
+        assertEquals(listOf("two words", "; touch /tmp/not-run", "\$HOME"), request.programArguments)
     }
 
     @Test
