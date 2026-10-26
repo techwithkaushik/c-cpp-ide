@@ -11,7 +11,7 @@ class TermuxBuildRunnerTest {
         val command = TermuxBuildRunner.createCompileCommand(
             TermuxBuildRequest(
                 sourcePath = "/storage/emulated/0/My Projects/hello world.c",
-                outputPath = "/storage/emulated/0/My Projects/hello app",
+                outputPath = "/data/data/com.termux/files/home/My Projects/hello app",
                 workingDirectory = "/storage/emulated/0/My Projects",
                 language = TermuxSourceLanguage.C
             )
@@ -25,7 +25,7 @@ class TermuxBuildRunnerTest {
                 "-Wextra",
                 "/storage/emulated/0/My Projects/hello world.c",
                 "-o",
-                "/storage/emulated/0/My Projects/hello app"
+                "/data/data/com.termux/files/home/My Projects/hello app"
             ),
             command.arguments
         )
@@ -55,7 +55,7 @@ class TermuxBuildRunnerTest {
             TermuxBuildRunner.createCompileCommand(
                 TermuxBuildRequest(
                     sourcePath = "main.c",
-                    outputPath = "/tmp/main",
+                    outputPath = "/data/data/com.termux/files/home/main",
                     workingDirectory = "/tmp",
                     language = TermuxSourceLanguage.C
                 )
@@ -65,7 +65,7 @@ class TermuxBuildRunnerTest {
             TermuxBuildRunner.createCompileCommand(
                 TermuxBuildRequest(
                     sourcePath = "/tmp/main.c",
-                    outputPath = "/tmp/main",
+                    outputPath = "/data/data/com.termux/files/home/main",
                     workingDirectory = "/tmp",
                     language = TermuxSourceLanguage.CPP
                 )
@@ -79,7 +79,7 @@ class TermuxBuildRunnerTest {
             TermuxBuildRunner.createCompileCommand(
                 TermuxBuildRequest(
                     sourcePath = "/tmp/main.c",
-                    outputPath = "/tmp/main",
+                    outputPath = "/data/data/com.termux/files/home/main",
                     workingDirectory = "/tmp",
                     language = TermuxSourceLanguage.C,
                     programArguments = listOf("bad\u0000argument")
@@ -90,7 +90,7 @@ class TermuxBuildRunnerTest {
             TermuxBuildRunner.createCompileCommand(
                 TermuxBuildRequest(
                     sourcePath = "/tmp/main.c",
-                    outputPath = "/tmp/main",
+                    outputPath = "/data/data/com.termux/files/home/main",
                     workingDirectory = "/tmp",
                     language = TermuxSourceLanguage.C,
                     programArguments = List(129) { "arg" }
