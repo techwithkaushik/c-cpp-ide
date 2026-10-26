@@ -120,7 +120,10 @@ object StandaloneToolchain {
         }
         try {
             val cSource = File(testDir, "smoke.c")
-            cSource.writeText("#include <stdio.h>\\nint main(void) { puts(\"C17_SMOKE_OK\"); return 0; }\\n")
+            cSource.writeText("""
+                #include <stdio.h>
+                int main(void) { puts("C17_SMOKE_OK"); return 0; }
+            """.trimIndent() + "\n")
             val cBinary = File(testDir, "smoke-c")
             runSmokeCommand(
                 listOf(File(root, "bin/clang").absolutePath, "-std=c17", cSource.absolutePath, "-o", cBinary.absolutePath),
@@ -135,7 +138,10 @@ object StandaloneToolchain {
             }
 
             val cppSource = File(testDir, "smoke.cpp")
-            cppSource.writeText("#include <iostream>\\nint main() { std::cout << \"CPP20_SMOKE_OK\\n\"; }\\n")
+            cppSource.writeText("""
+                #include <iostream>
+                int main() { std::cout << "CPP20_SMOKE_OK\\n"; }
+            """.trimIndent() + "\n")
             val cppBinary = File(testDir, "smoke-cpp")
             runSmokeCommand(
                 listOf(File(root, "bin/clang++").absolutePath, "-std=c++20", cppSource.absolutePath, "-o", cppBinary.absolutePath),
@@ -172,7 +178,7 @@ object StandaloneToolchain {
         val output = StringBuilder()
         val reader = Thread {
             process.inputStream.bufferedReader().useLines { lines ->
-                lines.forEach { line -> synchronized(output) { output.append(line).append('\\n') } }
+                lines.forEach { line -> synchronized(output) { output.append(line).append('\n') } }
             }
         }.apply { isDaemon = true; start() }
         val completed = try {
