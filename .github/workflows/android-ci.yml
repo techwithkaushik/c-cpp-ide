@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, architecture/termux-integration]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,6 +34,21 @@ jobs:
         with:
           gradle-version: "8.13"
 
+      - name: Restore reusable debug keystore
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          if [[ -n "${ANDROID_DEBUG_KEYSTORE_BASE64:-}" ]]; then
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+            chmod 600 "$HOME/.android/debug.keystore"
+            echo "Reusable debug keystore restored."
+          else
+            echo "::warning::ANDROID_DEBUG_KEYSTORE_BASE64 is not configured; Gradle will generate a temporary debug key. Configure the repository Actions secret to keep APK signatures stable across CI runs."
+          fi
+
       - name: Check Gradle project configuration
         run: gradle --no-daemon tasks
 
@@ -41,3 +57,11 @@ jobs:
 
       - name: Assemble debug APK
         run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload debug APK for device testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-ide-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
