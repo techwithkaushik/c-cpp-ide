@@ -260,6 +260,7 @@ object StandaloneToolchain {
         destination.mkdirs()
         var count = 0
         var expanded = 0L
+        val seenEntries = mutableSetOf<String>()
         ZipInputStream(zipFile.inputStream().buffered()).use { zip ->
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
             while (true) {
@@ -267,6 +268,7 @@ object StandaloneToolchain {
                 count++
                 require(count <= MAX_ENTRIES) { "Runtime archive has too many entries." }
                 val name = entry.name
+                require(seenEntries.add(name)) { "Duplicate path in runtime archive: $name" }
                 require(name.isNotBlank() && !name.startsWith("/") && '\\' !in name) {
                     "Unsafe path in runtime archive."
                 }
