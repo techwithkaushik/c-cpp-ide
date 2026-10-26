@@ -20,14 +20,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * shell-string API from this class. Runtime behavior must be verified on supported devices.
  */
 object TermuxCommandClient {
-    const val TERMUX_PACKAGE = "com.termux"
+    const val TERMUX_PACKAGE = TermuxEnvironment.PACKAGE
     const val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
 
     private const val RUN_COMMAND_ACTION = "com.termux.RUN_COMMAND"
     private const val RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
     // RUN_COMMAND_PATH is an executable path, not a shell expression: $PREFIX is not expanded here.
-    private const val TERMUX_PREFIX = "/data/data/com.termux/files/usr"
-    private const val TERMUX_HOME = "/data/data/com.termux/files/home"
     private const val RESULT_SERVICE_EXTRA = "com.termux.RUN_COMMAND_PENDING_INTENT"
     private const val RESULT_BUNDLE_KEY = "result"
     private const val RESULT_STDOUT_KEY = "stdout"
@@ -111,9 +109,9 @@ object TermuxCommandClient {
     suspend fun probeCommandApi(context: Context): TermuxCommandResult {
         val received = executeCommand(
             context = context,
-            executablePath = "$TERMUX_PREFIX/bin/printf",
+            executablePath = "${TermuxEnvironment.BIN}/printf",
             arguments = listOf(PROBE_MARKER),
-            workingDirectory = TERMUX_HOME,
+            workingDirectory = TermuxEnvironment.HOME,
             label = "C/C++ IDE Termux capability probe",
             description = "Runs a fixed harmless command to verify authorized command execution.",
             timeoutMs = PROBE_TIMEOUT_MS
