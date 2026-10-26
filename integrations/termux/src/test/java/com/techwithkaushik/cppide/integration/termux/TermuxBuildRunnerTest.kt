@@ -7,6 +7,17 @@ import org.junit.Test
 
 class TermuxBuildRunnerTest {
     @Test
+    fun `uses canonical Termux environment defaults`() {
+        assertEquals("/data/data/com.termux/files/usr", TermuxEnvironment.PREFIX)
+        assertEquals("/data/data/com.termux/files/home", TermuxEnvironment.HOME)
+        assertEquals("${TermuxEnvironment.PREFIX}/tmp", TermuxEnvironment.TMPDIR)
+        assertEquals("${TermuxEnvironment.PREFIX}/bin", TermuxEnvironment.BIN)
+        assertEquals(TermuxEnvironment.HOME, TermuxEnvironment.defaultEnvironment()["HOME"])
+        assertEquals(TermuxEnvironment.PREFIX, TermuxEnvironment.defaultEnvironment()["PREFIX"])
+        assertEquals(TermuxEnvironment.TMPDIR, TermuxEnvironment.defaultEnvironment()["TMPDIR"])
+    }
+
+    @Test
     fun `builds C compiler argv without shell concatenation`() {
         val command = TermuxBuildRunner.createCompileCommand(
             TermuxBuildRequest(
