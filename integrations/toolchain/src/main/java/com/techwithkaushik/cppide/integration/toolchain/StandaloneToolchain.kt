@@ -24,12 +24,12 @@ object StandaloneToolchain {
         val clangxx: File?, val message: String
     ) { val ready: Boolean get() = state == State.READY }
 
-    fun inspect(context: Context): Status {
+    fun inspect(context: Context, runtimeVersion: String = RUNTIME_VERSION): Status {
         val abi = supportedAbi() ?: return Status(
             State.ABI_UNSUPPORTED, Build.SUPPORTED_ABIS.firstOrNull().orEmpty(),
             null, null, null, "No standalone runtime is available for this ABI."
         )
-        val root = File(context.noBackupFilesDir, "toolchain/" + RUNTIME_VERSION + "/" + abi)
+        val root = File(context.noBackupFilesDir, "toolchain/" + runtimeVersion + "/" + abi)
         val clang = File(root, "bin/clang")
         val clangxx = File(root, "bin/clang++")
         if (root.isDirectory && clang.isFile && clang.canExecute() &&
@@ -150,7 +150,7 @@ object StandaloneToolchain {
                 throw IllegalStateException("Unable to activate runtime.")
             }
             backup.deleteRecursively()
-            return inspect(context)
+            return inspect(context, runtimeVersion)
         } catch (e: Exception) {
             staging.deleteRecursively()
             return Status(
