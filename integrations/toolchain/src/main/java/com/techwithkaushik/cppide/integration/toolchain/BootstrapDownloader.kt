@@ -6,6 +6,9 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Downloads a reviewed bootstrap artifact into app-private staging storage.
@@ -28,8 +31,12 @@ object BootstrapDownloader {
         if (!root.exists() && !root.mkdirs()) return Result(null, "Cannot create private staging directory.")
         val safeVersion = artifact.version.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val destination = File(root, "$safeVersion-${artifact.abi}.zip")
-        val temporary = File(root, destination.name + ".part")
+        var temporary: File? = null
         try {
+            // Each request gets a unique staging file; simultaneous retries must not overwrite
+            // one another's partial downloads.
+            temporary = File.createTempFile("$safeVersion-${artifact.abi}-", ".part", root)
+            val stagedFile = temporary
             val digest = MessageDigest.getInstance("SHA-256")
             var connection: HttpURLConnection? = null
             var currentUrl = URL(artifact.downloadUrl)
@@ -74,7 +81,7 @@ object BootstrapDownloader {
                         throw IOException("Bootstrap content length does not match the reviewed manifest.")
                     }
                     connection.inputStream.use { input ->
-                        temporary.outputStream().buffered().use { output ->
+                        stagedFile.outputStream().buffered().use { output ->
                             val buffer = ByteArray(32 * 1024)
                             var total = 0L
                             while (true) {
@@ -102,13 +109,19 @@ object BootstrapDownloader {
             if (!actual.equals(artifact.sha256, ignoreCase = true)) {
                 throw IOException("Bootstrap SHA-256 verification failed.")
             }
-            if (destination.exists() && !destination.delete()) {
-                throw IOException("Cannot replace previous staged bootstrap.")
+            try {
+                Files.move(
+                    stagedFile.toPath(), destination.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                // Keep the previously staged artifact until the replacement is fully verified.
+                Files.move(stagedFile.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
-            if (!temporary.renameTo(destination)) throw IOException("Cannot finalize staged bootstrap.")
+            temporary = null
             return Result(destination, null)
         } catch (e: Exception) {
-            temporary.delete()
+            temporary?.delete()
             return Result(null, e.message ?: "Bootstrap download failed.")
         }
     }
