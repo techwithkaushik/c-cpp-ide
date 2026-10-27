@@ -64,10 +64,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-private val IdeBackground = Color(0xFF101319)
-private val IdeSurface = Color(0xFF1A2029)
-private val IdeSurfaceRaised = Color(0xFF242C38)
-private val IdeAccent = Color(0xFF83B7FF)
+private val IdeBackground = Color(0xFF101820)
+private val IdeSurface = Color(0xFF192733)
+private val IdeSurfaceRaised = Color(0xFF243D52)
+private val IdeAccent = Color(0xFF659AD2)
 private val IdeMuted = Color(0xFF9AA8BA)
 private val IdeGreen = Color(0xFF7DDBB0)
 
@@ -541,7 +541,7 @@ private fun RecentFilesSheet(
             displayFiles.distinct().forEach { file ->
                 Row(
                     Modifier.fillMaxWidth()
-                        .background(if (file == activeFile) Color(0xFF1D3047) else IdeSurfaceRaised, RoundedCornerShape(10.dp))
+                        .background(if (file == activeFile) Color(0xFF173D5C) else IdeSurfaceRaised, RoundedCornerShape(10.dp))
                         .clickable { onOpenFile(file) }
                         .padding(horizontal = 12.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -1047,7 +1047,7 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
     Column(
         Modifier
             .clickable(onClick = onClick)
-            .background(if (selected) Color(0xFF26384D) else Color.Transparent, RoundedCornerShape(11.dp))
+            .background(if (selected) Color(0xFF173D5C) else Color.Transparent, RoundedCornerShape(11.dp))
             .padding(horizontal = 13.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
