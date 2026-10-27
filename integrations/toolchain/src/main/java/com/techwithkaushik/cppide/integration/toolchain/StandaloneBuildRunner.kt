@@ -46,7 +46,8 @@ class StandaloneBuildRunner(
         if (executable.absoluteFile == source.absoluteFile) {
             return Result(null, null, "", "", error = "Output executable must not overwrite the source file.")
         }
-        if (!executable.parentFile?.let { it.exists() || it.mkdirs() }!!) {
+        val outputParent = executable.absoluteFile.parentFile
+        if (outputParent == null || !(outputParent.isDirectory || outputParent.mkdirs())) {
             return Result(null, null, "", "", error = "Cannot create output directory.")
         }
 
@@ -86,13 +87,31 @@ class StandaloneBuildRunner(
                     environment()["LD_LIBRARY_PATH"] = File(root, "lib").absolutePath
                 }
                 .start()
+            // Always drain process output, but cap retained diagnostics to prevent a noisy
+            // compiler or program from exhausting the IDE process memory.
             val output = StringBuilder()
+            val maxOutputChars = 64 * 1024
             val reader = Thread {
-                process.inputStream.bufferedReader().useLines { lines ->
-                    lines.forEach { line -> synchronized(output) { output.append(line).append('\n') } }
+                process.inputStream.bufferedReader().use { input ->
+                    val buffer = CharArray(4096)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        synchronized(output) {
+                            val remaining = maxOutputChars - output.length
+                            if (remaining > 0) output.append(buffer, 0, minOf(count, remaining))
+                        }
+                    }
                 }
             }.apply { isDaemon = true; start() }
-            val completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            val completed = try {
+                process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            } catch (e: InterruptedException) {
+                process.destroyForcibly()
+                Thread.currentThread().interrupt()
+                reader.join(500)
+                return CommandResult(null, synchronized(output) { output.toString() }, error = "Command was interrupted.")
+            }
             if (!completed) {
                 process.destroy()
                 if (!process.waitFor(500, TimeUnit.MILLISECONDS)) process.destroyForcibly()
