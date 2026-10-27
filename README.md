@@ -37,9 +37,15 @@ c-cpp-ide/
 This commit establishes the module registry, dependency catalog, and initial compiler/LSP IPC contracts. Module implementations, Android manifests, native dependencies, and executable toolchain packaging are intentionally staged for later steps.
 
 
-## Termux integration decision
+## Runtime and bootstrap direction
 
-Termux is intended to be the source of truth for the user's toolchain and (where access is explicitly supported) workspace. **The cross-app transport has not yet been validated on-device.** AIDL currently describes communication inside the IDE; it does not grant access to Termux's private files or implement a Termux service.
+The standalone IDE must work without requiring a separately installed Termux app and must not ask users to paste a compiler/rootfs URL. The selected direction is an app-managed Ubuntu rootfs bootstrap with ABI selection and a project-controlled, versioned manifest. The rootfs is only a userspace base: the execution layer and Android-compatible compiler/runtime must be proven before it can be marked ready.
+
+Read [ADR 0002 — Ubuntu rootfs bootstrap](docs/architecture/adr-0002-ubuntu-rootfs-bootstrap.md) for the bootstrap flow, security constraints, and device validation gates. The existing `:integrations:toolchain` implementation contains archive/download safety primitives, but no production Ubuntu rootfs artifacts or validated Android execution layer are claimed yet.
+
+## Optional Termux integration spike
+
+Termux remains a separate optional integration experiment, not a prerequisite for the standalone runtime. **The cross-app transport has not yet been validated on-device.** AIDL describes communication inside the IDE; it does not grant access to Termux's private files or implement a Termux service.
 
 Read these architecture records before adding a Termux adapter:
 
