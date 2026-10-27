@@ -6,6 +6,10 @@ import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -851,15 +856,15 @@ private fun WorkspaceScreen(
                     }
                 },
                 navigationIcon = {
-                    Text("☰", Modifier.clickable(onClick = onMenu).padding(horizontal = 14.dp), color = IdeAccent, fontSize = 23.sp)
+                    IconButton(onClick = onMenu) { IdeIcon("menu", IdeAccent, 23.dp) }
                 },
                 actions = {
-                    Text("▤", Modifier.clickable(onClick = onExplorer).padding(horizontal = 6.dp), fontSize = 20.sp, color = IdeAccent)
-                    Text("↶", Modifier.clickable { onAction("Undo") }.padding(horizontal = 6.dp), fontSize = 22.sp, color = IdeMuted)
-                    Text("↷", Modifier.clickable { onAction("Redo") }.padding(horizontal = 6.dp), fontSize = 22.sp, color = IdeMuted)
-                    Text("▣", Modifier.clickable { onAction("Save") }.padding(horizontal = 6.dp), fontSize = 18.sp, color = IdeAccent)
-                    Text("▶", Modifier.clickable { onAction("Build") }.padding(horizontal = 6.dp), fontSize = 17.sp, color = IdeGreen)
-                    Text("▷", Modifier.clickable { onAction("Run") }.padding(start = 6.dp, end = 12.dp), fontSize = 19.sp, color = IdeGreen)
+                    IconButton(onClick = onExplorer) { IdeIcon("folder", IdeAccent, 20.dp) }
+                    IconButton(onClick = { onAction("Undo") }) { IdeIcon("undo", IdeMuted, 21.dp) }
+                    IconButton(onClick = { onAction("Redo") }) { IdeIcon("redo", IdeMuted, 21.dp) }
+                    IconButton(onClick = { onAction("Save") }) { IdeIcon("save", IdeAccent, 19.dp) }
+                    IconButton(onClick = { onAction("Build") }) { IdeIcon("build", IdeGreen, 19.dp) }
+                    IconButton(onClick = { onAction("Run") }) { IdeIcon("run", IdeGreen, 19.dp) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeSurface)
             )
@@ -871,10 +876,10 @@ private fun WorkspaceScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BottomToolButton("Terminal", ">_", selectedPanel == ToolPanel.Terminal) { onPanel(ToolPanel.Terminal) }
-                    BottomToolButton("Build", "▤", selectedPanel == ToolPanel.Build) { onPanel(ToolPanel.Build) }
-                    BottomToolButton("Problems", "!", selectedPanel == ToolPanel.Problems) { onPanel(ToolPanel.Problems) }
-                    BottomToolButton("Output", "≋", selectedPanel == ToolPanel.Output) { onPanel(ToolPanel.Output) }
+                    BottomToolButton("Terminal", "terminal", selectedPanel == ToolPanel.Terminal) { onPanel(ToolPanel.Terminal) }
+                    BottomToolButton("Build", "build", selectedPanel == ToolPanel.Build) { onPanel(ToolPanel.Build) }
+                    BottomToolButton("Problems", "problems", selectedPanel == ToolPanel.Problems) { onPanel(ToolPanel.Problems) }
+                    BottomToolButton("Output", "output", selectedPanel == ToolPanel.Output) { onPanel(ToolPanel.Output) }
                 }
                 Row(
                     Modifier.fillMaxWidth().background(Color(0xFF0C1016)).padding(horizontal = 12.dp, vertical = 5.dp),
@@ -971,7 +976,7 @@ private fun FileExplorerSheet(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text("Find a file") },
-            leadingIcon = { Text("⌕", color = IdeAccent, fontSize = 20.sp) },
+            leadingIcon = { IdeIcon("search", IdeAccent, 20.dp) },
             trailingIcon = { if (query.isNotEmpty()) Text("×", Modifier.clickable { query = "" }.padding(8.dp), color = IdeMuted) }
         )
         Row(
@@ -1080,7 +1085,7 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Text(icon, color = if (selected) IdeAccent else IdeMuted, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        IdeIcon(icon, if (selected) IdeAccent else IdeMuted, 18.dp)
         Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         Box(Modifier.width(18.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent, RoundedCornerShape(1.dp)))
     }
@@ -1191,6 +1196,38 @@ private fun PanelInfoRow(number: String, title: String, status: String) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, color = Color(0xFFE8EDF5), fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Text(status, color = IdeMuted, fontSize = 10.sp)
+        }
+    }
+}
+
+
+@Composable
+private fun IdeIcon(name: String, tint: Color, iconSize: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(iconSize)) {
+        val w = size.width
+        val h = size.height
+        val stroke = (w * 0.085f).coerceAtLeast(1.4f)
+        fun line(a: Float, b: Float, c: Float, d: Float) =
+            drawLine(tint, Offset(w * a, h * b), Offset(w * c, h * d), strokeWidth = stroke, cap = StrokeCap.Round)
+        fun rect(a: Float, b: Float, c: Float, d: Float) =
+            drawRect(tint, Offset(w * a, h * b), Size(w * (c - a), h * (d - b)), style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+        fun circle(a: Float, b: Float, r: Float) =
+            drawCircle(tint, r * w, Offset(w * a, h * b), style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+        when (name) {
+            "menu" -> { line(.15f,.25f,.85f,.25f); line(.15f,.5f,.85f,.5f); line(.15f,.75f,.85f,.75f) }
+            "folder" -> { line(.1f,.3f,.42f,.3f); line(.42f,.3f,.53f,.42f); line(.53f,.42f,.9f,.42f); line(.1f,.3f,.1f,.8f); line(.1f,.8f,.9f,.8f); line(.9f,.42f,.9f,.8f) }
+            "undo" -> { line(.2f,.35f,.48f,.12f); line(.2f,.35f,.48f,.58f); line(.22f,.35f,.58f,.35f); line(.58f,.35f,.8f,.55f); line(.8f,.55f,.8f,.8f) }
+            "redo" -> { line(.8f,.35f,.52f,.12f); line(.8f,.35f,.52f,.58f); line(.78f,.35f,.42f,.35f); line(.42f,.35f,.2f,.55f); line(.2f,.55f,.2f,.8f) }
+            "save" -> { rect(.15f,.1f,.85f,.9f); rect(.28f,.1f,.68f,.38f); rect(.28f,.58f,.72f,.9f) }
+            "build" -> { line(.2f,.8f,.8f,.2f); line(.18f,.2f,.42f,.2f); line(.18f,.2f,.18f,.45f); line(.58f,.8f,.82f,.8f); line(.82f,.55f,.82f,.8f) }
+            "run" -> { line(.25f,.12f,.82f,.5f); line(.82f,.5f,.25f,.88f); line(.25f,.88f,.25f,.12f) }
+            "search" -> { circle(.43f,.42f,.27f); line(.63f,.63f,.9f,.9f) }
+            "terminal" -> { rect(.08f,.15f,.92f,.84f); line(.22f,.35f,.4f,.5f); line(.4f,.5f,.22f,.65f); line(.5f,.68f,.75f,.68f) }
+            "problems" -> { line(.5f,.1f,.9f,.85f); line(.9f,.85f,.1f,.85f); line(.1f,.85f,.5f,.1f); line(.5f,.35f,.5f,.58f); circle(.5f,.72f,.018f) }
+            "output" -> { line(.15f,.25f,.85f,.25f); line(.15f,.5f,.85f,.5f); line(.15f,.75f,.65f,.75f) }
+            "close" -> { line(.25f,.25f,.75f,.75f); line(.75f,.25f,.25f,.75f) }
+            "add" -> { line(.5f,.15f,.5f,.85f); line(.15f,.5f,.85f,.5f) }
+            else -> circle(.5f,.5f,.3f)
         }
     }
 }
