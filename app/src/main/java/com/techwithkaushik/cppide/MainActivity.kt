@@ -3,239 +3,614 @@ package com.techwithkaushik.cppide
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.DrawerValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.techwithkaushik.cppide.integration.termux.TermuxBuildRequest
-import com.techwithkaushik.cppide.integration.termux.TermuxBuildRunner
-import com.techwithkaushik.cppide.integration.termux.TermuxCommandClient
-import com.techwithkaushik.cppide.integration.termux.TermuxSourceLanguage
-import com.techwithkaushik.cppide.integration.toolchain.StandaloneToolchain
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-/**
- * Termux integration screen. It probes the documented command API automatically and can compile
- * a source file accessible to Termux. The probe does not launch Termux's terminal UI.
- */
+private val IdeBackground = Color(0xFF101319)
+private val IdeSurface = Color(0xFF1A2029)
+private val IdeSurfaceRaised = Color(0xFF242C38)
+private val IdeAccent = Color(0xFF83B7FF)
+private val IdeMuted = Color(0xFF9AA8BA)
+private val IdeGreen = Color(0xFF7DDBB0)
+
+private enum class IdeScreen { Welcome, Setup, Projects, Workspace }
+private enum class ToolPanel { Terminal, Build, Problems, Output }
+
+private data class IdeProject(val name: String, val language: String, val path: String, val updated: String)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    val context = LocalContext.current
-                    val scope = rememberCoroutineScope()
-                    var status by remember { mutableStateOf(TermuxCommandClient.inspect(context)) }
-                    val standaloneStatus = remember(context) { StandaloneToolchain.inspect(context) }
-                    var commandApiReady by remember { mutableStateOf(false) }
-                    var connecting by remember { mutableStateOf(false) }
-                    var connectionMessage by remember {
-                        mutableStateOf("Checking Termux command access…")
+            MaterialTheme(
+                colorScheme = androidx.compose.material3.darkColorScheme(
+                    primary = IdeAccent,
+                    onPrimary = Color(0xFF071426),
+                    background = IdeBackground,
+                    surface = IdeSurface,
+                    onSurface = Color(0xFFE8EDF5),
+                    onSurfaceVariant = IdeMuted,
+                    secondary = IdeGreen
+                )
+            ) {
+                Surface(Modifier.fillMaxSize(), color = IdeBackground) {
+                    IdeUiPrototype()
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IdeUiPrototype() {
+    var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
+    var setupChoice by rememberSaveable { mutableStateOf("Download Ubuntu from Internet") }
+    var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
+    var activeFile by rememberSaveable { mutableStateOf("main.c") }
+    var code by rememberSaveable {
+        mutableStateOf("#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}")
+    }
+    var newProjectDialog by rememberSaveable { mutableStateOf(false) }
+    var newProjectName by rememberSaveable { mutableStateOf("") }
+    var showToolPanel by rememberSaveable { mutableStateOf(false) }
+    var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
+    var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
+    val projects = remember {
+        mutableStateListOf(
+            IdeProject("Hello C", "C17", "Projects/Hello-C", "Just now"),
+            IdeProject("Cpp Playground", "C++20", "Projects/Cpp-Playground", "Yesterday")
+        )
+    }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    if (screen != IdeScreen.Workspace) {
+        when (screen) {
+            IdeScreen.Welcome -> WelcomeScreen(
+                onGetStarted = { screen = IdeScreen.Setup },
+                onSettings = { screen = IdeScreen.Setup }
+            )
+            IdeScreen.Setup -> SetupScreen(
+                selected = setupChoice,
+                onSelect = { setupChoice = it },
+                onContinue = { screen = IdeScreen.Projects },
+                onBack = { screen = IdeScreen.Welcome }
+            )
+            IdeScreen.Projects -> ProjectListScreen(
+                projects = projects,
+                onOpen = { project -> selectedProject = project.name; activeFile = if (project.language == "C++20") "main.cpp" else "main.c"; screen = IdeScreen.Workspace },
+                onNew = { newProjectDialog = true },
+                onSettings = { screen = IdeScreen.Setup }
+            )
+            else -> Unit
+        }
+    } else {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = IdeSurface,
+                    drawerContentColor = Color(0xFFE8EDF5)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                        Text("C/C++ IDE", fontSize = 23.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
+                        Spacer(Modifier.height(4.dp))
+                        Text(selectedProject, color = IdeMuted, fontSize = 13.sp)
                     }
-                    var language by remember { mutableStateOf(TermuxSourceLanguage.C) }
-                    var sourcePath by remember { mutableStateOf("/sdcard/Download/main.c") }
-                    var outputPath by remember { mutableStateOf("/data/data/com.termux/files/home/cppide-main") }
-                    var workingDirectory by remember { mutableStateOf("/sdcard/Download") }
-                    var programArguments by remember { mutableStateOf("") }
-                    var running by remember { mutableStateOf(false) }
-                    var output by remember { mutableStateOf("Choose a source file accessible to Termux, then tap Compile & Run.") }
-
-                    fun connectToTermux() {
-                        status = TermuxCommandClient.inspect(context)
-                        if (!status.installed || !status.serviceResolvable || !status.permissionGranted) {
-                            commandApiReady = false
-                            connectionMessage = status.message
-                            return
-                        }
-                        connecting = true
-                        commandApiReady = false
-                        connectionMessage = "Connecting to Termux without opening its terminal UI…"
-                        scope.launch {
-                            try {
-                                TermuxCommandClient.probeCommandApi(context)
-                                commandApiReady = true
-                                connectionMessage = "Connected. Termux command execution is ready."
-                            } catch (error: Exception) {
-                                commandApiReady = false
-                                connectionMessage = "Connection failed: ${error.message ?: error.javaClass.simpleName}. Check Termux's allow-external-apps setting and RUN_COMMAND permission."
-                            } finally {
-                                connecting = false
-                                status = TermuxCommandClient.inspect(context)
-                            }
+                    Divider(color = IdeSurfaceRaised)
+                    listOf("File Explorer", "Terminal", "Build / Problems", "Project Overview", "Recent Files", "Settings", "Runtime Setup").forEach { item ->
+                        val active = drawerDestination == item
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                drawerDestination = item
+                                when (item) {
+                                    "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
+                                    "Build / Problems" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                                    "Runtime Setup" -> screen = IdeScreen.Setup
+                                }
+                                scope.launch { drawerState.close() }
+                            }.background(if (active) IdeSurfaceRaised else Color.Transparent)
+                                .padding(horizontal = 20.dp, vertical = 15.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                when (item) {
+                                    "File Explorer" -> "▤"
+                                    "Terminal" -> ">_"
+                                    "Build / Problems" -> "✓"
+                                    "Project Overview" -> "⌂"
+                                    "Recent Files" -> "◷"
+                                    "Settings" -> "⚙"
+                                    else -> "⬇"
+                                },
+                                color = if (active) IdeAccent else IdeMuted,
+                                modifier = Modifier.width(32.dp)
+                            )
+                            Text(item, color = if (active) IdeAccent else Color(0xFFE8EDF5))
                         }
                     }
-
-                    LaunchedEffect(Unit) {
-                        connectToTermux()
+                    Spacer(Modifier.weight(1f))
+                    Text("UI prototype • runtime not connected", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.padding(18.dp))
+                }
+            }
+        ) {
+            WorkspaceScreen(
+                projectName = selectedProject,
+                activeFile = activeFile,
+                code = code,
+                onCodeChange = { code = it },
+                onMenu = { scope.launch { drawerState.open() } },
+                onFile = { file -> activeFile = file; code = sampleCode(file) },
+                onAction = { action ->
+                    when (action) {
+                        "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
+                        "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                        "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                        "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                        "Save" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                        "Undo", "Redo" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                     }
+                },
+                selectedPanel = selectedPanel,
+                onPanel = { selectedPanel = it; showToolPanel = true }
+            )
+        }
+        if (showToolPanel) {
+            ModalBottomSheet(
+                onDismissRequest = { showToolPanel = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+                containerColor = IdeSurface,
+                contentWindowInsets = { WindowInsets.navigationBars }
+            ) {
+                ToolPanelContent(
+                    selected = selectedPanel,
+                    onSelect = { selectedPanel = it },
+                    onClose = { showToolPanel = false }
+                )
+            }
+        }
+    }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text("C/C++ IDE", style = MaterialTheme.typography.headlineMedium)
-                        Text("Standalone compiler runtime: ${standaloneStatus.state}")
-                        Text(standaloneStatus.message)
-                        Text("The bundled compiler runtime is not available yet, so compile/run still uses the Termux integration. You do not need to open the Termux terminal UI for each build.")
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text("Termux: ${if (status.installed) "detected" else "not detected"}")
-                                Text("RUN_COMMAND service: ${if (status.serviceResolvable) "available" else "unavailable"}")
-                                Text("Permission: ${if (status.permissionGranted) "granted" else "not granted"}")
-                                Text("Version: ${status.packageVersion ?: "unknown"}")
-                                Text("Command API: ${if (commandApiReady) "ready" else if (connecting) "connecting…" else "not ready"}")
-                                Text(connectionMessage)
-                                Button(
-                                    enabled = !running && !connecting,
-                                    onClick = { connectToTermux() }
-                                ) { Text(if (connecting) "Connecting…" else "Connect / retry") }
-                            }
-                        }
+    if (newProjectDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { newProjectDialog = false; newProjectName = "" },
+            containerColor = IdeSurface,
+            title = { Text("Create project") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = newProjectName,
+                        onValueChange = { newProjectName = it },
+                        label = { Text("Project name") },
+                        singleLine = true
+                    )
+                    Text("Choose the project type on the next setup step.", color = IdeMuted, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val name = newProjectName.trim().ifBlank { "New C Project" }
+                    projects.add(0, IdeProject(name, "C17", "Projects/$name", "Just now"))
+                    selectedProject = name
+                    activeFile = "main.c"
+                    code = sampleCode("main.c")
+                    newProjectDialog = false
+                    newProjectName = ""
+                    screen = IdeScreen.Workspace
+                }) { Text("Create") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { newProjectDialog = false; newProjectName = "" }) { Text("Cancel") }
+            }
+        )
+    }
+}
 
-                        Text("Source settings", style = MaterialTheme.typography.titleLarge)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                enabled = !running,
-                                onClick = {
-                                    language = TermuxSourceLanguage.C
-                                    if (sourcePath.endsWith(".cpp") || sourcePath.endsWith(".cc") || sourcePath.endsWith(".cxx")) {
-                                        sourcePath = sourcePath.substringBeforeLast('.') + ".c"
+@Composable
+private fun WelcomeScreen(onGetStarted: () -> Unit, onSettings: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(IdeBackground)) {
+        Column(
+            Modifier.fillMaxWidth().align(Alignment.Center).padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Box(
+                Modifier.size(104.dp).background(IdeSurfaceRaised, RoundedCornerShape(30.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("</>", color = IdeAccent, fontSize = 38.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+            Text("C/C++ IDE", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF2F6FC))
+            Text("Your coding workspace, wherever you are.", color = IdeMuted, fontSize = 15.sp)
+            Spacer(Modifier.height(8.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FeatureLine("⌘", "C17 & C++20 workspace")
+                    FeatureLine("▤", "Projects and file explorer")
+                    FeatureLine(">_", "Integrated terminal and build tools")
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Button(onClick = onGetStarted, modifier = Modifier.fillMaxWidth().height(54.dp)) {
+                Text("Get Started  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Runtime setup") }
+            Text("Designed for Android • ARMv7 / ARM64", color = IdeMuted, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun FeatureLine(icon: String, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(icon, color = IdeAccent, fontSize = 18.sp, modifier = Modifier.width(34.dp))
+        Text(label, color = Color(0xFFDDE5F0), fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue: () -> Unit, onBack: () -> Unit) {
+    Scaffold(
+        containerColor = IdeBackground,
+        topBar = { TopAppBar(title = { Text("Set up your environment") }, navigationIcon = { Text("‹", Modifier.clickable(onClick = onBack).padding(horizontal = 18.dp), fontSize = 32.sp, color = IdeAccent) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)) }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Choose how to provide a Linux root filesystem.", color = IdeMuted)
+            SetupChoiceCard(
+                title = "Download Ubuntu from Internet",
+                subtitle = "Get the app's configured Ubuntu environment.",
+                icon = "↓",
+                selected = selected == "Download Ubuntu from Internet",
+                onClick = { onSelect("Download Ubuntu from Internet") }
+            )
+            SetupChoiceCard(
+                title = "Use Downloaded Rootfs from Storage",
+                subtitle = "Import a compatible Ubuntu, Debian or other Linux rootfs archive.",
+                icon = "▣",
+                selected = selected == "Use Downloaded Rootfs from Storage",
+                onClick = { onSelect("Use Downloaded Rootfs from Storage") }
+            )
+            Card(colors = CardDefaults.cardColors(containerColor = IdeSurface), shape = RoundedCornerShape(14.dp)) {
+                Text("This is the UI-first prototype. Downloading, importing and runtime validation are not connected yet.", Modifier.padding(16.dp), color = IdeMuted, fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Continue to Projects  →") }
+            Text("Prototype navigation only — no rootfs is installed.", color = IdeMuted, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun SetupChoiceCard(title: String, subtitle: String, icon: String, selected: Boolean, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = if (selected) Color(0xFF1D3047) else IdeSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) IdeAccent else IdeSurfaceRaised),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(icon, color = IdeAccent, fontSize = 25.sp, modifier = Modifier.width(44.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(title, fontWeight = FontWeight.SemiBold, color = Color(0xFFF0F4FA))
+                Text(subtitle, color = IdeMuted, fontSize = 12.sp)
+            }
+            Text(if (selected) "●" else "○", color = IdeAccent, fontSize = 20.sp)
+        }
+    }
+}
+
+@Composable
+private fun ProjectListScreen(
+    projects: List<IdeProject>,
+    onOpen: (IdeProject) -> Unit,
+    onNew: () -> Unit,
+    onSettings: () -> Unit
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    Scaffold(
+        containerColor = IdeBackground,
+        topBar = {
+            TopAppBar(
+                title = { Column { Text("Projects", fontWeight = FontWeight.Bold); Text("Your coding workspace", color = IdeMuted, fontSize = 12.sp) } },
+                actions = { Text("⚙", Modifier.clickable(onClick = onSettings).padding(horizontal = 18.dp), fontSize = 22.sp, color = IdeMuted) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)
+            )
+        },
+        floatingActionButton = {
+            Button(onClick = onNew) { Text("+  New Project") }
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 18.dp)) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Search projects") },
+                singleLine = true
+            )
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Recent projects", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                Text("${projects.size} projects", color = IdeMuted, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(10.dp))
+            val visible = projects.filter { it.name.contains(query, ignoreCase = true) }
+            if (visible.isEmpty()) {
+                EmptyProjects(onNew = onNew)
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp)) {
+                    items(visible, key = { it.name }) { project ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onOpen(project) },
+                            colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(44.dp).background(IdeSurfaceRaised, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                                        Text(if (project.language == "C++20") "C++" else "C", color = IdeAccent, fontWeight = FontWeight.Bold)
                                     }
-                                }
-                            ) { Text(if (language == TermuxSourceLanguage.C) "✓ C17" else "C17") }
-                            Button(
-                                enabled = !running,
-                                onClick = {
-                                    language = TermuxSourceLanguage.CPP
-                                    if (sourcePath.endsWith(".c")) {
-                                        sourcePath = sourcePath.substringBeforeLast('.') + ".cpp"
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(project.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                                        Text(project.language, color = IdeAccent, fontSize = 12.sp)
                                     }
+                                    Text("›", color = IdeMuted, fontSize = 28.sp)
                                 }
-                            ) { Text(if (language == TermuxSourceLanguage.CPP) "✓ C++20" else "C++20") }
-                        }
-                        OutlinedTextField(
-                            value = sourcePath,
-                            onValueChange = { sourcePath = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Source file path") },
-                            singleLine = true,
-                            enabled = !running
-                        )
-                        OutlinedTextField(
-                            value = outputPath,
-                            onValueChange = { outputPath = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Output executable path (Termux home/usr/tmp)") },
-                            singleLine = true,
-                            enabled = !running
-                        )
-                        OutlinedTextField(
-                            value = workingDirectory,
-                            onValueChange = { workingDirectory = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Working directory") },
-                            singleLine = true,
-                            enabled = !running
-                        )
-                        OutlinedTextField(
-                            value = programArguments,
-                            onValueChange = { programArguments = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Program arguments (one argument per line)") },
-                            minLines = 2,
-                            enabled = !running
-                        )
-                        Text("Termux must be able to read the source and working directory. For shared storage, one-time storage permission setup may be required. Compiled executables stay in Termux private storage to avoid noexec mounts.")
-                        Button(
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !running && !connecting && commandApiReady,
-                            onClick = {
-                                running = true
-                                output = "Submitting compile request…"
-                                scope.launch {
-                                    output = try {
-                                        val args = programArguments.lineSequence().filter { it.isNotEmpty() }.toList()
-                                        val outcome = TermuxBuildRunner.compileAndRun(
-                                            context,
-                                            TermuxBuildRequest(
-                                                sourcePath = sourcePath.trim(),
-                                                outputPath = outputPath.trim(),
-                                                workingDirectory = workingDirectory.trim(),
-                                                language = language,
-                                                programArguments = args
-                                            )
-                                        )
-                                        buildString {
-                                            appendLine(if (outcome.compilationSucceeded) "COMPILE: PASS" else "COMPILE: FAIL")
-                                            appendLine("Exit code: ${outcome.compileResult.exitCode ?: "unknown"}")
-                                            if (outcome.compileResult.stdout.isNotBlank()) {
-                                                appendLine("Compiler output:")
-                                                appendLine(outcome.compileResult.stdout)
-                                            }
-                                            if (outcome.compileResult.stderr.isNotBlank()) {
-                                                appendLine("Compiler diagnostics:")
-                                                appendLine(outcome.compileResult.stderr)
-                                            }
-                                            val runResult = outcome.runResult
-                                            if (runResult != null) {
-                                                appendLine()
-                                                appendLine(if (outcome.executionSucceeded) "RUN: PASS" else "RUN: FAIL")
-                                                appendLine("Exit code: ${runResult.exitCode ?: "unknown"}")
-                                                if (runResult.stdout.isNotBlank()) {
-                                                    appendLine("Program output:")
-                                                    appendLine(runResult.stdout)
-                                                }
-                                                if (runResult.stderr.isNotBlank()) {
-                                                    appendLine("Program stderr:")
-                                                    appendLine(runResult.stderr)
-                                                }
-                                            } else {
-                                                appendLine()
-                                                appendLine("Program was not run because compilation did not succeed.")
-                                            }
-                                        }.trim()
-                                    } catch (error: Exception) {
-                                        "FAILED — ${error.message ?: error.javaClass.simpleName}\n\nA result timeout stops waiting; it does not guarantee the Termux process was terminated."
-                                    } finally {
-                                        running = false
-                                        status = TermuxCommandClient.inspect(context)
-                                    }
-                                }
+                                Text(project.path, color = IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Updated ${project.updated}", color = IdeMuted, fontSize = 11.sp)
                             }
-                        ) { Text(if (running) "Working…" else "Compile & Run") }
-                        Text("Result", style = MaterialTheme.typography.titleLarge)
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Text(output, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun EmptyProjects(onNew: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("▤", color = IdeAccent, fontSize = 42.sp)
+        Text("No projects found", fontWeight = FontWeight.SemiBold)
+        Text("Create a project to start coding.", color = IdeMuted)
+        Button(onClick = onNew) { Text("Create your first project") }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkspaceScreen(
+    projectName: String,
+    activeFile: String,
+    code: String,
+    onCodeChange: (String) -> Unit,
+    onMenu: () -> Unit,
+    onFile: (String) -> Unit,
+    onAction: (String) -> Unit,
+    selectedPanel: ToolPanel,
+    onPanel: (ToolPanel) -> Unit
+) {
+    var selectedTab by rememberSaveable { mutableStateOf("Editor") }
+    Scaffold(
+        containerColor = IdeBackground,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(activeFile, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(projectName, fontSize = 11.sp, color = IdeMuted)
+                    }
+                },
+                navigationIcon = { Text("☰", Modifier.clickable(onClick = onMenu).padding(horizontal = 16.dp), color = IdeAccent, fontSize = 23.sp) },
+                actions = {
+                    Text("↶", Modifier.clickable { onAction("Undo") }.padding(horizontal = 7.dp), fontSize = 23.sp, color = IdeMuted)
+                    Text("↷", Modifier.clickable { onAction("Redo") }.padding(horizontal = 7.dp), fontSize = 23.sp, color = IdeMuted)
+                    Text("▣", Modifier.clickable { onAction("Save") }.padding(horizontal = 7.dp), fontSize = 20.sp, color = IdeAccent)
+                    Text("▶", Modifier.clickable { onAction("Build") }.padding(horizontal = 7.dp), fontSize = 18.sp, color = IdeGreen)
+                    Text("▷", Modifier.clickable { onAction("Run") }.padding(horizontal = 12.dp), fontSize = 20.sp, color = IdeGreen)
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeSurface)
+            )
+        },
+        bottomBar = {
+            Column(Modifier.fillMaxWidth().background(IdeSurface)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
+                    BottomToolButton("Terminal", ">_", selectedPanel == ToolPanel.Terminal) { onPanel(ToolPanel.Terminal) }
+                    BottomToolButton("Build", "▤", selectedPanel == ToolPanel.Build) { onPanel(ToolPanel.Build) }
+                    BottomToolButton("Problems", "!", selectedPanel == ToolPanel.Problems) { onPanel(ToolPanel.Problems) }
+                    BottomToolButton("Output", "≋", selectedPanel == ToolPanel.Output) { onPanel(ToolPanel.Output) }
+                }
+                Row(Modifier.fillMaxWidth().background(Color(0xFF0C1016)).padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("● UI PREVIEW", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    Text("C17  •  UTF-8  •  Ln 1, Col 1", color = IdeMuted, fontSize = 10.sp)
+                }
+            }
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Row(Modifier.fillMaxWidth().background(Color(0xFF151A22)).padding(start = 10.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FileTab("main.c", activeFile == "main.c") { onFile("main.c") }
+                FileTab("main.cpp", activeFile == "main.cpp") { onFile("main.cpp") }
+                Spacer(Modifier.weight(1f))
+                Text("＋", Modifier.clickable { onFile(if (activeFile == "main.c") "utils.h" else "main.c") }.padding(8.dp), color = IdeAccent, fontSize = 19.sp)
+            }
+            Row(Modifier.fillMaxWidth().background(Color(0xFF10151C)).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Projects", color = IdeMuted, fontSize = 11.sp)
+                Text("  /  $projectName  /  $activeFile", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                Column(Modifier.width(38.dp).fillMaxSize().background(Color(0xFF141922)).padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("1", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("2", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("3", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("4", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("5", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("6", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("7", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                }
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = onCodeChange,
+                    modifier = Modifier.fillMaxSize(),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp, color = Color(0xFFD9E4F4)),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = IdeBackground,
+                        unfocusedContainerColor = IdeBackground,
+                        cursorColor = IdeAccent
+                    )
+                )
+            }
+            if (selectedTab == "Explorer") {
+                Text("Explorer selected", color = IdeMuted, modifier = Modifier.padding(12.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp)) {
+        Text(name, color = if (selected) IdeAccent else IdeMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(5.dp))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
+    }
+}
+
+@Composable
+private fun BottomToolButton(label: String, icon: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.clickable(onClick = onClick).background(if (selected) IdeSurfaceRaised else Color.Transparent, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(icon, color = if (selected) IdeAccent else IdeMuted, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = if (selected) IdeAccent else IdeMuted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit, onClose: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 26.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                when (selected) {
+                    ToolPanel.Terminal -> "Terminal"
+                    ToolPanel.Build -> "Build"
+                    ToolPanel.Problems -> "Problems"
+                    ToolPanel.Output -> "Output"
+                },
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolPanel.entries.forEach { panel ->
+                val label = when (panel) {
+                    ToolPanel.Terminal -> "Terminal"
+                    ToolPanel.Build -> "Build"
+                    ToolPanel.Problems -> "Problems"
+                    ToolPanel.Output -> "Output"
+                }
+                if (panel == selected) Button(onClick = { onSelect(panel) }) { Text(label) }
+                else OutlinedButton(onClick = { onSelect(panel) }) { Text(label) }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Box(Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF0B0F14), RoundedCornerShape(12.dp)).padding(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                when (selected) {
+                    ToolPanel.Terminal -> {
+                        Text("C/C++ IDE terminal", color = IdeGreen, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("Runtime is not connected yet.", color = Color(0xFFD9E4F4), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("This panel is UI-only; no shell process has been started.", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        Text("›  Waiting for runtime integration", color = IdeAccent, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                    ToolPanel.Build -> {
+                        Text("BUILD", color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Build UI preview", color = Color(0xFFD9E4F4), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("Compiler process is not connected yet.", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    }
+                    ToolPanel.Problems -> {
+                        Text("No diagnostics to display", color = IdeGreen, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("Problem reporting will be connected with the compiler/LSP later.", color = IdeMuted, fontSize = 11.sp)
+                    }
+                    ToolPanel.Output -> {
+                        Text("OUTPUT", color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("No program output yet.", color = Color(0xFFD9E4F4), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun sampleCode(file: String): String = when {
+    file.endsWith(".cpp") -> "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, C++20!\\n\";\n    return 0;\n}"
+    file.endsWith(".h") -> "#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet(void);\n\n#endif"
+    else -> "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}"
 }
