@@ -109,6 +109,9 @@ private fun IdeUiPrototype() {
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     var showExplorer by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var editorFontSize by rememberSaveable { mutableStateOf(13f) }
+    var editorWordWrap by rememberSaveable { mutableStateOf(false) }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember {
@@ -164,6 +167,7 @@ private fun IdeUiPrototype() {
                                     "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                     "Build / Problems" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                     "Runtime Setup" -> screen = IdeScreen.Setup
+                                    "Settings" -> showSettings = true
                                 }
                                 scope.launch { drawerState.close() }
                             }.background(if (active) IdeSurfaceRaised else Color.Transparent)
@@ -197,6 +201,8 @@ private fun IdeUiPrototype() {
                 code = code,
                 onCodeChange = { code = it },
                 editorController = editorController,
+                editorFontSize = editorFontSize,
+                editorWordWrap = editorWordWrap,
                 onMenu = { scope.launch { drawerState.open() } },
                 onExplorer = { showExplorer = true },
                 onFile = { file -> activeFile = file; code = sampleCode(file) },
@@ -213,6 +219,31 @@ private fun IdeUiPrototype() {
                 },
                 selectedPanel = selectedPanel,
                 onPanel = { selectedPanel = it; showToolPanel = true }
+            )
+        }
+        if (showSettings) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showSettings = false },
+                containerColor = IdeSurface,
+                title = { Text("Editor Settings", color = Color(0xFFE8EDF5)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("Font size: ${editorFontSize.toInt()} sp", color = IdeMuted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { editorFontSize = (editorFontSize - 1f).coerceAtLeast(10f) }) { Text("A−") }
+                            OutlinedButton(onClick = { editorFontSize = (editorFontSize + 1f).coerceAtMost(24f) }) { Text("A+") }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Word wrap", color = Color(0xFFE8EDF5))
+                                Text("Wrap long source lines", color = IdeMuted, fontSize = 12.sp)
+                            }
+                            androidx.compose.material3.Switch(checked = editorWordWrap, onCheckedChange = { editorWordWrap = it })
+                        }
+                        Text("Language: C / C++ • Editor: Sora", color = IdeMuted, fontSize = 12.sp)
+                    }
+                },
+                confirmButton = { Button(onClick = { showSettings = false }) { Text("Done") } }
             )
         }
         if (showExplorer) {
@@ -512,6 +543,8 @@ private fun WorkspaceScreen(
     code: String,
     onCodeChange: (String) -> Unit,
     editorController: SoraEditorController,
+    editorFontSize: Float,
+    editorWordWrap: Boolean,
     onMenu: () -> Unit,
     onExplorer: () -> Unit,
     onFile: (String) -> Unit,
@@ -599,7 +632,9 @@ private fun WorkspaceScreen(
                     code = code,
                     onCodeChange = onCodeChange,
                     modifier = Modifier.fillMaxSize(),
-                    controller = editorController
+                    controller = editorController,
+                    fontSize = editorFontSize,
+                    wordWrap = editorWordWrap
                 )
             }
         }
