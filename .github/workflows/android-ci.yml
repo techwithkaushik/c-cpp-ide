@@ -1,8 +1,8 @@
 name: Android Release Build
 
 on:
-  pull_request:
-    branches: [main]
+  # Run once per pushed commit. Avoid duplicate push + pull_request builds
+  # for the same branch; PRs still display the commit's push check.
   push:
     branches: [main, architecture/termux-integration]
   workflow_dispatch:
@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-release-${{ github.workflow }}-${{ github.ref }}
+  # A branch push and any manual run on that branch share one active build.
+  group: android-release-${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
