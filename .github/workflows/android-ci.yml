@@ -34,20 +34,29 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Restore repository debug keystore
-        id: debug-key
+      - name: Restore signing keystore from GitHub Secrets
+        id: keystore
         shell: bash
+        env:
+          SIGNING_KEY_STORE_B64: ${{ secrets.SIGNING_KEY_STORE }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.android"
-          if base64 --decode ci/debug-keystore.b64 > "$HOME/.android/debug.keystore" 2>/dev/null \
-             && keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null 2>&1; then
-            chmod 600 "$HOME/.android/debug.keystore"
-            echo "Reusable repository debug keystore restored and validated."
-          else
-            rm -f "$HOME/.android/debug.keystore"
-            echo "::warning::Repository debug keystore is invalid; using a temporary runner debug key for this CI build. Fix ci/debug-keystore.b64 to enable stable signatures."
+          key_path="$RUNNER_TEMP/cpp-ide-signing.jks"
+          if [[ -z "${SIGNING_KEY_STORE_B64:-}" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "filePath=" >> "$GITHUB_OUTPUT"
+            echo "::warning::SIGNING_KEY_STORE secret is not configured; release signing will be skipped."
+            exit 0
           fi
+          printf '%s' "$SIGNING_KEY_STORE_B64" | base64 --decode > "$key_path"
+          chmod 600 "$key_path"
+          if [[ ! -s "$key_path" ]]; then
+            echo "::error::Decoded signing keystore is empty."
+            exit 1
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "filePath=$key_path" >> "$GITHUB_OUTPUT"
+          echo "Signing keystore restored from GitHub Secrets."
 
       - name: Validate bootstrap archive tooling
         run: |
@@ -62,7 +71,30 @@ jobs:
         run: gradle --no-daemon :integrations:termux:testDebugUnitTest :integrations:toolchain:testDebugUnitTest
 
       - name: Assemble debug APK
+        env:
+          SIGN_KEY_STORE: ${{ steps.keystore.outputs.filePath }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: gradle --no-daemon :app:assembleDebug
+
+      - name: Assemble signed release APK
+        if: steps.keystore.outputs.configured == 'true'
+        env:
+          SIGN_KEY_STORE: ${{ steps.keystore.outputs.filePath }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Upload signed release APK
+        if: steps.keystore.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-ide-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload debug APK for device testing
         uses: actions/upload-artifact@v4
