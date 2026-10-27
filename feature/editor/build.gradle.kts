@@ -23,7 +23,7 @@ kotlin {
 }
 
 dependencies {
-    implementation("io.github.rosemoe:editor:0.24.7")
+    implementation("io.github.rosemoe:editor:0.24.4")
     implementation(project(":core:designsystem"))
     implementation(project(":core:lsp"))
     implementation(platform(libs.androidx.compose.bom))
