@@ -26,6 +26,13 @@ class BootstrapManifestTest {
     }
 
     @Test
+    fun rejectsPathTraversalAndUnsafeRuntimeVersions() {
+        assertNotNull(BootstrapManifest(1, "../outside", listOf(artifact())).validate())
+        assertNotNull(BootstrapManifest(1, "nested/version", listOf(artifact())).validate())
+        assertNotNull(BootstrapManifest(1, "..", listOf(artifact(version = ".."))).validate())
+    }
+
+    @Test
     fun rejectsUnsupportedSchema() {
         assertNotNull(BootstrapManifest(2, "0.1.0", listOf(artifact())).validate())
     }
