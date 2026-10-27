@@ -106,6 +106,7 @@ private fun IdeUiPrototype() {
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
+    var showExplorer by rememberSaveable { mutableStateOf(false) }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember {
@@ -156,6 +157,7 @@ private fun IdeUiPrototype() {
                             Modifier.fillMaxWidth().clickable {
                                 drawerDestination = item
                                 when (item) {
+                                    "File Explorer" -> showExplorer = true
                                     "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                     "Build / Problems" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                     "Runtime Setup" -> screen = IdeScreen.Setup
@@ -192,6 +194,7 @@ private fun IdeUiPrototype() {
                 code = code,
                 onCodeChange = { code = it },
                 onMenu = { scope.launch { drawerState.open() } },
+                onExplorer = { showExplorer = true },
                 onFile = { file -> activeFile = file; code = sampleCode(file) },
                 onAction = { action ->
                     when (action) {
@@ -206,6 +209,25 @@ private fun IdeUiPrototype() {
                 selectedPanel = selectedPanel,
                 onPanel = { selectedPanel = it; showToolPanel = true }
             )
+        }
+        if (showExplorer) {
+            ModalBottomSheet(
+                onDismissRequest = { showExplorer = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+                containerColor = IdeSurface,
+                contentWindowInsets = { WindowInsets.navigationBars }
+            ) {
+                FileExplorerSheet(
+                    projectName = selectedProject,
+                    activeFile = activeFile,
+                    onOpenFile = { file ->
+                        activeFile = file
+                        code = sampleCode(file)
+                        showExplorer = false
+                    },
+                    onClose = { showExplorer = false }
+                )
+            }
         }
         if (showToolPanel) {
             ModalBottomSheet(
@@ -485,12 +507,12 @@ private fun WorkspaceScreen(
     code: String,
     onCodeChange: (String) -> Unit,
     onMenu: () -> Unit,
+    onExplorer: () -> Unit,
     onFile: (String) -> Unit,
     onAction: (String) -> Unit,
     selectedPanel: ToolPanel,
     onPanel: (ToolPanel) -> Unit
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf("Editor") }
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
@@ -503,6 +525,7 @@ private fun WorkspaceScreen(
                 },
                 navigationIcon = { Text("☰", Modifier.clickable(onClick = onMenu).padding(horizontal = 16.dp), color = IdeAccent, fontSize = 23.sp) },
                 actions = {
+                    Text("▤", Modifier.clickable(onClick = onExplorer).padding(horizontal = 7.dp), fontSize = 20.sp, color = IdeAccent)
                     Text("↶", Modifier.clickable { onAction("Undo") }.padding(horizontal = 7.dp), fontSize = 23.sp, color = IdeMuted)
                     Text("↷", Modifier.clickable { onAction("Redo") }.padding(horizontal = 7.dp), fontSize = 23.sp, color = IdeMuted)
                     Text("▣", Modifier.clickable { onAction("Save") }.padding(horizontal = 7.dp), fontSize = 20.sp, color = IdeAccent)
@@ -540,14 +563,19 @@ private fun WorkspaceScreen(
                 Text("  /  $projectName  /  $activeFile", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(Modifier.weight(1f).fillMaxWidth()) {
-                Column(Modifier.width(38.dp).fillMaxSize().background(Color(0xFF141922)).padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("1", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                    Text("2", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                    Text("3", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                    Text("4", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                    Text("5", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                    Text("6", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                    Text("7", color = IdeMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Column(
+                    Modifier.width(42.dp).fillMaxSize().background(Color(0xFF141922)).padding(top = 15.dp, end = 8.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    repeat(maxOf(code.lines().size, 12)) { index ->
+                        Text(
+                            (index + 1).toString(),
+                            color = if (index == 0) IdeAccent else IdeMuted,
+                            fontSize = 12.sp,
+                            lineHeight = 21.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = code,
@@ -563,9 +591,6 @@ private fun WorkspaceScreen(
                         cursorColor = IdeAccent
                     )
                 )
-            }
-            if (selectedTab == "Explorer") {
-                Text("Explorer selected", color = IdeMuted, modifier = Modifier.padding(12.dp))
             }
         }
     }
