@@ -24,6 +24,27 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        create("release") {
+            val signingStore = System.getenv("SIGN_KEY_STORE")
+            val signingAlias = System.getenv("SIGNING_KEY_ALIAS")
+            val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            val signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
+            if (!signingStore.isNullOrBlank()) {
+                storeFile = file(signingStore)
+                keyAlias = signingAlias
+                keyPassword = signingKeyPassword
+                storePassword = signingStorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     buildFeatures { compose = true }
 }
 
