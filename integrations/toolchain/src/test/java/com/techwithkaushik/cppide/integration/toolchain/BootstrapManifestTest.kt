@@ -62,3 +62,47 @@ class BootstrapManifestTest {
         assertEquals(null, manifest.artifactFor("armeabi-v7a"))
     }
 }
+
+
+class BootstrapArtifactValidationTest {
+    private fun artifact(
+        abi: String = "armeabi-v7a",
+        url: String = "https://downloads.example.invalid/runtime.zip",
+        sha256: String = "a".repeat(64),
+        compressedSize: Long = 1024,
+        expandedSize: Long = 4096
+    ) = BootstrapArtifact(
+        version = "0.1.0",
+        abi = abi,
+        downloadUrl = url,
+        sha256 = sha256,
+        compressedSizeBytes = compressedSize,
+        maximumExpandedBytes = expandedSize
+    )
+
+    @Test
+    fun acceptsValidArtifact() {
+        assertNull(artifact().validate())
+    }
+
+    @Test
+    fun rejectsNonHttpsAndCredentialedUrls() {
+        assertNotNull(artifact(url = "http://downloads.example.invalid/runtime.zip").validate())
+        assertNotNull(artifact(url = "https://user:pass@downloads.example.invalid/runtime.zip").validate())
+        assertNotNull(artifact(url = "https:///runtime.zip").validate())
+    }
+
+    @Test
+    fun rejectsUnsupportedAbiAndInvalidDigest() {
+        assertNotNull(artifact(abi = "mips").validate())
+        assertNotNull(artifact(sha256 = "not-a-digest").validate())
+    }
+
+    @Test
+    fun rejectsInvalidCompressedAndExpandedSizes() {
+        assertNotNull(artifact(compressedSize = 0).validate())
+        assertNotNull(artifact(compressedSize = BootstrapArtifact.MAX_COMPRESSED_BYTES + 1).validate())
+        assertNotNull(artifact(expandedSize = 0).validate())
+        assertNotNull(artifact(expandedSize = BootstrapArtifact.MAX_EXPANDED_BYTES + 1).validate())
+    }
+}
