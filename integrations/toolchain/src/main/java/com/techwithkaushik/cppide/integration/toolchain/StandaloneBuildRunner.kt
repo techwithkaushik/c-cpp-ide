@@ -14,6 +14,12 @@ class StandaloneBuildRunner(
 ) {
     enum class Language { C17, CPP20 }
 
+    companion object {
+        private const val MAX_ARGUMENTS = 128
+        private const val MAX_ARGUMENT_LENGTH = 8_192
+        private const val MAX_TOTAL_ARGUMENT_CHARS = 64 * 1024
+    }
+
     data class Result(
         val compileExitCode: Int?,
         val runExitCode: Int?,
@@ -37,13 +43,21 @@ class StandaloneBuildRunner(
         if (!status.ready || status.root == null || status.clang == null || status.clangxx == null) {
             return Result(null, null, "", "", error = "Standalone compiler runtime is not ready.")
         }
+        if (timeoutSeconds !in 1..120) {
+            return Result(null, null, "", "", error = "Timeout must be between 1 and 120 seconds.")
+        }
+        if (arguments.size > MAX_ARGUMENTS ||
+            arguments.any { '\u0000' in it || it.length > MAX_ARGUMENT_LENGTH } ||
+            arguments.sumOf { it.length.toLong() } > MAX_TOTAL_ARGUMENT_CHARS) {
+            return Result(null, null, "", "", error = "Program arguments exceed the allowed limits.")
+        }
         if (!source.isFile || !source.canRead()) {
             return Result(null, null, "", "", error = "Source file does not exist or cannot be read.")
         }
         if (!workingDirectory.isDirectory || !workingDirectory.canRead()) {
             return Result(null, null, "", "", error = "Working directory does not exist or cannot be read.")
         }
-        if (executable.absoluteFile == source.absoluteFile) {
+        if (executable.canonicalFile == source.canonicalFile) {
             return Result(null, null, "", "", error = "Output executable must not overwrite the source file.")
         }
         val outputParent = executable.absoluteFile.parentFile
