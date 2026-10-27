@@ -524,54 +524,77 @@ private fun WorkspaceScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(activeFile, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Text(projectName, fontSize = 11.sp, color = IdeMuted)
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(activeFile, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text(projectName, fontSize = 11.sp, color = IdeMuted, maxLines = 1)
                     }
                 },
-                navigationIcon = { Text("☰", Modifier.clickable(onClick = onMenu).padding(horizontal = 16.dp), color = IdeAccent, fontSize = 23.sp) },
+                navigationIcon = {
+                    Text("☰", Modifier.clickable(onClick = onMenu).padding(horizontal = 14.dp), color = IdeAccent, fontSize = 23.sp)
+                },
                 actions = {
-                    Text("▤", Modifier.clickable(onClick = onExplorer).padding(horizontal = 7.dp), fontSize = 20.sp, color = IdeAccent)
-                    Text("↶", Modifier.clickable { onAction("Undo") }.padding(horizontal = 7.dp), fontSize = 23.sp, color = IdeMuted)
-                    Text("↷", Modifier.clickable { onAction("Redo") }.padding(horizontal = 7.dp), fontSize = 23.sp, color = IdeMuted)
-                    Text("▣", Modifier.clickable { onAction("Save") }.padding(horizontal = 7.dp), fontSize = 20.sp, color = IdeAccent)
-                    Text("▶", Modifier.clickable { onAction("Build") }.padding(horizontal = 7.dp), fontSize = 18.sp, color = IdeGreen)
-                    Text("▷", Modifier.clickable { onAction("Run") }.padding(horizontal = 12.dp), fontSize = 20.sp, color = IdeGreen)
+                    Text("▤", Modifier.clickable(onClick = onExplorer).padding(horizontal = 6.dp), fontSize = 20.sp, color = IdeAccent)
+                    Text("↶", Modifier.clickable { onAction("Undo") }.padding(horizontal = 6.dp), fontSize = 22.sp, color = IdeMuted)
+                    Text("↷", Modifier.clickable { onAction("Redo") }.padding(horizontal = 6.dp), fontSize = 22.sp, color = IdeMuted)
+                    Text("▣", Modifier.clickable { onAction("Save") }.padding(horizontal = 6.dp), fontSize = 18.sp, color = IdeAccent)
+                    Text("▶", Modifier.clickable { onAction("Build") }.padding(horizontal = 6.dp), fontSize = 17.sp, color = IdeGreen)
+                    Text("▷", Modifier.clickable { onAction("Run") }.padding(start = 6.dp, end = 12.dp), fontSize = 19.sp, color = IdeGreen)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeSurface)
             )
         },
         bottomBar = {
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     BottomToolButton("Terminal", ">_", selectedPanel == ToolPanel.Terminal) { onPanel(ToolPanel.Terminal) }
                     BottomToolButton("Build", "▤", selectedPanel == ToolPanel.Build) { onPanel(ToolPanel.Build) }
                     BottomToolButton("Problems", "!", selectedPanel == ToolPanel.Problems) { onPanel(ToolPanel.Problems) }
                     BottomToolButton("Output", "≋", selectedPanel == ToolPanel.Output) { onPanel(ToolPanel.Output) }
                 }
-                Row(Modifier.fillMaxWidth().background(Color(0xFF0C1016)).padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("● UI PREVIEW", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    Modifier.fillMaxWidth().background(Color(0xFF0C1016)).padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("● READY", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
-                    Text(if (activeFile.endsWith(".cpp")) "C++20  •  UTF-8  •  Ln 1, Col 1" else "C17  •  UTF-8  •  Ln 1, Col 1", color = IdeMuted, fontSize = 10.sp)
+                    Text(
+                        if (activeFile.endsWith(".cpp")) "C++20 • UTF-8 • Ln 1, Col 1" else "C17 • UTF-8 • Ln 1, Col 1",
+                        color = IdeMuted, fontSize = 10.sp
+                    )
                 }
             }
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            Row(Modifier.fillMaxWidth().background(Color(0xFF151A22)).padding(start = 10.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                FileTab("main.c", activeFile == "main.c") { onFile("main.c") }
-                FileTab("main.cpp", activeFile == "main.cpp") { onFile("main.cpp") }
-                if (activeFile == "utils.h") {
-                    FileTab("utils.h", selected = true) { onFile("utils.h") }
-                }
+        Column(
+            Modifier.fillMaxSize().padding(padding).background(IdeBackground)
+        ) {
+            // Compact AndroidIDE-style open-file strip: never let a tab consume the full row width.
+            Row(
+                Modifier.fillMaxWidth().height(42.dp).background(Color(0xFF151A22)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FileTab(activeFile, selected = true) { onFile(activeFile) }
                 Spacer(Modifier.weight(1f))
-                Text("＋", Modifier.clickable { onFile(if (activeFile == "main.c") "utils.h" else "main.c") }.padding(8.dp), color = IdeAccent, fontSize = 19.sp)
+                Text(
+                    "＋",
+                    Modifier.clickable { onFile(if (activeFile == "main.c") "utils.h" else "main.c") }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    color = IdeAccent, fontSize = 20.sp
+                )
             }
-            Row(Modifier.fillMaxWidth().background(Color(0xFF10151C)).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().height(30.dp).background(Color(0xFF10151C)).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("Projects", color = IdeMuted, fontSize = 11.sp)
-                Text("  /  $projectName  /  $activeFile", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("  ›  $projectName  ›  $activeFile", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Row(Modifier.weight(1f).fillMaxWidth()) {
+            // The editor owns all remaining vertical space, like AndroidIDE's workspace.
+            Box(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0F1218))) {
                 SoraCodeEditor(
                     code = code,
                     onCodeChange = onCodeChange,
