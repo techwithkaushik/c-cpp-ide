@@ -1013,13 +1013,13 @@ private fun FileExplorerSheet(
             singleLine = true,
             label = { Text("Find a file") },
             leadingIcon = { IdeIcon("search", IdeAccent, 20.dp) },
-            trailingIcon = { if (query.isNotEmpty()) Text("×", Modifier.clickable { query = "" }.padding(8.dp), color = IdeMuted) }
+            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { IdeIcon("close", IdeMuted, 15.dp) } }
         )
         Row(
             Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("▾", color = IdeAccent, modifier = Modifier.padding(end = 10.dp))
+            IdeIcon("folder", IdeAccent, 19.dp, Modifier.padding(end = 10.dp))
             Column(Modifier.weight(1f)) {
                 Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("PROJECT ROOT  •  ${visibleFiles.size} matching files", color = IdeMuted, fontSize = 10.sp)
@@ -1028,7 +1028,7 @@ private fun FileExplorerSheet(
         }
         if (query.isBlank() || visibleFiles.any { it.third == "src" }) {
             Row(Modifier.fillMaxWidth().clickable { srcExpanded = !srcExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (srcExpanded || query.isNotBlank()) "▾" else "▸", color = IdeAccent, modifier = Modifier.width(24.dp))
+                IdeIcon(if (srcExpanded || query.isNotBlank()) "chevronDown" else "chevronRight", IdeAccent, 15.dp, Modifier.width(24.dp))
                 Text("src", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(8.dp))
                 Text("2 files", color = IdeMuted, fontSize = 10.sp)
@@ -1039,7 +1039,7 @@ private fun FileExplorerSheet(
         }
         if (query.isBlank() || visibleFiles.any { it.third == "include" }) {
             Row(Modifier.fillMaxWidth().clickable { includeExpanded = !includeExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (includeExpanded || query.isNotBlank()) "▾" else "▸", color = IdeAccent, modifier = Modifier.width(24.dp))
+                IdeIcon(if (includeExpanded || query.isNotBlank()) "chevronDown" else "chevronRight", IdeAccent, 15.dp, Modifier.width(24.dp))
                 Text("include", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(8.dp))
                 Text("1 file", color = IdeMuted, fontSize = 10.sp)
@@ -1077,7 +1077,7 @@ private fun ExplorerFileRow(
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(if (name.endsWith(".h")) "◇" else "‹›", color = IdeAccent, fontSize = 16.sp, modifier = Modifier.width(30.dp))
+        IdeIcon(if (name.endsWith(".h")) "header" else if (name.endsWith(".cpp")) "cpp" else "code", IdeAccent, 18.dp, Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
             Text(name, color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 13.sp)
             Text(description, color = IdeMuted, fontSize = 10.sp)
@@ -1101,10 +1101,10 @@ private fun FileTab(name: String, selected: Boolean, dirty: Boolean, onClick: ()
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(if (name.endsWith(".cpp") || name.endsWith(".hpp")) "C++" else "C", color = fileAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            IdeIcon(if (name.endsWith(".cpp") || name.endsWith(".hpp")) "cpp" else "code", fileAccent, 14.dp)
             Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (dirty) Text("●", color = Color(0xFFE5B978), fontSize = 9.sp)
-            Text("×", Modifier.clickable(onClick = onClose).padding(start = 4.dp), color = IdeMuted, fontSize = 14.sp)
+            IdeIcon("close", IdeMuted, 13.dp, Modifier.clickable(onClick = onClose).padding(start = 4.dp))
         }
         Spacer(Modifier.height(7.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
