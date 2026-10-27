@@ -78,6 +78,43 @@ class StandaloneBuildRunnerTest {
         }
     }
 
+
+    @Test
+    fun rejectsArgumentsContainingNul() {
+        val root = Files.createTempDirectory("standalone-runner-nul-arg").toFile()
+        try {
+            val status = readyStatus(root)
+            val source = File(root, "main.c").apply { writeText("int main(void) { return 0; }") }
+            val result = StandaloneBuildRunner().compileAndRun(
+                status, source, File(root, "main"), root,
+                StandaloneBuildRunner.Language.C17, listOf("bad\\u0000arg")
+            )
+
+            assertEquals("Program arguments exceed the allowed limits.", result.error)
+            assertFalse(File(root, "main").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsInvalidTimeoutBeforeLaunchingCompiler() {
+        val root = Files.createTempDirectory("standalone-runner-timeout").toFile()
+        try {
+            val status = readyStatus(root)
+            val source = File(root, "main.c").apply { writeText("int main(void) { return 0; }") }
+            val result = StandaloneBuildRunner(0).compileAndRun(
+                status, source, File(root, "main"), root,
+                StandaloneBuildRunner.Language.C17
+            )
+
+            assertEquals("Timeout must be between 1 and 120 seconds.", result.error)
+            assertFalse(File(root, "main").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun readyStatus(root: File): StandaloneToolchain.Status {
         val bin = File(root, "bin").apply { mkdirs() }
         val lib = File(root, "lib").apply { mkdirs() }
