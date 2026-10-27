@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide
 
 import android.os.Bundle
+import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -563,33 +564,10 @@ private fun WorkspaceScreen(
                 Text("  /  $projectName  /  $activeFile", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(Modifier.weight(1f).fillMaxWidth()) {
-                Column(
-                    Modifier.width(42.dp).fillMaxSize().background(Color(0xFF141922)).padding(top = 15.dp, end = 8.dp),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    repeat(maxOf(code.lines().size, 12)) { index ->
-                        Text(
-                            (index + 1).toString(),
-                            color = if (index == 0) IdeAccent else IdeMuted,
-                            fontSize = 12.sp,
-                            lineHeight = 21.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = onCodeChange,
-                    modifier = Modifier.fillMaxSize(),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 21.sp, color = Color(0xFFD9E4F4)),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = IdeBackground,
-                        unfocusedContainerColor = IdeBackground,
-                        cursorColor = IdeAccent
-                    )
+                SoraCodeEditor(
+                    code = code,
+                    onCodeChange = onCodeChange,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
