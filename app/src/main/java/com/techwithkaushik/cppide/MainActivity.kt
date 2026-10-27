@@ -112,6 +112,14 @@ private fun IdeUiPrototype() {
     val openFiles = remember { mutableStateListOf("main.c") }
     val dirtyFiles = remember { mutableStateListOf<String>() }
     val fileContents = remember { mutableStateMapOf("main.c" to code) }
+    }
+    var newProjectDialog by rememberSaveable { mutableStateOf(false) }
+    var newProjectName by rememberSaveable { mutableStateOf("") }
+    var showToolPanel by rememberSaveable { mutableStateOf(false) }
+    var showExplorer by rememberSaveable { mutableStateOf(false) }
+    var showProjectOverview by rememberSaveable { mutableStateOf(false) }
+    var showRecentFiles by rememberSaveable { mutableStateOf(false) }
+    var recentFiles = remember { mutableStateListOf<String>() }
     fun openFile(file: String) {
         if (!openFiles.contains(file)) openFiles.add(file)
         activeFile = file
@@ -128,14 +136,7 @@ private fun IdeUiPrototype() {
             activeFile = next
             code = fileContents[next] ?: sampleCode(next).also { fileContents[next] = it }
         }
-    }
-    var newProjectDialog by rememberSaveable { mutableStateOf(false) }
-    var newProjectName by rememberSaveable { mutableStateOf("") }
-    var showToolPanel by rememberSaveable { mutableStateOf(false) }
-    var showExplorer by rememberSaveable { mutableStateOf(false) }
-    var showProjectOverview by rememberSaveable { mutableStateOf(false) }
-    var showRecentFiles by rememberSaveable { mutableStateOf(false) }
-    var recentFiles = remember { mutableStateListOf<String>() }
+
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var editorFontSize by rememberSaveable { mutableStateOf(13f) }
     var editorWordWrap by rememberSaveable { mutableStateOf(false) }
@@ -164,7 +165,7 @@ private fun IdeUiPrototype() {
             )
             IdeScreen.Projects -> ProjectListScreen(
                 projects = projects,
-                onOpen = { project -> selectedProject = project.name; activeFile = if (project.language == "C++20") "main.cpp" else "main.c"; screen = IdeScreen.Workspace },
+                onOpen = { project -> selectedProject = project.name; openFile(if (project.language == "C++20") "main.cpp" else "main.c"); screen = IdeScreen.Workspace },
                 onNew = { newProjectDialog = true },
                 onSettings = { screen = IdeScreen.Setup }
             )
