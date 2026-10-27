@@ -597,6 +597,69 @@ private fun WorkspaceScreen(
 }
 
 @Composable
+private fun FileExplorerSheet(
+    projectName: String,
+    activeFile: String,
+    onOpenFile: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("File Explorer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(projectName, color = IdeMuted, fontSize = 12.sp)
+            }
+            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("▾", color = IdeAccent, modifier = Modifier.padding(end = 10.dp))
+            Column {
+                Text(projectName, fontWeight = FontWeight.SemiBold)
+                Text("Project root", color = IdeMuted, fontSize = 11.sp)
+            }
+        }
+        Text("▾  src", color = IdeMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
+        ExplorerFileRow("main.c", "C source file", activeFile == "main.c", 32.dp) { onOpenFile("main.c") }
+        ExplorerFileRow("main.cpp", "C++ source file", activeFile == "main.cpp", 32.dp) { onOpenFile("main.cpp") }
+        Text("▾  include", color = IdeMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
+        ExplorerFileRow("utils.h", "C/C++ header", activeFile == "utils.h", 32.dp) { onOpenFile("utils.h") }
+        Text("UI preview • sample files only", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+@Composable
+private fun ExplorerFileRow(
+    name: String,
+    description: String,
+    selected: Boolean,
+    indent: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .padding(start = indent)
+            .background(if (selected) Color(0xFF1D3047) else Color.Transparent, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(if (name.endsWith(".h")) "◇" else "‹›", color = IdeAccent, fontSize = 16.sp, modifier = Modifier.width(30.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 13.sp)
+            Text(description, color = IdeMuted, fontSize = 10.sp)
+        }
+        if (selected) Text("●", color = IdeAccent, fontSize = 10.sp)
+    }
+}
+
+@Composable
 private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
     Column(Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp)) {
         Text(name, color = if (selected) IdeAccent else IdeMuted, fontSize = 12.sp)
