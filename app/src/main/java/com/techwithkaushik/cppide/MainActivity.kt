@@ -110,6 +110,9 @@ private fun IdeUiPrototype() {
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     var showExplorer by rememberSaveable { mutableStateOf(false) }
+    var showProjectOverview by rememberSaveable { mutableStateOf(false) }
+    var showRecentFiles by rememberSaveable { mutableStateOf(false) }
+    var recentFiles = remember { mutableStateListOf<String>() }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var editorFontSize by rememberSaveable { mutableStateOf(13f) }
     var editorWordWrap by rememberSaveable { mutableStateOf(false) }
@@ -165,6 +168,8 @@ private fun IdeUiPrototype() {
                                 drawerDestination = item
                                 when (item) {
                                     "File Explorer" -> showExplorer = true
+                                    "Project Overview" -> showProjectOverview = true
+                                    "Recent Files" -> showRecentFiles = true
                                     "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                     "Build / Problems" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                     "Runtime Setup" -> screen = IdeScreen.Setup
@@ -206,7 +211,12 @@ private fun IdeUiPrototype() {
                 editorWordWrap = editorWordWrap,
                 onMenu = { scope.launch { drawerState.open() } },
                 onExplorer = { showExplorer = true },
-                onFile = { file -> activeFile = file; code = sampleCode(file) },
+                onFile = { file ->
+                    activeFile = file
+                    code = sampleCode(file)
+                    recentFiles.remove(file)
+                    recentFiles.add(0, file)
+                },
                 onAction = { action ->
                     when (action) {
                         "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
@@ -302,9 +312,55 @@ private fun IdeUiPrototype() {
                     onOpenFile = { file ->
                         activeFile = file
                         code = sampleCode(file)
+                        recentFiles.remove(file)
+                        recentFiles.add(0, file)
                         showExplorer = false
                     },
                     onClose = { showExplorer = false }
+                )
+            }
+        }
+        if (showProjectOverview) {
+            ModalBottomSheet(
+                onDismissRequest = { showProjectOverview = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+                containerColor = IdeSurface,
+                contentWindowInsets = { WindowInsets.navigationBars }
+            ) {
+                ProjectOverviewSheet(
+                    projectName = selectedProject,
+                    projectLanguage = projects.firstOrNull { it.name == selectedProject }?.language ?: "C17",
+                    onOpenFile = { file ->
+                        activeFile = file
+                        code = sampleCode(file)
+                        recentFiles.remove(file)
+                        recentFiles.add(0, file)
+                        showProjectOverview = false
+                    },
+                    onBrowseFiles = { showProjectOverview = false; showExplorer = true },
+                    onClose = { showProjectOverview = false }
+                )
+            }
+        }
+        if (showRecentFiles) {
+            ModalBottomSheet(
+                onDismissRequest = { showRecentFiles = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+                containerColor = IdeSurface,
+                contentWindowInsets = { WindowInsets.navigationBars }
+            ) {
+                RecentFilesSheet(
+                    files = recentFiles.toList(),
+                    activeFile = activeFile,
+                    onOpenFile = { file ->
+                        activeFile = file
+                        code = sampleCode(file)
+                        recentFiles.remove(file)
+                        recentFiles.add(0, file)
+                        showRecentFiles = false
+                    },
+                    onClear = { recentFiles.clear() },
+                    onClose = { showRecentFiles = false }
                 )
             }
         }
@@ -356,6 +412,136 @@ private fun IdeUiPrototype() {
                 OutlinedButton(onClick = { newProjectDialog = false; newProjectName = "" }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun ProjectOverviewSheet(
+    projectName: String,
+    projectLanguage: String,
+    onOpenFile: (String) -> Unit,
+    onBrowseFiles: () -> Unit,
+    onClose: () -> Unit
+) {
+    val isCpp = projectLanguage.startsWith("C++")
+    val primaryFile = if (isCpp) "main.cpp" else "main.c"
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Project Overview", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("PROJECT SUMMARY", color = IdeMuted, fontSize = 10.sp)
+            }
+            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(14.dp)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(projectName, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text("Projects/$projectName", color = IdeMuted, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(projectLanguage, color = IdeAccent, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Text("• Sample workspace", color = IdeMuted, fontSize = 11.sp)
+                }
+            }
+        }
+        Text("PROJECT CONTENTS", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OverviewMetric("3", "Sample files", Modifier.weight(1f))
+            OverviewMetric("2", "Source files", Modifier.weight(1f))
+            OverviewMetric("1", "Header", Modifier.weight(1f))
+        }
+        Text("Quick open", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+        OverviewFileRow(primaryFile, if (isCpp) "C++ source · entry point" else "C source · entry point") { onOpenFile(primaryFile) }
+        OverviewFileRow(if (isCpp) "main.c" else "main.cpp", "Alternative language example") { onOpenFile(if (isCpp) "main.c" else "main.cpp") }
+        OverviewFileRow("utils.h", "Shared header declaration") { onOpenFile("utils.h") }
+        OutlinedButton(onClick = onBrowseFiles, modifier = Modifier.fillMaxWidth()) { Text("Browse project files") }
+        Text("Preview only: files and metadata are not yet loaded from disk.", color = Color(0xFFE5B978), fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun OverviewMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier.background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(vertical = 13.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(value, color = IdeAccent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = IdeMuted, fontSize = 10.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun OverviewFileRow(name: String, description: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(if (name.endsWith(".h")) "◇" else if (name.endsWith(".cpp")) "C++" else "C",
+            color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(38.dp))
+        Column(Modifier.weight(1f)) {
+            Text(name, color = Color(0xFFE8EDF5), fontSize = 13.sp)
+            Text(description, color = IdeMuted, fontSize = 10.sp)
+        }
+        Text("Open ›", color = IdeAccent, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun RecentFilesSheet(
+    files: List<String>,
+    activeFile: String,
+    onOpenFile: (String) -> Unit,
+    onClear: () -> Unit,
+    onClose: () -> Unit
+) {
+    val displayFiles = if (files.isEmpty()) listOf(activeFile) else files
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Recent Files", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("${displayFiles.distinct().size} recently opened · this session", color = IdeMuted, fontSize = 11.sp)
+            }
+            if (files.isNotEmpty()) Text("Clear", Modifier.clickable(onClick = onClear).padding(8.dp), color = IdeAccent)
+            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeMuted)
+        }
+        if (files.isEmpty()) {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("◷", color = IdeAccent, fontSize = 36.sp)
+                Text("No recent files yet", fontWeight = FontWeight.SemiBold)
+                Text("Files you open will appear here.", color = IdeMuted, fontSize = 12.sp)
+                OutlinedButton(onClick = { onOpenFile(activeFile) }) { Text("Return to current file") }
+            }
+        } else {
+            displayFiles.distinct().forEach { file ->
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(if (file == activeFile) Color(0xFF1D3047) else IdeSurfaceRaised, RoundedCornerShape(10.dp))
+                        .clickable { onOpenFile(file) }
+                        .padding(horizontal = 12.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (file.endsWith(".cpp")) "C++" else if (file.endsWith(".h")) "H" else "C",
+                        color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(38.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(file, color = if (file == activeFile) IdeAccent else Color(0xFFE8EDF5), fontSize = 13.sp)
+                        Text(if (file == activeFile) "Currently active" else "Sample project file", color = IdeMuted, fontSize = 10.sp)
+                    }
+                    Text("›", color = IdeMuted, fontSize = 20.sp)
+                }
+            }
+            Text("Recent history is kept in memory for this app session only.", color = IdeMuted, fontSize = 11.sp)
+        }
     }
 }
 
