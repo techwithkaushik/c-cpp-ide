@@ -3,6 +3,7 @@ agp = "8.13.0"
 kotlin = "2.2.20"
 ksp = "2.2.20-2.0.3"
 composeBom = "2025.09.00"
+soraEditor = "0.24.4"
 activityCompose = "1.11.0"
 lifecycle = "2.9.4"
 navigationCompose = "2.9.4"
@@ -23,6 +24,9 @@ androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-ru
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+sora-editor-bom = { module = "io.github.rosemoe:editor-bom", version.ref = "soraEditor" }
+sora-editor = { module = "io.github.rosemoe:editor" }
+sora-language-textmate = { module = "io.github.rosemoe:language-textmate" }
 androidx-compose-ui = { module = "androidx.compose.ui:ui" }
 androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
