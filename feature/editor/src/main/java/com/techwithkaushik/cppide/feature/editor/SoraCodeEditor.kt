@@ -38,7 +38,9 @@ fun SoraCodeEditor(
     code: String,
     onCodeChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    controller: SoraEditorController? = null
+    controller: SoraEditorController? = null,
+    fontSize: Float = 13f,
+    wordWrap: Boolean = false
 ) {
     val currentOnCodeChange = rememberUpdatedState(onCodeChange)
     AndroidView(
@@ -46,8 +48,8 @@ fun SoraCodeEditor(
         factory = { context ->
             CodeEditor(context).apply {
                 setText(code)
-                setTextSize(13f)
-                isWordwrap = false
+                setTextSize(fontSize)
+                isWordwrap = wordWrap
                 colorScheme.setColor(EditorColorScheme.WHOLE_BACKGROUND, AndroidColor.rgb(16, 19, 25))
                 colorScheme.setColor(EditorColorScheme.TEXT_NORMAL, AndroidColor.rgb(217, 228, 244))
                 colorScheme.setColor(EditorColorScheme.LINE_NUMBER_BACKGROUND, AndroidColor.rgb(20, 25, 34))
@@ -60,6 +62,8 @@ fun SoraCodeEditor(
             }
         },
         update = { editor ->
+            editor.setTextSize(fontSize)
+            editor.isWordwrap = wordWrap
             controller?.attach(editor)
             if (editor.text.toString() != code) editor.setText(code)
         },
