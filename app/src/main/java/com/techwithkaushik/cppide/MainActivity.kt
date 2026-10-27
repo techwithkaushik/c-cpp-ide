@@ -649,6 +649,15 @@ private fun FileExplorerSheet(
     onOpenFile: (String) -> Unit,
     onClose: () -> Unit
 ) {
+    var query by rememberSaveable(projectName) { mutableStateOf("") }
+    var srcExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
+    var includeExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
+    val sourceFiles = listOf(
+        Triple("main.c", "C source file", "src"),
+        Triple("main.cpp", "C++ source file", "src"),
+        Triple("utils.h", "C/C++ header", "include")
+    )
+    val visibleFiles = sourceFiles.filter { it.first.contains(query, ignoreCase = true) || it.second.contains(query, ignoreCase = true) }
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -656,30 +665,65 @@ private fun FileExplorerSheet(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("File Explorer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text(projectName, color = IdeMuted, fontSize = 12.sp)
+                Text("PROJECT  /  $projectName", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
         }
-        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Find a file") },
+            leadingIcon = { Text("⌕", color = IdeAccent, fontSize = 20.sp) },
+            trailingIcon = { if (query.isNotEmpty()) Text("×", Modifier.clickable { query = "" }.padding(8.dp), color = IdeMuted) }
+        )
         Row(
             Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("▾", color = IdeAccent, modifier = Modifier.padding(end = 10.dp))
-            Column {
-                Text(projectName, fontWeight = FontWeight.SemiBold)
-                Text("Project root", color = IdeMuted, fontSize = 11.sp)
+            Column(Modifier.weight(1f)) {
+                Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("PROJECT ROOT  •  ${visibleFiles.size} matching files", color = IdeMuted, fontSize = 10.sp)
+            }
+            Text("C/C++", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        if (query.isBlank() || visibleFiles.any { it.third == "src" }) {
+            Row(Modifier.fillMaxWidth().clickable { srcExpanded = !srcExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (srcExpanded || query.isNotBlank()) "▾" else "▸", color = IdeAccent, modifier = Modifier.width(24.dp))
+                Text("src", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Text("2 files", color = IdeMuted, fontSize = 10.sp)
+            }
+            if (srcExpanded || query.isNotBlank()) visibleFiles.filter { it.third == "src" }.forEach { file ->
+                ExplorerFileRow(file.first, file.second, activeFile == file.first, 28.dp) { onOpenFile(file.first) }
             }
         }
-        Text("▾  src", color = IdeMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
-        ExplorerFileRow("main.c", "C source file", activeFile == "main.c", 32.dp) { onOpenFile("main.c") }
-        ExplorerFileRow("main.cpp", "C++ source file", activeFile == "main.cpp", 32.dp) { onOpenFile("main.cpp") }
-        Text("▾  include", color = IdeMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 4.dp))
-        ExplorerFileRow("utils.h", "C/C++ header", activeFile == "utils.h", 32.dp) { onOpenFile("utils.h") }
-        Text("UI preview • sample files only", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+        if (query.isBlank() || visibleFiles.any { it.third == "include" }) {
+            Row(Modifier.fillMaxWidth().clickable { includeExpanded = !includeExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (includeExpanded || query.isNotBlank()) "▾" else "▸", color = IdeAccent, modifier = Modifier.width(24.dp))
+                Text("include", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Text("1 file", color = IdeMuted, fontSize = 10.sp)
+            }
+            if (includeExpanded || query.isNotBlank()) visibleFiles.filter { it.third == "include" }.forEach { file ->
+                ExplorerFileRow(file.first, file.second, activeFile == file.first, 28.dp) { onOpenFile(file.first) }
+            }
+        }
+        if (visibleFiles.isEmpty()) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("No matching files", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                Text("Try a different file name.", color = IdeMuted, fontSize = 12.sp)
+            }
+        }
+        Divider(color = IdeSurfaceRaised)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Sample project tree", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            Text("Runtime not connected", color = Color(0xFFE5B978), fontSize = 10.sp)
+        }
     }
 }
-
 @Composable
 private fun ExplorerFileRow(
     name: String,
