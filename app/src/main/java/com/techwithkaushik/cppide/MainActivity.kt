@@ -7,6 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -105,6 +108,26 @@ private fun IdeUiPrototype() {
     var activeFile by rememberSaveable { mutableStateOf("main.c") }
     var code by rememberSaveable {
         mutableStateOf("#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}")
+    }
+    val openFiles = remember { mutableStateListOf("main.c") }
+    val dirtyFiles = remember { mutableStateListOf<String>() }
+    val fileContents = remember { mutableStateMapOf("main.c" to code) }
+    fun openFile(file: String) {
+        if (!openFiles.contains(file)) openFiles.add(file)
+        activeFile = file
+        code = fileContents[file] ?: sampleCode(file).also { fileContents[file] = it }
+        recentFiles.remove(file)
+        recentFiles.add(0, file)
+    }
+    fun closeFile(file: String) {
+        if (dirtyFiles.contains(file)) return
+        openFiles.remove(file)
+        if (openFiles.isEmpty()) openFiles.add(if (file == "main.c") "main.cpp" else "main.c")
+        if (activeFile == file) {
+            val next = openFiles.last()
+            activeFile = next
+            code = fileContents[next] ?: sampleCode(next).also { fileContents[next] = it }
+        }
     }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
@@ -205,17 +228,18 @@ private fun IdeUiPrototype() {
                 projectName = selectedProject,
                 activeFile = activeFile,
                 code = code,
-                onCodeChange = { code = it },
+                openFiles = openFiles,
+                dirtyFiles = dirtyFiles,
+                onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
+                onSelectFile = { openFile(it) },
+                onCloseFile = { closeFile(it) },
                 editorController = editorController,
                 editorFontSize = editorFontSize,
                 editorWordWrap = editorWordWrap,
                 onMenu = { scope.launch { drawerState.open() } },
                 onExplorer = { showExplorer = true },
                 onFile = { file ->
-                    activeFile = file
-                    code = sampleCode(file)
-                    recentFiles.remove(file)
-                    recentFiles.add(0, file)
+                    openFile(file)
                 },
                 onAction = { action ->
                     when (action) {
@@ -223,7 +247,7 @@ private fun IdeUiPrototype() {
                         "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                         "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                         "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                        "Save" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                        "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code; selectedPanel = ToolPanel.Output; showToolPanel = true }
                         "Undo" -> editorController.undo()
                         "Redo" -> editorController.redo()
                     }
@@ -310,10 +334,7 @@ private fun IdeUiPrototype() {
                     projectName = selectedProject,
                     activeFile = activeFile,
                     onOpenFile = { file ->
-                        activeFile = file
-                        code = sampleCode(file)
-                        recentFiles.remove(file)
-                        recentFiles.add(0, file)
+                        openFile(file)
                         showExplorer = false
                     },
                     onClose = { showExplorer = false }
@@ -331,10 +352,7 @@ private fun IdeUiPrototype() {
                     projectName = selectedProject,
                     projectLanguage = projects.firstOrNull { it.name == selectedProject }?.language ?: "C17",
                     onOpenFile = { file ->
-                        activeFile = file
-                        code = sampleCode(file)
-                        recentFiles.remove(file)
-                        recentFiles.add(0, file)
+                        openFile(file)
                         showProjectOverview = false
                     },
                     onBrowseFiles = { showProjectOverview = false; showExplorer = true },
@@ -353,10 +371,7 @@ private fun IdeUiPrototype() {
                     files = recentFiles.toList(),
                     activeFile = activeFile,
                     onOpenFile = { file ->
-                        activeFile = file
-                        code = sampleCode(file)
-                        recentFiles.remove(file)
-                        recentFiles.add(0, file)
+                        openFile(file)
                         showRecentFiles = false
                     },
                     onClear = { recentFiles.clear() },
@@ -782,7 +797,11 @@ private fun WorkspaceScreen(
     projectName: String,
     activeFile: String,
     code: String,
+    openFiles: List<String>,
+    dirtyFiles: List<String>,
     onCodeChange: (String) -> Unit,
+    onSelectFile: (String) -> Unit,
+    onCloseFile: (String) -> Unit,
     editorController: SoraEditorController,
     editorFontSize: Float,
     editorWordWrap: Boolean,
@@ -851,12 +870,21 @@ private fun WorkspaceScreen(
                 Modifier.fillMaxWidth().height(46.dp).background(Color(0xFF151A22)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FileTab(activeFile, selected = true) { onFile(activeFile) }
-                Spacer(Modifier.weight(1f))
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                    openFiles.forEach { file ->
+                        FileTab(
+                            name = file,
+                            selected = file == activeFile,
+                            dirty = dirtyFiles.contains(file),
+                            onClick = { onSelectFile(file) },
+                            onClose = { onCloseFile(file) }
+                        )
+                    }
+                }
                 Text(
                     "＋",
-                    Modifier.clickable { onFile(if (activeFile == "main.c") "utils.h" else "main.c") }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    Modifier.clickable { onFile(if (activeFile == "main.c") "main.cpp" else if (activeFile == "main.cpp") "utils.h" else "main.c") }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     color = IdeAccent, fontSize = 20.sp
                 )
             }
@@ -990,7 +1018,7 @@ private fun ExplorerFileRow(
 }
 
 @Composable
-private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
+private fun FileTab(name: String, selected: Boolean, dirty: Boolean, onClick: () -> Unit, onClose: () -> Unit) {
     val fileAccent = when {
         name.endsWith(".cpp") || name.endsWith(".hpp") -> Color(0xFF9CBEFF)
         name.endsWith(".h") -> Color(0xFFE5B978)
@@ -1006,6 +1034,8 @@ private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(if (name.endsWith(".cpp") || name.endsWith(".hpp")) "C++" else "C", color = fileAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (dirty) Text("●", color = Color(0xFFE5B978), fontSize = 9.sp)
+            Text("×", Modifier.clickable(onClick = onClose).padding(start = 4.dp), color = IdeMuted, fontSize = 14.sp)
         }
         Spacer(Modifier.height(7.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
