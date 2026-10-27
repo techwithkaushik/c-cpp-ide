@@ -671,7 +671,7 @@ private fun ExplorerFileRow(
 
 @Composable
 private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
-    Column(Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp)) {
+    Column(Modifier.width(72.dp).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp)) {
         Text(name, color = if (selected) IdeAccent else IdeMuted, fontSize = 12.sp)
         Spacer(Modifier.height(5.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
