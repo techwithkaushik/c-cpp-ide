@@ -35,8 +35,8 @@ object BootstrapDownloader {
         try {
             // Each request gets a unique staging file; simultaneous retries must not overwrite
             // one another's partial downloads.
-            temporary = File.createTempFile("$safeVersion-${artifact.abi}-", ".part", root)
-            val stagedFile = temporary
+            val stagedFile = File.createTempFile("$safeVersion-${artifact.abi}-", ".part", root)
+            temporary = stagedFile
             val digest = MessageDigest.getInstance("SHA-256")
             var connection: HttpURLConnection? = null
             var currentUrl = URL(artifact.downloadUrl)
