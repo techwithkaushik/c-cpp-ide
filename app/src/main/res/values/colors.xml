@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ide_blue">#659AD2</color>
+    <color name="ide_blue_light">#83B7FF</color>
+    <color name="ide_blue_dark">#00599C</color>
+    <color name="ide_navy">#003F70</color>
+    <color name="ide_background">#101820</color>
+    <color name="ide_surface">#192733</color>
+</resources>
