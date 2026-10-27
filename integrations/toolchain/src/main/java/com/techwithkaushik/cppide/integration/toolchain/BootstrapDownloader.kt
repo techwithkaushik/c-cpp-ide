@@ -36,8 +36,17 @@ object BootstrapDownloader {
             try {
                 var redirects = 0
                 while (true) {
-                    require(currentUrl.protocol.equals("https", ignoreCase = true)) {
-                        "Bootstrap redirects must remain HTTPS."
+                    val currentUri = try {
+                        currentUrl.toURI()
+                    } catch (e: Exception) {
+                        throw IOException("Bootstrap redirect URL is malformed.", e)
+                    }
+                    require(
+                        currentUri.scheme.equals("https", ignoreCase = true) &&
+                            !currentUri.host.isNullOrBlank() &&
+                            currentUri.userInfo == null
+                    ) {
+                        "Bootstrap URLs and redirects must use HTTPS without embedded credentials."
                     }
                     connection = (currentUrl.openConnection() as HttpURLConnection).apply {
                         connectTimeout = CONNECT_TIMEOUT_MS
