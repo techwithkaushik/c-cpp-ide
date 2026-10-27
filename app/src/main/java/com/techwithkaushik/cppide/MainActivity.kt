@@ -112,7 +112,6 @@ private fun IdeUiPrototype() {
     val openFiles = remember { mutableStateListOf("main.c") }
     val dirtyFiles = remember { mutableStateListOf<String>() }
     val fileContents = remember { mutableStateMapOf("main.c" to code) }
-    }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
