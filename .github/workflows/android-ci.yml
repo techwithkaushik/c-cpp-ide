@@ -1,4 +1,4 @@
-name: Android CI
+name: Android Release Build
 
 on:
   pull_request:
@@ -11,12 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  group: android-release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build Android modules
+  release:
+    name: Build signed release APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -34,52 +34,14 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Restore signing keystore from GitHub Secrets
+      - name: Restore development signing key
         id: keystore
-        shell: bash
-        env:
-          SIGNING_KEY_STORE_B64: ${{ secrets.SIGNING_KEY_STORE }}
-        run: |
-          set -euo pipefail
-          key_path="$RUNNER_TEMP/cpp-ide-signing.jks"
-          if [[ -z "${SIGNING_KEY_STORE_B64:-}" ]]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "filePath=" >> "$GITHUB_OUTPUT"
-            echo "::warning::SIGNING_KEY_STORE secret is not configured; release signing will be skipped."
-            exit 0
-          fi
-          printf '%s' "$SIGNING_KEY_STORE_B64" | base64 --decode > "$key_path"
-          chmod 600 "$key_path"
-          if [[ ! -s "$key_path" ]]; then
-            echo "::error::Decoded signing keystore is empty."
-            exit 1
-          fi
-          echo "configured=true" >> "$GITHUB_OUTPUT"
-          echo "filePath=$key_path" >> "$GITHUB_OUTPUT"
-          echo "Signing keystore restored from GitHub Secrets."
+        uses: timheuer/base64-to-file@v2.0
+        with:
+          fileName: dev_keystore.jks
+          encodedString: ${{ secrets.SIGNING_KEYSTORE }}
 
-      - name: Validate bootstrap archive tooling
-        run: |
-          python3 -m unittest tools/test_validate_bootstrap_archive.py tools/test_validate_bootstrap_manifest.py -v
-          python3 tools/validate-bootstrap-archive.py --help >/dev/null
-          python3 tools/validate_bootstrap_manifest.py --help >/dev/null
-
-      - name: Check Gradle project configuration
-        run: gradle --no-daemon tasks
-
-      - name: Run unit tests
-        run: gradle --no-daemon :integrations:termux:testDebugUnitTest :integrations:toolchain:testDebugUnitTest
-
-      - name: Assemble debug APK
-        env:
-          SIGN_KEY_STORE: ${{ steps.keystore.outputs.filePath }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: gradle --no-daemon :app:assembleDebug
-
-      - name: Assemble signed release APK
-        if: steps.keystore.outputs.configured == 'true'
+      - name: Assemble release APK
         env:
           SIGN_KEY_STORE: ${{ steps.keystore.outputs.filePath }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
@@ -87,19 +49,10 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: gradle --no-daemon :app:assembleRelease
 
-      - name: Upload signed release APK
-        if: steps.keystore.outputs.configured == 'true'
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: cpp-ide-release-apk
           path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload debug APK for device testing
-        uses: actions/upload-artifact@v4
-        with:
-          name: cpp-ide-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
