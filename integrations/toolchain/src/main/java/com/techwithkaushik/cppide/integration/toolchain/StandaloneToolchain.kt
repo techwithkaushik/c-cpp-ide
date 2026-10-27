@@ -235,10 +235,21 @@ object StandaloneToolchain {
         } catch (e: Exception) {
             throw IllegalStateException("$label could not start: ${e.message}", e)
         }
+        // Drain all compiler output to avoid blocking the child process, but retain only a
+        // bounded diagnostic tail/prefix so a broken or hostile compiler cannot exhaust app RAM.
         val output = StringBuilder()
+        val maxOutputChars = 64 * 1024
         val reader = Thread {
-            process.inputStream.bufferedReader().useLines { lines ->
-                lines.forEach { line -> synchronized(output) { output.append(line).append('\n') } }
+            process.inputStream.bufferedReader().use { input ->
+                val buffer = CharArray(4096)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    synchronized(output) {
+                        val remaining = maxOutputChars - output.length
+                        if (remaining > 0) output.append(buffer, 0, minOf(count, remaining))
+                    }
+                }
             }
         }.apply { isDaemon = true; start() }
         val completed = try {
