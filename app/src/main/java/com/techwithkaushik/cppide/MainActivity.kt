@@ -1060,23 +1060,27 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
 
 @Composable
 private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit, onClose: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 26.dp)) {
+    val title = when (selected) {
+        ToolPanel.Terminal -> "Terminal"
+        ToolPanel.Build -> "Build"
+        ToolPanel.Problems -> "Problems"
+        ToolPanel.Output -> "Output"
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 26.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                when (selected) {
-                    ToolPanel.Terminal -> "Terminal"
-                    ToolPanel.Build -> "Build"
-                    ToolPanel.Problems -> "Problems"
-                    ToolPanel.Output -> "Output"
-                },
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("WORKSPACE TOOLS", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
             Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
         }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
             ToolPanel.entries.forEach { panel ->
                 val label = when (panel) {
                     ToolPanel.Terminal -> "Terminal"
@@ -1084,35 +1088,81 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
                     ToolPanel.Problems -> "Problems"
                     ToolPanel.Output -> "Output"
                 }
-                if (panel == selected) Button(onClick = { onSelect(panel) }) { Text(label) }
-                else OutlinedButton(onClick = { onSelect(panel) }) { Text(label) }
+                if (panel == selected) Button(onClick = { onSelect(panel) }) { Text(label, fontSize = 12.sp) }
+                else OutlinedButton(onClick = { onSelect(panel) }) { Text(label, fontSize = 12.sp) }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Box(Modifier.fillMaxWidth().height(180.dp).background(Color(0xFF0B0F14), RoundedCornerShape(12.dp)).padding(14.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                when (selected) {
-                    ToolPanel.Terminal -> {
-                        Text("C/C++ IDE terminal", color = IdeGreen, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                        Text("Runtime is not connected yet.", color = Color(0xFFD9E4F4), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                        Text("This panel is UI-only; no shell process has been started.", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                        Text("›  Waiting for runtime integration", color = IdeAccent, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                    }
-                    ToolPanel.Build -> {
-                        Text("BUILD", color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Build UI preview", color = Color(0xFFD9E4F4), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                        Text("Compiler process is not connected yet.", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                    }
-                    ToolPanel.Problems -> {
-                        Text("No diagnostics to display", color = IdeGreen, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                        Text("Problem reporting will be connected with the compiler/LSP later.", color = IdeMuted, fontSize = 11.sp)
-                    }
-                    ToolPanel.Output -> {
-                        Text("OUTPUT", color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("No program output yet.", color = Color(0xFFD9E4F4), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                    }
+        when (selected) {
+            ToolPanel.Terminal -> {
+                ToolStatusCard("TERMINAL SESSION", "Not connected", "The shell runtime has not been started.", "›  Waiting for runtime integration", IdeAccent)
+                Text("Terminal commands will be available after the Termux runtime bridge is connected.", color = IdeMuted, fontSize = 11.sp)
+            }
+            ToolPanel.Build -> {
+                ToolStatusCard("BUILD STATUS", "Ready to configure", "No build has been run in this UI preview.", "Compiler: Clang / LLVM · Not connected", IdeAccent)
+                Text("Build steps", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                PanelInfoRow("1", "Resolve project configuration", "Waiting for build integration")
+                PanelInfoRow("2", "Compile C/C++ sources", "Compiler not connected")
+                PanelInfoRow("3", "Link executable", "Not started")
+            }
+            ToolPanel.Problems -> {
+                ToolStatusCard("DIAGNOSTICS", "No diagnostics", "No compiler or clangd results are available yet.", "0 errors  ·  0 warnings  ·  UI preview", IdeGreen)
+                Text("Problem list will populate when the compiler and language server are connected.", color = IdeMuted, fontSize = 11.sp)
+            }
+            ToolPanel.Output -> {
+                ToolStatusCard("PROGRAM OUTPUT", "No output yet", "Run output will appear here after execution support is connected.", "Execution target: Linux environment", IdeAccent)
+                Box(
+                    Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF0B0F14), RoundedCornerShape(10.dp)).padding(12.dp)
+                ) {
+                    Text("Waiting for program execution…", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                 }
             }
+        }
+        Text("Preview only · runtime/compiler integration is not connected", color = Color(0xFFE5B978), fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun ToolStatusCard(
+    eyebrow: String,
+    status: String,
+    description: String,
+    detail: String,
+    accent: Color
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F141C)),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(15.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Text(eyebrow, color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(9.dp).background(accent, RoundedCornerShape(50)))
+                Text(status, color = Color(0xFFE8EDF5), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Text(description, color = IdeMuted, fontSize = 12.sp)
+            Divider(color = IdeSurfaceRaised)
+            Text(detail, color = accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+@Composable
+private fun PanelInfoRow(number: String, title: String, status: String) {
+    Row(
+        Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(9.dp)).padding(11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(Modifier.size(26.dp).background(IdeSurface, RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
+            Text(number, color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = Color(0xFFE8EDF5), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(status, color = IdeMuted, fontSize = 10.sp)
         }
     }
 }
