@@ -241,18 +241,17 @@ private fun IdeUiPrototype() {
                                 .padding(horizontal = 20.dp, vertical = 15.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
+                            IdeIcon(
                                 when (item) {
-                                    "File Explorer" -> "▤"
-                                    "Terminal" -> ">_"
-                                    "Build / Problems" -> "✓"
-                                    "Project Overview" -> "⌂"
-                                    "Recent Files" -> "◷"
-                                    "Settings" -> "⚙"
-                                    else -> "⬇"
+                                    "File Explorer" -> "folder"
+                                    "Terminal" -> "terminal"
+                                    "Build / Problems" -> "problems"
+                                    "Project Overview" -> "home"
+                                    "Recent Files" -> "history"
+                                    "Settings" -> "settings"
+                                    else -> "build"
                                 },
-                                color = if (active) IdeAccent else IdeMuted,
-                                modifier = Modifier.width(32.dp)
+                                if (active) IdeAccent else IdeMuted, 20.dp, Modifier.width(32.dp)
                             )
                             Text(item, color = if (active) IdeAccent else Color(0xFFE8EDF5))
                         }
@@ -888,6 +887,20 @@ private fun WorkspaceScreen(
                     IconButton(onClick = { onAction("Save") }) { IdeIcon("save", IdeAccent, 19.dp) }
                     IconButton(onClick = { onAction("Build") }) { IdeIcon("build", IdeGreen, 19.dp) }
                     IconButton(onClick = { onAction("Run") }) { IdeIcon("run", IdeGreen, 19.dp) }
+                    IconButton(onClick = { onAction("Find") }) { IdeIcon("search", IdeMuted, 19.dp) }
+                    var showOverflow by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
+                        androidx.compose.material3.DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
+                            listOf("Find", "Find in Project", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", "Settings", "Sync Project", "Cancel Build").forEach { action ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(action) },
+                                    leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; else -> "save" }, IdeAccent, 18.dp) },
+                                    onClick = { showOverflow = false; when (action) { "File Explorer" -> onExplorer(); "Terminal", "Build", "Problems", "Output" -> onAction(action); else -> onAction(action) } }
+                                )
+                            }
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeSurface)
             )
