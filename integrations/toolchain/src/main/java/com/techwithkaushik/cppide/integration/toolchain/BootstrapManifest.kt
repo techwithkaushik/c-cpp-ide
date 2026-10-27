@@ -13,7 +13,10 @@ data class BootstrapManifest(
         if (schemaVersion != SUPPORTED_SCHEMA_VERSION) {
             return "Unsupported bootstrap manifest schema: $schemaVersion"
         }
-        if (runtimeVersion.isBlank()) return "Runtime version is missing."
+        if (!runtimeVersion.matches(Regex("[A-Za-z0-9._+-]{1,64}") ) ||
+            runtimeVersion == "." || runtimeVersion == "..") {
+            return "Runtime version is invalid."
+        }
         if (artifacts.isEmpty()) return "Bootstrap manifest has no artifacts."
         val seenAbis = mutableSetOf<String>()
         for (artifact in artifacts) {
