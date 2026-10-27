@@ -223,25 +223,67 @@ private fun IdeUiPrototype() {
             )
         }
         if (showSettings) {
+            var settingsCategory by rememberSaveable { mutableStateOf("Editor") }
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showSettings = false },
                 containerColor = IdeSurface,
-                title = { Text("Editor Settings", color = Color(0xFFE8EDF5)) },
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Settings", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold)
+                        Text("Configure your coding workspace", color = IdeMuted, fontSize = 12.sp)
+                    }
+                },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text("Font size: ${editorFontSize.toInt()} sp", color = IdeMuted)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { editorFontSize = (editorFontSize - 1f).coerceAtLeast(10f) }) { Text("A−") }
-                            OutlinedButton(onClick = { editorFontSize = (editorFontSize + 1f).coerceAtMost(24f) }) { Text("A+") }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Word wrap", color = Color(0xFFE8EDF5))
-                                Text("Wrap long source lines", color = IdeMuted, fontSize = 12.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("Editor", "C/C++", "Build", "Appearance").forEach { category ->
+                                if (settingsCategory == category) {
+                                    Button(onClick = { settingsCategory = category }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 7.dp)) { Text(category, fontSize = 11.sp) }
+                                } else {
+                                    OutlinedButton(onClick = { settingsCategory = category }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 7.dp)) { Text(category, fontSize = 11.sp) }
+                                }
                             }
-                            androidx.compose.material3.Switch(checked = editorWordWrap, onCheckedChange = { editorWordWrap = it })
                         }
-                        Text("Language: C / C++ • Editor: Sora", color = IdeMuted, fontSize = 12.sp)
+                        Divider(color = IdeSurfaceRaised)
+                        when (settingsCategory) {
+                            "Editor" -> {
+                                Text("EDITOR", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Font size: ${editorFontSize.toInt()} sp", color = Color(0xFFE8EDF5))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { editorFontSize = (editorFontSize - 1f).coerceAtLeast(10f) }) { Text("A− Smaller") }
+                                    OutlinedButton(onClick = { editorFontSize = (editorFontSize + 1f).coerceAtMost(24f) }) { Text("A+ Larger") }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Word wrap", color = Color(0xFFE8EDF5))
+                                        Text("Wrap long source lines", color = IdeMuted, fontSize = 12.sp)
+                                    }
+                                    androidx.compose.material3.Switch(checked = editorWordWrap, onCheckedChange = { editorWordWrap = it })
+                                }
+                                SettingsInfoRow("Editor engine", "Sora code editor")
+                            }
+                            "C/C++" -> {
+                                Text("LANGUAGE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                SettingsInfoRow("Supported source", "C (.c), C++ (.cpp)")
+                                SettingsInfoRow("Header files", ".h / .hpp")
+                                SettingsInfoRow("Language standard", "C17 / C++20 (preview)")
+                                SettingsInfoRow("Language server", "clangd — not connected")
+                            }
+                            "Build" -> {
+                                Text("BUILD TOOLCHAIN", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                SettingsInfoRow("Compiler", "Clang / LLVM — not connected")
+                                SettingsInfoRow("Build system", "CMake — not connected")
+                                SettingsInfoRow("Execution target", "Linux environment")
+                                Text("Toolchain options are informational until runtime integration is implemented.", color = Color(0xFFE5B978), fontSize = 11.sp)
+                            }
+                            else -> {
+                                Text("WORKSPACE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                SettingsInfoRow("Theme", "Dark IDE")
+                                SettingsInfoRow("Accent", "Blue")
+                                SettingsInfoRow("Project", selectedProject)
+                                Text("Appearance controls will be expanded in a later UI pass.", color = IdeMuted, fontSize = 11.sp)
+                            }
+                        }
                     }
                 },
                 confirmButton = { Button(onClick = { showSettings = false }) { Text("Done") } }
@@ -314,6 +356,18 @@ private fun IdeUiPrototype() {
                 OutlinedButton(onClick = { newProjectDialog = false; newProjectName = "" }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun SettingsInfoRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = IdeMuted, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        Text(value, color = Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
