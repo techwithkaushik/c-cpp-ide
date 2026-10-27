@@ -304,6 +304,7 @@ private fun FeatureLine(icon: String, label: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue: () -> Unit, onBack: () -> Unit) {
     Scaffold(
@@ -355,6 +356,7 @@ private fun SetupChoiceCard(title: String, subtitle: String, icon: String, selec
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProjectListScreen(
     projects: List<IdeProject>,
