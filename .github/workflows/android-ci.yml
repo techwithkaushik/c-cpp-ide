@@ -59,7 +59,7 @@ jobs:
         run: gradle --no-daemon tasks
 
       - name: Run unit tests
-        run: gradle --no-daemon :integrations:termux:testDebugUnitTest
+        run: gradle --no-daemon :integrations:termux:testDebugUnitTest :integrations:toolchain:testDebugUnitTest
 
       - name: Assemble debug APK
         run: gradle --no-daemon :app:assembleDebug
