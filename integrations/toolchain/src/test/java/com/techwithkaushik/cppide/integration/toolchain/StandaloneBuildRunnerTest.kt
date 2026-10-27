@@ -87,7 +87,7 @@ class StandaloneBuildRunnerTest {
             val source = File(root, "main.c").apply { writeText("int main(void) { return 0; }") }
             val result = StandaloneBuildRunner().compileAndRun(
                 status, source, File(root, "main"), root,
-                StandaloneBuildRunner.Language.C17, listOf("bad\\u0000arg")
+                StandaloneBuildRunner.Language.C17, listOf("bad\u0000arg")
             )
 
             assertEquals("Program arguments exceed the allowed limits.", result.error)
