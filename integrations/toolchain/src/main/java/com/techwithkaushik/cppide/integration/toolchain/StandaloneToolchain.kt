@@ -25,6 +25,10 @@ object StandaloneToolchain {
     ) { val ready: Boolean get() = state == State.READY }
 
     fun inspect(context: Context, runtimeVersion: String = RUNTIME_VERSION): Status {
+        if (!isSafeRuntimeVersion(runtimeVersion)) return Status(
+            State.INVALID_ARCHIVE, supportedAbi().orEmpty(), null, null, null,
+            "Runtime version is invalid."
+        )
         val abi = supportedAbi() ?: return Status(
             State.ABI_UNSUPPORTED, Build.SUPPORTED_ABIS.firstOrNull().orEmpty(),
             null, null, null, "No standalone runtime is available for this ABI."
@@ -83,12 +87,17 @@ object StandaloneToolchain {
         maximumExpandedBytes: Long
     ): Status {
         val abi = supportedAbi() ?: return inspect(context)
-        require(maximumExpandedBytes in 1..MAX_EXPANDED_BYTES) {
+        if (!isSafeRuntimeVersion(runtimeVersion)) return Status(
+            State.INVALID_ARCHIVE, abi, null, null, null, "Runtime version is invalid."
+        )
+        if (maximumExpandedBytes !in 1..MAX_EXPANDED_BYTES) return Status(
+            State.INVALID_ARCHIVE, abi, null, null, null,
             "Expanded runtime size is outside allowed limits."
-        }
-        require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) {
+        )
+        if (!expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) return Status(
+            State.INVALID_ARCHIVE, abi, null, null, null,
             "A reviewed SHA-256 digest is required."
-        }
+        )
         val assetPath = ASSET_ROOT + "/" + abi + "/runtime.zip"
         val parent = File(context.noBackupFilesDir, "toolchain/.staging").apply { mkdirs() }
         val nonce = System.nanoTime().toString()
@@ -254,6 +263,9 @@ object StandaloneToolchain {
     private fun supportedAbi(): String? = Build.SUPPORTED_ABIS.firstOrNull {
         it == "arm64-v8a" || it == "armeabi-v7a" || it == "x86_64" || it == "x86"
     }
+
+    private fun isSafeRuntimeVersion(value: String): Boolean =
+        value.matches(Regex("[A-Za-z0-9._+-]{1,64}")) && value != "." && value != ".."
 
     private fun extractSafely(zipFile: File, destination: File, maximumExpandedBytes: Long) {
         require(zipFile.length() in 1..MAX_ARCHIVE_BYTES) { "Runtime archive is empty or too large." }
