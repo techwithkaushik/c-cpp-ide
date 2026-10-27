@@ -2,6 +2,7 @@ package com.techwithkaushik.cppide
 
 import android.os.Bundle
 import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
+import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -116,6 +117,7 @@ private fun IdeUiPrototype() {
             IdeProject("Cpp Playground", "C++20", "Projects/Cpp-Playground", "Yesterday")
         )
     }
+    val editorController = remember { SoraEditorController() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -194,6 +196,7 @@ private fun IdeUiPrototype() {
                 activeFile = activeFile,
                 code = code,
                 onCodeChange = { code = it },
+                editorController = editorController,
                 onMenu = { scope.launch { drawerState.open() } },
                 onExplorer = { showExplorer = true },
                 onFile = { file -> activeFile = file; code = sampleCode(file) },
@@ -204,7 +207,8 @@ private fun IdeUiPrototype() {
                         "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                         "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                         "Save" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
-                        "Undo", "Redo" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                        "Undo" -> editorController.undo()
+                        "Redo" -> editorController.redo()
                     }
                 },
                 selectedPanel = selectedPanel,
@@ -507,6 +511,7 @@ private fun WorkspaceScreen(
     activeFile: String,
     code: String,
     onCodeChange: (String) -> Unit,
+    editorController: SoraEditorController,
     onMenu: () -> Unit,
     onExplorer: () -> Unit,
     onFile: (String) -> Unit,
@@ -567,7 +572,8 @@ private fun WorkspaceScreen(
                 SoraCodeEditor(
                     code = code,
                     onCodeChange = onCodeChange,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    controller = editorController
                 )
             }
         }
