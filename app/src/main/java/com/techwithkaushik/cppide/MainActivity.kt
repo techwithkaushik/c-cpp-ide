@@ -145,6 +145,9 @@ private fun IdeUiPrototype() {
         }
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchInProject by rememberSaveable { mutableStateOf(false) }
     var editorFontSize by rememberSaveable { mutableStateOf(13f) }
     var editorWordWrap by rememberSaveable { mutableStateOf(false) }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
@@ -285,11 +288,29 @@ private fun IdeUiPrototype() {
                         "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
                         "Undo" -> editorController.undo()
                         "Redo" -> editorController.redo()
+                        "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
+                        "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
+                        "Save All" -> { openFiles.forEach { file -> if (file == activeFile) fileContents[file] = code }; dirtyFiles.clear() }
+                        "Settings" -> showSettings = true
+                        "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                        "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                     }
                 },
                 selectedPanel = selectedPanel,
                 onPanel = { selectedPanel = it; showToolPanel = true }
             )
+        }
+        if (showSearch) {
+            val searchable = if (searchInProject) fileContents.values.joinToString("\\n") else code
+            val matchCount = if (searchQuery.isBlank()) 0 else Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE).findAll(searchable).count()
+            AlertDialog(onDismissRequest = { showSearch = false }, containerColor = IdeSurface,
+                title = { Text(if (searchInProject) "Find in project" else "Find in file", color = Color(0xFFE8EDF5)) },
+                text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search text") })
+                    Text(if (searchQuery.isBlank()) "Enter text to search" else "$matchCount matches found", color = IdeMuted, fontSize = 12.sp)
+                } },
+                confirmButton = { TextButton(onClick = { showSearch = false }) { Text("Done") } },
+                dismissButton = { TextButton(onClick = { searchQuery = "" }) { Text("Clear") } })
         }
         if (showSettings) {
             var settingsCategory by rememberSaveable { mutableStateOf("Editor") }
