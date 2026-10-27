@@ -120,8 +120,7 @@ private fun IdeUiPrototype() {
     if (screen != IdeScreen.Workspace) {
         when (screen) {
             IdeScreen.Welcome -> WelcomeScreen(
-                onGetStarted = { screen = IdeScreen.Setup },
-                onSettings = { screen = IdeScreen.Setup }
+                onNext = { screen = IdeScreen.Setup }
             )
             IdeScreen.Setup -> SetupScreen(
                 selected = setupChoice,
@@ -260,47 +259,49 @@ private fun IdeUiPrototype() {
 }
 
 @Composable
-private fun WelcomeScreen(onGetStarted: () -> Unit, onSettings: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(IdeBackground)) {
+private fun WelcomeScreen(onNext: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(IdeBackground)
+            .padding(horizontal = 28.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Column(
-            Modifier.fillMaxWidth().align(Alignment.Center).padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             Box(
-                Modifier.size(104.dp).background(IdeSurfaceRaised, RoundedCornerShape(30.dp)),
+                Modifier
+                    .size(84.dp)
+                    .background(IdeSurface, RoundedCornerShape(24.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("</>", color = IdeAccent, fontSize = 38.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Text(
+                    "</>",
+                    color = IdeAccent,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
             }
-            Text("C/C++ IDE", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF2F6FC))
-            Text("Your coding workspace, wherever you are.", color = IdeMuted, fontSize = 15.sp)
-            Spacer(Modifier.height(8.dp))
-            Card(
-                colors = CardDefaults.cardColors(containerColor = IdeSurface),
-                shape = RoundedCornerShape(18.dp)
+            Text(
+                "C/C++ IDE",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFF2F6FC)
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onNext,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FeatureLine("⌘", "C17 & C++20 workspace")
-                    FeatureLine("▤", "Projects and file explorer")
-                    FeatureLine(">_", "Integrated terminal and build tools")
-                }
+                Text("Next  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
-            Spacer(Modifier.height(6.dp))
-            Button(onClick = onGetStarted, modifier = Modifier.fillMaxWidth().height(54.dp)) {
-                Text("Get Started  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
-            OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth()) { Text("Runtime setup") }
-            Text("Designed for Android • ARMv7 / ARM64", color = IdeMuted, fontSize = 11.sp)
         }
-    }
-}
-
-@Composable
-private fun FeatureLine(icon: String, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(icon, color = IdeAccent, fontSize = 18.sp, modifier = Modifier.width(34.dp))
-        Text(label, color = Color(0xFFDDE5F0), fontSize = 14.sp)
     }
 }
 
