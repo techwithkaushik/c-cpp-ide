@@ -136,7 +136,7 @@ private fun IdeUiPrototype() {
             activeFile = next
             code = fileContents[next] ?: sampleCode(next).also { fileContents[next] = it }
         }
-
+    }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var editorFontSize by rememberSaveable { mutableStateOf(13f) }
     var editorWordWrap by rememberSaveable { mutableStateOf(false) }
