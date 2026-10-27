@@ -1,66 +1,102 @@
-# Rootfs setup screen: download or import
+# Rootfs setup and terminal startup
 
-- **Status:** UI/flow specification
+- **Status:** Implementation contract
 - **Date:** 2026-10-27
-- **Scope:** Standalone Ubuntu rootfs first-run setup
+- **Scope:** Standalone Linux userspace for the IDE terminal
 
-## Setup screen
+## Two setup choices
 
-Show two equally clear choices:
+The first-run setup screen must expose exactly these two source choices:
 
-1. **Download from Internet**
-   - Supporting text: “Download a supported Ubuntu rootfs for this device.”
-   - Display selected Ubuntu release, ABI, compressed download size, and required free storage before starting.
-   - Choose the URL from a project-controlled, versioned manifest. Never ask users to type or paste a URL.
-   - Show download progress, downloaded/total bytes when known, speed, and Cancel. Offer pause/resume only if genuinely supported.
-   - Verify the pinned SHA-256 and archive metadata before extraction.
-   - If download fails, preserve a safe retry path and never leave a partial archive looking installed.
+1. **Download Ubuntu from Internet**
+   - The Ubuntu rootfs URL is configured inside the app through a versioned, project-controlled manifest; the user does not type a URL.
+   - Select the artifact for the device ABI from the manifest.
+   - Show Ubuntu release, ABI, download size, progress, and cancel state.
+   - Verify the manifest-pinned digest before extraction.
+   - Do not advertise a release/ABI until the full terminal + execution layer + compiler flow has been tested on a physical device.
 
 2. **Use Downloaded Rootfs from Storage**
-   - Supporting text: “Choose a rootfs archive already saved on your phone.”
-   - Button: **Select Rootfs Archive**.
-   - Launch Android Storage Access Framework with ACTION_OPEN_DOCUMENT and supported archive MIME types. Do not request broad storage permission just to pick a file.
-   - Accept only explicitly supported archive formats. Initially prefer one format, such as .tar.xz or .tar.gz, rather than guessing from filenames.
-   - Read the selected URI through ContentResolver into a bounded app-private staging file; never assume a content:// URI is a filesystem path.
-   - Show the selected filename and size, then validate metadata, ABI compatibility, integrity where a trusted digest is available, and safe extraction limits.
-   - If no trusted metadata accompanies the archive, do not silently trust a digest supplied by the archive itself. Explain that authenticity cannot be established and require a supported verification route.
+   - Open Android's Storage Access Framework picker using `ACTION_OPEN_DOCUMENT`; do not require broad storage permission.
+   - This route may accept a compatible Ubuntu, Debian, or another Linux rootfs archive, not only the app's official Ubuntu artifact.
+   - Read `content://` URIs with `ContentResolver` into a bounded app-private staging file. Never assume a picked URI is a normal filesystem path.
+   - The file name, extension, MIME type, and `/etc/os-release` are hints, not proof that the archive is a valid or trustworthy rootfs.
+   - Show the detected distribution/release only after inspecting the extracted filesystem. If identity is unknown, label it as unknown rather than guessing.
 
-## Shared installation pipeline
+Both choices must converge on the same archive inspection, validation, extraction, runtime setup, and activation pipeline. The Internet choice is constrained to the app's pinned Ubuntu artifact; the storage choice is distribution-flexible but must pass the same structural and execution-compatibility checks.
 
-Both choices must converge on the same installer; only the source of archive bytes differs.
+## Rootfs detection and validation
 
-Source selection -> bounded staging -> integrity/metadata validation -> safe extraction -> runtime provisioning -> C17/C++20 smoke tests -> activate runtime.
+Do not decide that an archive is a rootfs from its filename alone. Inspect archive entries before extraction, then inspect the staged tree after safe extraction.
 
-Requirements:
+Minimum structural checks should include:
+- A root-level `etc/` and `etc/os-release` or another accepted distribution identity marker.
+- A coherent root filesystem layout, normally including several of `usr/`, `bin/`, `sbin/`, `lib/`, `var/`, and `dev/` (some may be symlinks).
+- Required shell and dynamic-loader/runtime files appropriate to the selected execution method.
+- ABI/architecture compatibility with the device and supported execution layer.
+- No absolute paths, parent traversal, duplicate-path overwrite tricks, or unsupported special files in archive entries.
+- Bounded compressed size, expanded size, entry count, path length, and extraction time.
+- An explicit symlink/hardlink policy; reject links that escape the rootfs and unsupported device nodes/FIFOs/sockets.
+- Trusted digest verification for official downloads. For user-selected archives, a self-declared checksum is not trusted proof of origin. Structural validity is separate from authenticity.
 
-- Use unique staging paths and transactional activation; never overwrite the working runtime before the replacement passes all checks.
-- Enforce compressed size, expanded size, archive entry count, path traversal, duplicate-entry and symlink/hardlink policies.
-- Do not trust archive filenames, MIME type, /etc/os-release, or archive-provided checksums as proof of authenticity.
-- Do not report success until the execution layer and compiler have passed compile-and-run checks.
-- Keep runtime files under app-private storage.
-- Clearly report unsupported ABI, corrupt archive, insufficient storage, digest mismatch, and runtime smoke-test failures.
-- Test interrupted downloads/imports, low storage, duplicate taps, and retry/rollback.
+A directory that merely contains an `etc/` folder is not sufficient. A structurally valid rootfs may still be unusable on Android, so validate architecture, loader, shell, and execution-layer compatibility before marking it ready.
 
-## Rootfs artifact format contract
+## Paths and activation
 
-A generic Ubuntu rootfs is not necessarily directly executable on Android. The artifact contract must state:
+Use a deterministic app-private layout, for example:
 
-- Ubuntu release and rootfs provenance.
-- Supported ABI and minimum Android/API assumptions.
-- Archive format and exact compressed size.
-- Expected SHA-256 delivered through a trusted project-controlled manifest.
-- Execution-layer requirements (for example, a validated proot-based arrangement if chosen).
-- Whether clang/clang++, linker, headers and required runtime libraries are included or provisioned afterward.
-- Expected expanded size and tested storage budget.
+```text
+noBackupFilesDir/
+  linux-rootfs/
+    staging/<unique-install-id>/   # never used as the active runtime
+    active/                        # only a fully validated runtime
+    backup/                         # previous active runtime during transaction
+```
 
-Do not advertise an ABI until the complete rootfs + execution layer + compiler pipeline passes on a physical device.
+The actual path must be generated by the app, not taken from archive content or user input. Keep rootfs data in app-private storage; do not extract to shared Downloads.
+
+Installation sequence:
+
+1. Copy/download the archive into a unique bounded staging file.
+2. Verify official artifact digest where applicable.
+3. Inspect archive paths and entry types before extraction.
+4. Extract safely into a unique staging directory.
+5. Inspect the resulting rootfs structure and identify distro/release/architecture.
+6. Prepare the supported Android execution layer and any required runtime/compiler components.
+7. Run shell startup and execution smoke tests; for a compiler-ready environment, compile **and run** minimal C17 and C++20 programs.
+8. Only after every required check passes, atomically promote the staged rootfs to `active/`; retain or restore the prior active runtime if activation fails.
+9. Persist the app-generated active rootfs path and runtime metadata.
+
+Never display “installed” merely because extraction completed. Never delete the previous working runtime before the replacement has passed checks.
+
+## Terminal startup contract
+
+After setup succeeds, tapping **Terminal** must open the app's terminal UI connected to a shell *inside the active rootfs*, not the Android host shell and not the Termux app.
+
+- The terminal session launcher obtains the active rootfs path from the app's runtime registry; it must not reconstruct the path from an archive filename.
+- Enter the rootfs through a validated Android-compatible execution layer (for example, a proven `proot` setup if selected). Android does not provide ordinary Linux `chroot` to an unprivileged app, so extraction alone does not make a rootfs executable.
+- Set a predictable working directory, `HOME`, `TMPDIR`, and required `PATH`/library environment for that rootfs. Create writable user directories only inside app-private storage.
+- Start the distro's available shell (prefer `/bin/bash`, fall back to a supported `/bin/sh`); if neither can execute, fail with a useful diagnostic and return to setup/repair rather than showing a fake terminal.
+- Keep terminal input/output attached to a real long-lived process. Support Ctrl-C, process exit, session close, and app lifecycle cleanup.
+- Use the same terminal/session layer for official Ubuntu and compatible imported distributions; do not hard-code Ubuntu-only paths after import.
+- If the rootfs passes structural inspection but no compatible execution layer is installed or supported for its architecture, report **rootfs detected, not runnable**. Do not mark it ready.
+
+## Security and resource limits
+
+- Do not disable SELinux, require root, or expose a localhost TCP service as a shortcut.
+- Do not trust archive paths, symlinks, hardlinks, special files, embedded checksums, or distribution labels.
+- Enforce compressed/expanded size, entry-count, path-length, and available-storage checks before/during extraction.
+- Handle cancellation, low storage, corrupt archives, unsupported ABI, duplicate taps, process crashes, and retry/rollback.
+- Keep the app-owned rootfs separate from the user's original archive; never modify or delete the source file.
 
 ## Acceptance criteria
 
-- The setup screen exposes exactly the two source choices above.
-- Internet setup uses a manifest-selected source; there is no raw URL input.
-- Storage import uses the Android system picker and works with content:// URIs.
-- Both paths call the same validator and installer.
-- Malformed, incompatible, oversized, or untrusted artifacts fail safely.
-- The previous working runtime remains intact if an update fails.
-- Success is shown only after C17 and C++20 programs compile and run.
+- The screen offers only the two setup choices above.
+- Internet download selects the app-configured Ubuntu URL from a trusted manifest, with no URL input field.
+- Storage import accepts supported Linux rootfs archives, including compatible Ubuntu/Debian/other distributions.
+- The app inspects the archive and extracted filesystem before treating it as a rootfs.
+- A non-rootfs archive, unsafe archive, incompatible ABI, or non-runnable rootfs is rejected with a clear reason.
+- Both source paths use the same validator/installer.
+- After successful setup, Terminal starts a real shell inside the app-managed active rootfs.
+- Terminal does not silently fall back to Android host shell or Termux.
+- Runtime activation and replacement are transactional and app-private.
+- Success is shown only after rootfs startup and required compile/run smoke tests pass.
