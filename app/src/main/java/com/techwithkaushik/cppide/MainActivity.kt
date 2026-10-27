@@ -552,7 +552,7 @@ private fun WorkspaceScreen(
                 Row(Modifier.fillMaxWidth().background(Color(0xFF0C1016)).padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("● UI PREVIEW", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
-                    Text("C17  •  UTF-8  •  Ln 1, Col 1", color = IdeMuted, fontSize = 10.sp)
+                    Text(if (activeFile.endsWith(".cpp")) "C++20  •  UTF-8  •  Ln 1, Col 1" else "C17  •  UTF-8  •  Ln 1, Col 1", color = IdeMuted, fontSize = 10.sp)
                 }
             }
         }
@@ -561,6 +561,9 @@ private fun WorkspaceScreen(
             Row(Modifier.fillMaxWidth().background(Color(0xFF151A22)).padding(start = 10.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 FileTab("main.c", activeFile == "main.c") { onFile("main.c") }
                 FileTab("main.cpp", activeFile == "main.cpp") { onFile("main.cpp") }
+                if (activeFile == "utils.h") {
+                    FileTab("utils.h", selected = true) { onFile("utils.h") }
+                }
                 Spacer(Modifier.weight(1f))
                 Text("＋", Modifier.clickable { onFile(if (activeFile == "main.c") "utils.h" else "main.c") }.padding(8.dp), color = IdeAccent, fontSize = 19.sp)
             }
