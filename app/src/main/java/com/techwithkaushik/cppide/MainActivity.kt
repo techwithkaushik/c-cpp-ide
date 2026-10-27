@@ -310,30 +310,69 @@ private fun WelcomeScreen(onNext: () -> Unit) {
 private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue: () -> Unit, onBack: () -> Unit) {
     Scaffold(
         containerColor = IdeBackground,
-        topBar = { TopAppBar(title = { Text("Set up your environment") }, navigationIcon = { Text("‹", Modifier.clickable(onClick = onBack).padding(horizontal = 18.dp), fontSize = 32.sp, color = IdeAccent) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)) }
+        topBar = {
+            TopAppBar(
+                title = { Text("Environment Setup", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    Text(
+                        "‹",
+                        Modifier.clickable(onClick = onBack).padding(horizontal = 18.dp),
+                        fontSize = 32.sp,
+                        color = IdeAccent
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)
+            )
+        }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Choose how to provide a Linux root filesystem.", color = IdeMuted)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                "Choose your Linux environment",
+                color = Color(0xFFF2F6FC),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "C/C++ tools will run inside this environment.",
+                color = IdeMuted,
+                fontSize = 14.sp
+            )
+            Spacer(Modifier.height(4.dp))
             SetupChoiceCard(
-                title = "Download Ubuntu from Internet",
-                subtitle = "Get the app's configured Ubuntu environment.",
+                title = "Download Ubuntu",
+                subtitle = "Download and configure automatically",
                 icon = "↓",
                 selected = selected == "Download Ubuntu from Internet",
                 onClick = { onSelect("Download Ubuntu from Internet") }
             )
             SetupChoiceCard(
-                title = "Use Downloaded Rootfs from Storage",
-                subtitle = "Import a compatible Ubuntu, Debian or other Linux rootfs archive.",
+                title = "Import a root filesystem",
+                subtitle = "Choose a Linux rootfs archive from storage",
                 icon = "▣",
                 selected = selected == "Use Downloaded Rootfs from Storage",
                 onClick = { onSelect("Use Downloaded Rootfs from Storage") }
             )
-            Card(colors = CardDefaults.cardColors(containerColor = IdeSurface), shape = RoundedCornerShape(14.dp)) {
-                Text("This is the UI-first prototype. Downloading, importing and runtime validation are not connected yet.", Modifier.padding(16.dp), color = IdeMuted, fontSize = 12.sp)
-            }
             Spacer(Modifier.weight(1f))
-            Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Continue to Projects  →") }
-            Text("Prototype navigation only — no rootfs is installed.", color = IdeMuted, fontSize = 11.sp)
+            Text(
+                "Setup actions are not connected in this UI prototype yet.",
+                color = IdeMuted,
+                fontSize = 11.sp
+            )
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Continue  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
