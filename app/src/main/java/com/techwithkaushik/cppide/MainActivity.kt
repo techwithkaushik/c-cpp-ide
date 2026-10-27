@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -607,7 +608,7 @@ private fun WorkspaceScreen(
         ) {
             // Compact AndroidIDE-style open-file strip: never let a tab consume the full row width.
             Row(
-                Modifier.fillMaxWidth().height(42.dp).background(Color(0xFF151A22)),
+                Modifier.fillMaxWidth().height(46.dp).background(Color(0xFF151A22)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FileTab(activeFile, selected = true) { onFile(activeFile) }
@@ -706,9 +707,23 @@ private fun ExplorerFileRow(
 
 @Composable
 private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
-    Column(Modifier.width(72.dp).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp)) {
-        Text(name, color = if (selected) IdeAccent else IdeMuted, fontSize = 12.sp)
-        Spacer(Modifier.height(5.dp))
+    val fileAccent = when {
+        name.endsWith(".cpp") || name.endsWith(".hpp") -> Color(0xFF9CBEFF)
+        name.endsWith(".h") -> Color(0xFFE5B978)
+        else -> Color(0xFF86D6B5)
+    }
+    Column(
+        Modifier
+            .widthIn(min = 72.dp, max = 190.dp)
+            .clickable(onClick = onClick)
+            .background(if (selected) IdeSurface else Color.Transparent)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(if (name.endsWith(".cpp") || name.endsWith(".hpp")) "C++" else "C", color = fileAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(7.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
     }
 }
@@ -716,12 +731,16 @@ private fun FileTab(name: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun BottomToolButton(label: String, icon: String, selected: Boolean, onClick: () -> Unit) {
     Column(
-        Modifier.clickable(onClick = onClick).background(if (selected) IdeSurfaceRaised else Color.Transparent, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 7.dp),
+        Modifier
+            .clickable(onClick = onClick)
+            .background(if (selected) Color(0xFF26384D) else Color.Transparent, RoundedCornerShape(11.dp))
+            .padding(horizontal = 13.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Text(icon, color = if (selected) IdeAccent else IdeMuted, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = if (selected) IdeAccent else IdeMuted, fontSize = 10.sp)
+        Text(icon, color = if (selected) IdeAccent else IdeMuted, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Box(Modifier.width(18.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent, RoundedCornerShape(1.dp)))
     }
 }
 
