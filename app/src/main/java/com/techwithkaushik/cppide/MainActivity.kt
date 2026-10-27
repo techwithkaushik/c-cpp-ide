@@ -113,6 +113,7 @@ private fun IdeUiPrototype() {
     val dirtyFiles = remember { mutableStateListOf<String>() }
     val fileContents = remember { mutableStateMapOf("main.c" to code) }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     var showExplorer by rememberSaveable { mutableStateOf(false) }
@@ -127,7 +128,7 @@ private fun IdeUiPrototype() {
         recentFiles.add(0, file)
     }
     fun closeFile(file: String) {
-        if (dirtyFiles.contains(file)) return
+        if (dirtyFiles.contains(file)) { pendingCloseFile = file; return }
         openFiles.remove(file)
         if (openFiles.isEmpty()) openFiles.add(if (file == "main.c") "main.cpp" else "main.c")
         if (activeFile == file) {
@@ -150,6 +151,33 @@ private fun IdeUiPrototype() {
     val editorController = remember { SoraEditorController() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    pendingCloseFile?.let { fileToClose ->
+        AlertDialog(
+            onDismissRequest = { pendingCloseFile = null },
+            containerColor = IdeSurface,
+            title = { Text("Unsaved changes", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
+            text = { Text("Save changes to $fileToClose before closing it?", color = IdeMuted) },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (fileToClose == activeFile) fileContents[fileToClose] = code
+                    dirtyFiles.remove(fileToClose)
+                    pendingCloseFile = null
+                    closeFile(fileToClose)
+                }) { Text("Save", color = IdeAccent) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        dirtyFiles.remove(fileToClose)
+                        pendingCloseFile = null
+                        closeFile(fileToClose)
+                    }) { Text("Discard", color = IdeMuted) }
+                    TextButton(onClick = { pendingCloseFile = null }) { Text("Cancel", color = IdeAccent) }
+                }
+            }
+        )
+    }
 
     if (screen != IdeScreen.Workspace) {
         when (screen) {
@@ -247,7 +275,7 @@ private fun IdeUiPrototype() {
                         "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                         "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                         "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                        "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code; selectedPanel = ToolPanel.Output; showToolPanel = true }
+                        "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
                         "Undo" -> editorController.undo()
                         "Redo" -> editorController.redo()
                     }
