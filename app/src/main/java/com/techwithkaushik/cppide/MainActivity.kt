@@ -340,6 +340,7 @@ private fun IdeUiPrototype() {
                         onFile = { file -> openFile(file) },
                         onAction = { action ->
                             when (action) {
+                                "Command Palette" -> { commandQuery = ""; showCommandPalette = true }
                                 "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                 "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                 "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
