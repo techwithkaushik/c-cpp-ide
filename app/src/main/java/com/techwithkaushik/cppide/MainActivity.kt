@@ -512,11 +512,20 @@ private fun IdeUiPrototype() {
                                             "Cut" -> editorController.cut()
                                             "Paste" -> editorController.paste()
                                             "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
-                                            "Save", "Save All" -> {
+                                            "Save" -> {
                                                 fileContents[activeFile] = code
                                                 runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }
                                                     .onSuccess { dirtyFiles.remove(activeFile) }
                                                     .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                            }
+                                            "Save All" -> {
+                                                fileContents[activeFile] = code
+                                                dirtyFiles.toList().forEach { file ->
+                                                    val content = fileContents[file] ?: ""
+                                                    runCatching { projectStorage.writeFile(selectedProject, file, content) }
+                                                        .onSuccess { dirtyFiles.remove(file) }
+                                                        .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                                }
                                             }
                                             "Settings" -> showSettings = true
                                             "File Explorer" -> showExplorer = !showExplorer
