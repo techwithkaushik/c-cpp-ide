@@ -18,7 +18,9 @@ class EmbeddedTermuxRuntimeTest {
 
         layout.ensurePrivateDirectories()
 
-        assertTrue(layout.rootDirectory.canonicalPath.startsWith(files.canonicalPath + File.separator))
+        assertEquals(files.canonicalPath, layout.rootDirectory.canonicalPath)
+        assertEquals(File(files, "usr").canonicalPath, layout.prefix.canonicalPath)
+        assertEquals(File(layout.prefix, "tmp").canonicalPath, layout.temporaryDirectory.canonicalPath)
         assertTrue(layout.home.isDirectory)
         assertTrue(layout.temporaryDirectory.isDirectory)
         assertFalse(layout.prefix.exists())
