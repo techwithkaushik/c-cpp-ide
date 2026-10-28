@@ -1296,7 +1296,7 @@ private fun ProjectListScreen(
                                             "Java" -> "J"
                                             "Kotlin" -> "K"
                                             "HTML/CSS" -> "5"
-                                            "Shell" -> "$"
+                                            "Shell" -> "\\$"
                                             else -> "M↓"
                                         },
                                         color = accent,
