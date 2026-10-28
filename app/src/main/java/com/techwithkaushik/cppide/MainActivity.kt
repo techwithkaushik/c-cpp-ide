@@ -940,9 +940,12 @@ private fun WorkspaceScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(activeFile, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        Text(projectName, fontSize = 11.sp, color = IdeMuted, maxLines = 1)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        FileTypeIcon(activeFile, 25.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(activeFile + if (dirtyFiles.contains(activeFile)) "  ●" else "", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(projectName, fontSize = 11.sp, color = IdeMuted, maxLines = 1)
+                        }
                     }
                 },
                 navigationIcon = {
@@ -986,15 +989,16 @@ private fun WorkspaceScreen(
                     BottomToolButton("Output", "output", selectedPanel == ToolPanel.Output) { onPanel(ToolPanel.Output) }
                 }
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xFF0C1016)).padding(horizontal = 12.dp, vertical = 5.dp),
+                    Modifier.fillMaxWidth().background(Color(0xFF007ACC)).padding(horizontal = 10.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("● READY", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("⌘", color = Color.White, fontSize = 11.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text("main", color = Color.White, fontSize = 10.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("✓ UI Prototype", color = Color.White, fontSize = 10.sp)
                     Spacer(Modifier.weight(1f))
-                    Text(
-                        if (activeFile.endsWith(".cpp")) "C++20 • UTF-8 • Ln 1, Col 1" else "C17 • UTF-8 • Ln 1, Col 1",
-                        color = IdeMuted, fontSize = 10.sp
-                    )
+                    Text(if (activeFile.endsWith(".cpp")) "C++  •  UTF-8  •  Ln 1, Col 1" else if (activeFile.endsWith(".c")) "C  •  UTF-8  •  Ln 1, Col 1" else "UTF-8  •  Ln 1, Col 1", color = Color.White, fontSize = 10.sp)
                 }
             }
         }
@@ -1029,8 +1033,12 @@ private fun WorkspaceScreen(
                 Modifier.fillMaxWidth().height(30.dp).background(Color(0xFF10151C)).padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Projects", color = IdeMuted, fontSize = 11.sp)
-                Text("  ›  $projectName  ›  $activeFile", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("workspace", color = IdeMuted, fontSize = 11.sp)
+                Text("  ›  $projectName  ›  ", color = IdeMuted, fontSize = 11.sp)
+                FileTypeIcon(activeFile, 15.dp)
+                Text(" $activeFile", color = Color(0xFFCAD4E0), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.weight(1f))
+                Text("⋯", color = IdeMuted, fontSize = 20.sp)
             }
             // The editor owns all remaining vertical space, like AndroidIDE's workspace.
             Box(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0F1218))) {
