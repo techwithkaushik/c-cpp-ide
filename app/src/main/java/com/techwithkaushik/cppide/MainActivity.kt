@@ -1225,28 +1225,7 @@ private fun LinuxInstallScreen(
                         Text("Ready: ${File(archivePath!!).name}", color = IdeGreen, fontSize = 12.sp)
                     }
                     if (selected == "Download Ubuntu from Internet") {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    busy = true; failed = false; message = "Downloading official Ubuntu archive…"
-                                    runCatching {
-                                        installer.downloadUbuntu { received, total ->
-                                            progressBytes = received
-                                            totalBytes = total
-                                        }
-                                    }.onSuccess { file ->
-                                        archivePath = file.absolutePath
-                                        message = "Download and SHA-256 verification complete. Tap Install Ubuntu."
-                                    }.onFailure {
-                                        failed = true
-                                        message = it.message ?: "Download failed."
-                                    }
-                                    busy = false
-                                }
-                            },
-                            enabled = !busy,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(if (busy) "Downloading…" else "Download Ubuntu archive") }
+                        Text("Download starts automatically. The screen will show download, extraction and environment setup progress.", color = IdeMuted, fontSize = 12.sp)
                     } else {
                         OutlinedButton(
                             onClick = { archivePicker.launch(arrayOf("*/*")) },
@@ -1254,34 +1233,19 @@ private fun LinuxInstallScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("Select downloaded archive") }
                     }
-                    if (busy && selected == "Download Ubuntu from Internet" && totalBytes > 0) {
-                        androidx.compose.material3.LinearProgressIndicator(
-                            progress = { (progressBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text("${progressBytes / (1024 * 1024)} / ${totalBytes / (1024 * 1024)} MB", color = IdeMuted, fontSize = 11.sp)
+                    if (busy) {
+                        if (phase == 1 && totalBytes > 0) {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { (progressBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text("${progressBytes / (1024 * 1024)} / ${totalBytes / (1024 * 1024)} MB", color = IdeMuted, fontSize = 11.sp)
+                        } else {
+                            androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
                     }
                 }
             }
-            Button(
-                onClick = {
-                    val path = archivePath ?: return@Button
-                    scope.launch {
-                        busy = true; failed = false; message = "Extracting and validating Linux root filesystem…"
-                        runCatching { installer.installArchive(File(path)) }
-                            .onSuccess { result ->
-                                message = "Rootfs extracted successfully to app-private storage. Runtime execution is not yet validated, so terminal and package installs are not marked ready."
-                            }
-                            .onFailure {
-                                failed = true
-                                message = it.message ?: "Linux installation failed."
-                            }
-                        busy = false
-                    }
-                },
-                enabled = !busy && archivePath != null,
-                modifier = Modifier.fillMaxWidth().height(50.dp)
-            ) { Text(if (busy) "Working…" else "Install Linux distribution") }
 
             if (message.isNotBlank()) {
                 Card(
