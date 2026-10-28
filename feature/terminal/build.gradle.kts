@@ -25,10 +25,9 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:aidl"))
 
-    // Reuse the upstream Termux emulator and View instead of maintaining a forked parser.
-    // Pin to the inspected termux/termux-app master commit; update via reviewed revision bumps.
-    implementation("com.github.termux.termux-app:terminal-emulator:8629e632fcb95da272221be327db653fb24befe9")
-    implementation("com.github.termux.termux-app:terminal-view:8629e632fcb95da272221be327db653fb24befe9")
+    // Upstream Termux 0.119.0-beta.3 publishes terminal-view and its terminal-emulator
+    // dependency through JitPack. Keep the emulator transitive to avoid duplicate versions.
+    implementation("com.github.Termux:Termux-app:v0.119.0-beta.3")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
