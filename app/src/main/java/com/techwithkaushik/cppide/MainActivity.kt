@@ -869,7 +869,7 @@ private fun IdeUiPrototype() {
                     val name = newFileName.trim()
                     val safeName = name.substringAfterLast('/')
                     val validName = safeName.isNotBlank() && safeName != "." && safeName != ".." &&
-                        safeName.none { it == '\\\\' || it.isISOControl() }
+                        safeName.none { it == 92.toChar() || it.isISOControl() }
                     if (validName && safeName !in workspaceFiles) {
                         val starter = sampleCode(safeName)
                         runCatching { projectStorage.writeFile(selectedProject, safeName, starter) }
