@@ -139,8 +139,6 @@ private fun IdeUiPrototype() {
         }
     }
     var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
-    var startupChecked by remember { mutableStateOf(false) }
-    var setupChoice by rememberSaveable { mutableStateOf(LinuxSetupConfig.DOWNLOAD_METHOD) }
     var selectedProject by rememberSaveable { mutableStateOf("Welcome Workspace") }
     var activeFile by rememberSaveable { mutableStateOf("README.md") }
     var code by rememberSaveable { mutableStateOf("# Welcome Workspace\n\nOpen any file to edit it.\n") }
@@ -206,10 +204,6 @@ private fun IdeUiPrototype() {
 
     // Startup no longer enters the legacy Ubuntu/PRoot installer flow.
     // Termux runtime readiness is handled by the dedicated integration bootstrap.
-    LaunchedEffect(Unit) {
-        startupChecked = true
-    }
-
     BackHandler(enabled = screen != IdeScreen.Welcome) {
         when (screen) {
             IdeScreen.Workspace -> screen = IdeScreen.Projects
@@ -739,12 +733,7 @@ private fun IdeUiPrototype() {
                                         val role = LanguageToolingCatalog.Role.valueOf(pathRole)
                                         runCatching {
                                             toolPathPreferences.set(pathLanguage, role, toolPathValue)
-                                            val rootfs = LinuxDistroInstaller(
-                                                appContext.filesDir,
-                                                appContext.contentResolver,
-                                                File(appContext.applicationInfo.nativeLibraryDir)
-                                            ).findInstalledRootfs()
-                                            val resolved = toolPathPreferences.resolvePath(pathLanguage, role, rootfs)
+                                            val resolved = toolPathPreferences.resolvePath(pathLanguage, role, null)
                                             toolPathStatus = when {
                                                 resolved == null -> "Saved, but no executable exists at this path in Android or the installed Linux rootfs."
                                                 resolved.guestPath != null -> "Linux executable found: ${resolved.guestPath}. Runtime execution still needs validation."
