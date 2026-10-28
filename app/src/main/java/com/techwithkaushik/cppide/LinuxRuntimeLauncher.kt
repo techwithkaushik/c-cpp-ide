@@ -12,8 +12,10 @@ import java.util.concurrent.TimeUnit
  * The PRoot executable is intentionally not inferred from an installed Termux app. It must be
  * provisioned by the standalone runtime bootstrap at linux/runtime/proot and validated on-device.
  */
-internal class LinuxRuntimeLauncher(private val filesDir: File) {
-    private val runtimeDir get() = File(filesDir, RUNTIME_DIRECTORY)
+internal class LinuxRuntimeLauncher(private val filesDir: File, private val nativeLibraryDir: File) {
+    // Android 10+ may mount ordinary app data as noexec. Bundle executable payloads in jniLibs,
+    // where PackageManager extracts them to nativeLibraryDir with executable permissions.
+    private val runtimeDir get() = nativeLibraryDir
     private val proot get() = File(runtimeDir, PROOT_EXECUTABLE)
 
     data class ValidationResult(
@@ -124,8 +126,7 @@ internal class LinuxRuntimeLauncher(private val filesDir: File) {
     }
 
     private companion object {
-        const val RUNTIME_DIRECTORY = "linux/runtime"
-        const val PROOT_EXECUTABLE = "proot"
+        const val PROOT_EXECUTABLE = "libproot.so"
         const val SMOKE_TIMEOUT_SECONDS = 15L
         const val SMOKE_MARKER = "CODE_STUDIO_LINUX_SHELL_OK"
         const val DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
