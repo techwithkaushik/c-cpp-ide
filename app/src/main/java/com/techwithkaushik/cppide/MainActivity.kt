@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide
 
 import android.os.Bundle
+import android.app.Activity
 import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import androidx.activity.ComponentActivity
@@ -54,6 +55,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -64,6 +66,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +74,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 
 private val IdeBackground = Color(0xFF101820)
 private val IdeSurface = Color(0xFF192733)
@@ -110,6 +115,16 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IdeUiPrototype() {
+    val localView = LocalView.current
+    val hostActivity = localView.context as? Activity
+    SideEffect {
+        hostActivity?.window?.let { window ->
+            WindowCompat.setDecorFitsSystemWindows(window, !fullScreen)
+            val controller = WindowCompat.getInsetsController(window, localView)
+            if (fullScreen) controller.hide(WindowInsetsCompat.Type.systemBars())
+            else controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
     var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
     var setupChoice by rememberSaveable { mutableStateOf("Download Ubuntu from Internet") }
     var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
@@ -124,6 +139,7 @@ private fun IdeUiPrototype() {
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
+    var fullScreen by rememberSaveable { mutableStateOf(false) }
     var showExplorer by rememberSaveable { mutableStateOf(true) }
     var activeActivity by rememberSaveable { mutableStateOf("Explorer") }
     var showProjectOverview by rememberSaveable { mutableStateOf(false) }
@@ -579,20 +595,6 @@ private fun IdeUiPrototype() {
                 )
             }
         }
-        if (showToolPanel) {
-            ModalBottomSheet(
-                onDismissRequest = { showToolPanel = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
-                containerColor = IdeSurface,
-                contentWindowInsets = { WindowInsets.navigationBars }
-            ) {
-                ToolPanelContent(
-                    selected = selectedPanel,
-                    onSelect = { selectedPanel = it },
-                    onClose = { showToolPanel = false }
-                )
-            }
-        }
     }
 
     if (newProjectDialog) {
@@ -649,7 +651,7 @@ private fun ProjectOverviewSheet(
                 Text("Project Overview", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("PROJECT SUMMARY", color = IdeMuted, fontSize = 10.sp)
             }
-            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+            Text("×", Modifier.clickable(onClick = onClose).padding(6.dp), color = IdeAccent, fontSize = 18.sp)
         }
         Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(14.dp)) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1045,6 +1047,10 @@ private fun WorkspaceScreen(
     onFile: (String) -> Unit,
     onAction: (String) -> Unit,
     selectedPanel: ToolPanel,
+    showToolPanel: Boolean,
+    fullScreen: Boolean,
+    onToggleFullScreen: () -> Unit,
+    onCloseToolPanel: () -> Unit,
     onPanel: (ToolPanel) -> Unit
 ) {
     Scaffold(
@@ -1076,11 +1082,11 @@ private fun WorkspaceScreen(
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
                         androidx.compose.material3.DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
-                            listOf("Command Palette", "Find", "Find in Project", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", "Settings", "Sync Project", "Cancel Build").forEach { action ->
+                            listOf("Command Palette", "Find", "Find in Project", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", if (fullScreen) "Exit Full Screen" else "Full Screen", "Settings", "Sync Project", "Cancel Build").forEach { action ->
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = { Text(action) },
-                                    leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project", "Command Palette" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; else -> "save" }, IdeAccent, 18.dp) },
-                                    onClick = { showOverflow = false; when (action) { "File Explorer" -> onExplorer(); "Terminal", "Build", "Problems", "Output" -> onAction(action); else -> onAction(action) } }
+                                    leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project", "Command Palette" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; "Full Screen", "Exit Full Screen" -> "fullscreen"; else -> "save" }, IdeAccent, 18.dp) },
+                                    onClick = { showOverflow = false; when (action) { "File Explorer" -> onExplorer(); "Full Screen", "Exit Full Screen" -> onToggleFullScreen(); "Terminal", "Build", "Problems", "Output" -> onAction(action); else -> onAction(action) } }
                                 )
                             }
                         }
@@ -1091,6 +1097,21 @@ private fun WorkspaceScreen(
         },
         bottomBar = {
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
+                if (showToolPanel) {
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 170.dp, max = 230.dp)
+                            .background(Color(0xFF10151C)),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Box(Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
+                            ToolPanelContent(
+                                selected = selectedPanel,
+                                onSelect = onPanel,
+                                onClose = onCloseToolPanel
+                            )
+                        }
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                         .padding(start = 10.dp, end = 6.dp, top = 2.dp),
@@ -1116,13 +1137,13 @@ private fun WorkspaceScreen(
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    Text("⌃", Modifier.clickable { onPanel(selectedPanel) }.padding(horizontal = 10.dp, vertical = 6.dp), color = IdeMuted, fontSize = 16.sp)
+                    Text(if (showToolPanel) "⌄" else "⌃", Modifier.clickable { if (showToolPanel) onCloseToolPanel() else onPanel(selectedPanel) }.padding(horizontal = 10.dp, vertical = 6.dp), color = IdeMuted, fontSize = 16.sp)
                 }
                 Row(
                     Modifier.fillMaxWidth().height(22.dp).background(Color(0xFF007ACC)).padding(horizontal = 8.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("⌘", color = Color.White, fontSize = 11.sp)
+                    Text(if (fullScreen) "⛶" else "⌘", Modifier.clickable(onClick = onToggleFullScreen), color = Color.White, fontSize = 11.sp)
                     Spacer(Modifier.width(6.dp))
                     Text("main", color = Color.White, fontSize = 10.sp)
                     Spacer(Modifier.width(12.dp))
@@ -1456,13 +1477,13 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         ToolPanel.Output -> "Output"
     }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 26.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("WORKSPACE TOOLS", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(title.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("PANEL", color = IdeMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
             Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
         }
