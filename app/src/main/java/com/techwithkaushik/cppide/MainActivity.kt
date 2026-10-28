@@ -252,15 +252,23 @@ private fun IdeUiPrototype() {
                 projects = projects,
                 onOpen = { project ->
                     selectedProject = project.name
-                    val entryFile = entryFileForLanguage(project.language)
+                    val diskFiles = runCatching { projectStorage.listFiles(project.name) }.getOrDefault(emptyList())
                     workspaceFiles.clear()
-                    workspaceFiles.addAll(listOf(entryFile, "README.md").distinct())
+                    workspaceFiles.addAll(diskFiles)
                     fileContents.clear()
-                    fileContents[entryFile] = sampleCode(entryFile)
-                    fileContents["README.md"] = sampleCode("README.md")
+                    diskFiles.forEach { file ->
+                        runCatching { projectStorage.readFile(project.name, file) }
+                            .onSuccess { fileContents[file] = it }
+                    }
+                    val entryFile = entryFileForLanguage(project.language)
+                    if (workspaceFiles.isEmpty()) {
+                        workspaceFiles.addAll(listOf(entryFile, "README.md").distinct())
+                        fileContents[entryFile] = sampleCode(entryFile)
+                        fileContents["README.md"] = sampleCode("README.md")
+                    }
                     openFiles.clear()
                     dirtyFiles.clear()
-                    openFile(entryFile)
+                    openFile(if (entryFile in workspaceFiles) entryFile else workspaceFiles.first())
                     screen = IdeScreen.Workspace
                 },
                 onNew = { newProjectDialog = true },
@@ -408,7 +416,11 @@ private fun IdeUiPrototype() {
                                 "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                 "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                                 "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                                "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
+                                "Save" -> {
+                                    runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }
+                                        .onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
+                                        .onFailure { error -> selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                }
                                 "Undo" -> editorController.undo()
                                 "Redo" -> editorController.redo()
                                 "Select All" -> editorController.selectAll()
