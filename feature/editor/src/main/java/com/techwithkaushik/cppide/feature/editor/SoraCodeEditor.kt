@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.rosemoe.sora.event.ContentChangeEvent
+import java.util.concurrent.atomic.AtomicBoolean
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 
@@ -97,6 +98,7 @@ fun SoraCodeEditor(
     wordWrap: Boolean = false
 ) {
     val currentOnCodeChange = rememberUpdatedState(onCodeChange)
+    val suppressProgrammaticChanges = androidx.compose.runtime.remember { AtomicBoolean(false) }
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -131,7 +133,7 @@ fun SoraCodeEditor(
                     }
                 }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
-                    currentOnCodeChange.value(text.toString())
+                    if (!suppressProgrammaticChanges.get()) currentOnCodeChange.value(text.toString())
                 }
             }
         },
@@ -145,7 +147,14 @@ fun SoraCodeEditor(
             editor.setScrollBarEnabled(true)
             editor.setHorizontalScrollBarEnabled(true)
             controller?.attach(editor)
-            if (editor.text.toString() != code) editor.setText(code)
+            if (editor.text.toString() != code) {
+                suppressProgrammaticChanges.set(true)
+                try {
+                    editor.setText(code)
+                } finally {
+                    suppressProgrammaticChanges.set(false)
+                }
+            }
         },
         onRelease = { editor ->
             controller?.detach(editor)
