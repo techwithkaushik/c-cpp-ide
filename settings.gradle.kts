@@ -11,8 +11,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Pinned upstream Termux terminal libraries; see docs/upstream-termux-revisions.md.
-        maven { url = uri("https://jitpack.io") }
     }
 }
 
