@@ -73,4 +73,5 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.commons.compress)
     ksp(libs.hilt.compiler)
+    testImplementation(libs.junit)
 }
