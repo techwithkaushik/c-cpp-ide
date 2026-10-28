@@ -1279,7 +1279,7 @@ private fun LinuxInstallScreen(
         ) {
             Text("Ubuntu Base 24.04.5", color = Color(0xFFF2F6FC), fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text(
-                if (selected == "Download Ubuntu from Internet")
+                if (selected == LinuxSetupConfig.DOWNLOAD_METHOD)
                     "Step 1 of 2 · Download and verify the archive, then explicitly install it."
                 else
                     "Choose an archive from storage. The IDE copies it into private storage before extraction.",
