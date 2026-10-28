@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
-          grep -q 'TERMUX_APP_PACKAGE' termux-packages/scripts/properties.sh
+          grep -q 'TERMUX_APP__PACKAGE_NAME' termux-packages/scripts/properties.sh
           python3 - <<'PY'
           from pathlib import Path
           import re
@@ -50,7 +50,7 @@ jobs:
           text = p.read_text()
           matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP_PACKAGE\s*=.*$', text))
           if len(matches) != 1:
-              raise SystemExit(f"Expected one TERMUX_APP_PACKAGE assignment; found {len(matches)}. Upstream changed; review required.")
+              raise SystemExit(f"Expected one TERMUX_APP__PACKAGE_NAME assignment; found {len(matches)}. Upstream changed; review required.")
           old = matches[0].group(0)
           indent = re.match(r'^\s*', old).group(0)
           export = "export " if old.lstrip().startswith("export ") else ""
