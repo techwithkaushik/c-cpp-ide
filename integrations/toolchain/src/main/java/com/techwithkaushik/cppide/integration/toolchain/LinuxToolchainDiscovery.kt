@@ -49,14 +49,16 @@ class LinuxToolchainDiscovery {
 
         for (name in recommended + aliases.keys) {
             val candidates = mutableListOf<Pair<File, LinuxTool.Source>>()
-            pathEntries.forEachIndexed { index, entry ->
+            pathEntries.forEach { entry ->
                 val relative = entry.removePrefix("/")
                 val dir = File(canonicalRoot, relative)
-                candidates += File(dir, name) to if (index == 0 && entry.startsWith("/usr/local")) {
+                val source = if (entry.startsWith("/opt/") || entry.startsWith("/usr/local/") ||
+                    entry.startsWith("/home/") || entry.startsWith("/root/")) {
                     LinuxTool.Source.MANUAL_PATH
                 } else {
                     LinuxTool.Source.DISTRO_PATH
                 }
+                candidates += File(dir, name) to source
             }
 
             // Common manual SDK layouts: /opt/<sdk>/bin and /usr/local/<sdk>/bin.
@@ -72,7 +74,7 @@ class LinuxToolchainDiscovery {
             val found = candidates.firstNotNullOfOrNull { (candidate, source) ->
                 val canonical = runCatching { candidate.canonicalFile }.getOrNull() ?: return@firstNotNullOfOrNull null
                 if (!canonical.toPath().startsWith(canonicalRoot.toPath())) return@firstNotNullOfOrNull null
-                if (canonical.isFile && (canonical.canExecute() || name == "sh")) {
+                if (canonical.isFile && canonical.canExecute()) {
                     LinuxTool(name, canonical.absolutePath, source)
                 } else null
             }
