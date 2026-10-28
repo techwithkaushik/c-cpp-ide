@@ -5,6 +5,10 @@
 **Status:** Architecture and implementation gates; runtime is not yet production-ready.  
 **Scope:** App-private Termux-compatible environment, no external Termux app, no Termux RUN_COMMAND IPC, Android 10+.
 
+## Upstream-first implementation rule
+
+This is an integration project, not a from-scratch Termux clone. Prefer the pinned upstream Termux modules and build system over new implementations. Reuse the upstream bootstrap/package build pipeline and packages, and audit/reuse the relevant installer, shell environment, execution compatibility and terminal components where dependencies and Android API constraints allow. Implement only the IDE-specific Android UI, project workflow and narrow glue/adapters. Do not invent a replacement shell, apt/dpkg, libc/linker, compiler toolchain or terminal parser. Record the upstream revision, exact reused components, local patches and licenses. Any component that cannot be reused must have a documented compatibility reason and a test proving the replacement is necessary.
+
 ## 1. Non-negotiable architecture decisions
 
 1. Code Studio owns its runtime, prefix, home, temporary files, package database and package lifecycle under its own app-private storage.
