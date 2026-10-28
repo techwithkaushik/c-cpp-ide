@@ -1047,15 +1047,15 @@ private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue
             )
             Spacer(Modifier.height(4.dp))
             SetupChoiceCard(
-                title = "Download Ubuntu",
-                subtitle = "Install the app-managed Ubuntu runtime for this device",
+                title = "Download first, then install",
+                subtitle = "Download the official Ubuntu Base archive, verify its SHA-256, then install it",
                 icon = "↓",
                 selected = selected == "Download Ubuntu from Internet",
                 onClick = { onSelect("Download Ubuntu from Internet") }
             )
             SetupChoiceCard(
-                title = "Import a root filesystem",
-                subtitle = "Import a compatible Ubuntu, Debian or other Linux rootfs archive",
+                title = "Select downloaded, then install",
+                subtitle = "Choose a Linux rootfs .tar.gz already saved on this phone",
                 icon = "▣",
                 selected = selected == "Use Downloaded Rootfs from Storage",
                 onClick = { onSelect("Use Downloaded Rootfs from Storage") }
@@ -1074,7 +1074,7 @@ private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue
                         fontSize = 12.sp
                     )
                     Text(
-                        "Runtime download, extraction and package installation are not wired to this screen yet; setup must not be treated as complete until runtime validation passes.",
+                        "The archive will be extracted into app-private storage. A real shell still requires the unprivileged Linux runtime to pass validation; extraction alone does not mark Linux ready.",
                         color = Color(0xFFFFC978),
                         fontSize = 11.sp
                     )
@@ -1088,6 +1088,165 @@ private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Continue  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinuxInstallScreen(
+    selected: String,
+    onBack: () -> Unit,
+    onInstalled: () -> Unit
+) {
+    val context = LocalContext.current
+    val installer = remember(context) { LinuxDistroInstaller(context.filesDir, context.contentResolver) }
+    val scope = rememberCoroutineScope()
+    var archivePath by rememberSaveable { mutableStateOf<String?>(null) }
+    var busy by rememberSaveable { mutableStateOf(false) }
+    var progressBytes by rememberSaveable { mutableStateOf(0L) }
+    var totalBytes by rememberSaveable { mutableStateOf(0L) }
+    var message by rememberSaveable { mutableStateOf("") }
+    var failed by rememberSaveable { mutableStateOf(false) }
+
+    val archivePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                busy = true
+                failed = false
+                message = "Importing selected archive…"
+                runCatching { installer.importArchive(uri) }
+                    .onSuccess { file ->
+                        archivePath = file.absolutePath
+                        message = "Archive selected: ${file.name}. Tap Install to extract it."
+                    }
+                    .onFailure {
+                        failed = true
+                        message = it.message ?: "Could not import archive."
+                    }
+                busy = false
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = IdeBackground,
+        topBar = {
+            TopAppBar(
+                title = { Text("Install Linux", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    Text("‹", Modifier.clickable(onClick = onBack).padding(horizontal = 18.dp), fontSize = 32.sp, color = IdeAccent)
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)
+            )
+        }
+    ) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 18.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("Ubuntu Base 24.04.5", color = Color(0xFFF2F6FC), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (selected == "Download Ubuntu from Internet")
+                    "Step 1 of 2 · Download and verify the archive, then explicitly install it."
+                else
+                    "Choose an archive from storage. The IDE copies it into private storage before extraction.",
+                color = IdeMuted, fontSize = 13.sp
+            )
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, IdeSurfaceRaised),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Distribution archive", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                    Text("Architecture is selected from this device's Android ABI (ARM64 or ARMv7). The download is checked against Ubuntu's published SHA256SUMS before it can be installed.", color = IdeMuted, fontSize = 12.sp)
+                    if (archivePath != null) {
+                        Text("Ready: ${File(archivePath!!).name}", color = IdeGreen, fontSize = 12.sp)
+                    }
+                    if (selected == "Download Ubuntu from Internet") {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    busy = true; failed = false; message = "Downloading official Ubuntu archive…"
+                                    runCatching {
+                                        installer.downloadUbuntu { received, total ->
+                                            progressBytes = received
+                                            totalBytes = total
+                                        }
+                                    }.onSuccess { file ->
+                                        archivePath = file.absolutePath
+                                        message = "Download and SHA-256 verification complete. Tap Install Ubuntu."
+                                    }.onFailure {
+                                        failed = true
+                                        message = it.message ?: "Download failed."
+                                    }
+                                    busy = false
+                                }
+                            },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(if (busy) "Downloading…" else "Download Ubuntu archive") }
+                    } else {
+                        OutlinedButton(
+                            onClick = { archivePicker.launch(arrayOf("*/*")) },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Select downloaded archive") }
+                    }
+                    if (busy && selected == "Download Ubuntu from Internet" && totalBytes > 0) {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { (progressBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("${progressBytes / (1024 * 1024)} / ${totalBytes / (1024 * 1024)} MB", color = IdeMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+            Button(
+                onClick = {
+                    val path = archivePath ?: return@Button
+                    scope.launch {
+                        busy = true; failed = false; message = "Extracting and validating Linux root filesystem…"
+                        runCatching { installer.installArchive(File(path)) }
+                            .onSuccess { result ->
+                                message = "Rootfs extracted successfully to app-private storage. Runtime execution is not yet validated, so terminal and package installs are not marked ready."
+                            }
+                            .onFailure {
+                                failed = true
+                                message = it.message ?: "Linux installation failed."
+                            }
+                        busy = false
+                    }
+                },
+                enabled = !busy && archivePath != null,
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) { Text(if (busy) "Working…" else "Install Linux distribution") }
+
+            if (message.isNotBlank()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = if (failed) Color(0xFF3B2529) else IdeSurface),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(message, Modifier.padding(12.dp), color = if (failed) Color(0xFFFFB4AB) else IdeMuted, fontSize = 12.sp)
+                }
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("What this step does", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                    Text("• Downloads or imports a rootfs archive\n• Verifies official download checksum\n• Extracts files into app-private storage\n• Checks for Linux os-release metadata", color = IdeMuted, fontSize = 12.sp)
+                    Text("What remains", color = Color(0xFFFFC978), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Text("The unprivileged runtime must still launch /bin/sh successfully before Linux packages, terminal, compiler or LSP can be enabled.", color = IdeMuted, fontSize = 12.sp)
+                }
+            }
+            OutlinedButton(onClick = onInstalled, modifier = Modifier.fillMaxWidth()) {
+                Text("Continue to projects (runtime validation pending)")
             }
         }
     }
