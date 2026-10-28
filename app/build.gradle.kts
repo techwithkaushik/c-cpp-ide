@@ -71,5 +71,6 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.hilt.android)
+    implementation(libs.commons.compress)
     ksp(libs.hilt.compiler)
 }
