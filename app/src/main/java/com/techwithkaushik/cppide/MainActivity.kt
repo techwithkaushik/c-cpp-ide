@@ -170,6 +170,9 @@ private fun IdeUiPrototype() {
         }
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showSourceControl by rememberSaveable { mutableStateOf(false) }
+    var showExtensions by rememberSaveable { mutableStateOf(false) }
+    var extensionQuery by rememberSaveable { mutableStateOf("") }
     var showSearch by rememberSaveable { mutableStateOf(false) }
     var showCommandPalette by rememberSaveable { mutableStateOf(false) }
     var commandQuery by rememberSaveable { mutableStateOf("") }
@@ -322,8 +325,8 @@ private fun IdeUiPrototype() {
                                         "Explorer" -> showExplorer = !showExplorer
                                         "Search" -> { searchInProject = true; searchQuery = ""; showSearch = true }
                                         "Run and Debug" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                                        "Source Control" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
-                                        "Extensions" -> showSettings = true
+                                        "Source Control" -> showSourceControl = true
+                                        "Extensions" -> { extensionQuery = ""; showExtensions = true }
                                     }
                                 }
                                 .background(if (selected) Color(0xFF202B37) else Color.Transparent)
@@ -524,6 +527,88 @@ private fun IdeUiPrototype() {
                 },
                 confirmButton = { TextButton(onClick = { showSearch = false }) { Text("Done", color = IdeAccent) } },
                 dismissButton = { TextButton(onClick = { searchQuery = "" }) { Text("Clear", color = IdeMuted) } }
+            )
+        }
+        if (showSourceControl) {
+            AlertDialog(
+                onDismissRequest = { showSourceControl = false },
+                containerColor = IdeSurface,
+                title = { Text("Source Control", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("WORKING TREE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Local editor changes for this session", color = IdeMuted, fontSize = 12.sp)
+                        if (dirtyFiles.isEmpty()) {
+                            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                IdeIcon("git", IdeGreen, 30.dp)
+                                Text("Working tree clean", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                                Text("Edit a file to see it listed here.", color = IdeMuted, fontSize = 12.sp)
+                            }
+                        } else {
+                            dirtyFiles.forEach { file ->
+                                Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    FileTypeIcon(file, 18.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp)
+                                    Text("M", color = Color(0xFFE5B978), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                            Text("Git repository operations are not connected yet.", color = Color(0xFFE5B978), fontSize = 11.sp)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSourceControl = false }) { Text("Done", color = IdeAccent) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { dirtyFiles.clear(); showSourceControl = false }) { Text("Clear indicators", color = IdeMuted) }
+                }
+            )
+        }
+        if (showExtensions) {
+            val extensions = listOf(
+                Triple("C/C++", "Language support · clangd integration planned", "C, C++, headers"),
+                Triple("CMake Tools", "Configure and build CMake projects", "CMake"),
+                Triple("Python", "Python editing and language server", "Python"),
+                Triple("Rust", "Rust editing and rust-analyzer", "Rust"),
+                Triple("Kotlin", "Kotlin source editing", "Kotlin"),
+                Triple("Web Tools", "HTML, CSS, JavaScript and TypeScript", "Web")
+            ).filter { it.first.contains(extensionQuery, ignoreCase = true) || it.third.contains(extensionQuery, ignoreCase = true) }
+            AlertDialog(
+                onDismissRequest = { showExtensions = false },
+                containerColor = IdeSurface,
+                title = { Text("Extensions", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = extensionQuery,
+                            onValueChange = { extensionQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Search language tools") },
+                            leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) }
+                        )
+                        Column(Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            extensions.forEach { (name, description, tags) ->
+                                Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(36.dp).background(IdeSurface, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                                        IdeIcon("extensions", IdeAccent, 20.dp)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text(name, color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Text(description, color = IdeMuted, fontSize = 10.sp)
+                                        Text(tags, color = IdeAccent, fontSize = 10.sp)
+                                    }
+                                    Text("Planned", color = IdeMuted, fontSize = 10.sp)
+                                }
+                            }
+                            if (extensions.isEmpty()) Text("No matching extensions.", color = IdeMuted, fontSize = 12.sp)
+                        }
+                        Text("Extension installation is not connected; this catalog is informational.", color = Color(0xFFE5B978), fontSize = 11.sp)
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showExtensions = false }) { Text("Done", color = IdeAccent) } }
             )
         }
         if (showSettings) {
