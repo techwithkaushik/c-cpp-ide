@@ -1028,12 +1028,25 @@ private fun WelcomeScreen(onNext: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue: () -> Unit, onBack: () -> Unit) {
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SetupScreen(
+    selected: String,
+    onSelect: (String) -> Unit,
+    onContinue: () -> Unit,
+    onBack: () -> Unit
+) {
+    val downloadSelected = selected == "Download Ubuntu from Internet"
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Environment Setup", fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Linux environment", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                        Text("INITIAL SETUP  •  STEP 2 OF 3", color = IdeMuted, fontSize = 10.sp, letterSpacing = 1.sp)
+                    }
+                },
                 navigationIcon = {
                     Text(
                         "‹",
@@ -1050,64 +1063,126 @@ private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                "Choose your Linux environment",
-                color = Color(0xFFF2F6FC),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "The IDE will use a real Linux userspace for the terminal, compiler, build tools and language servers.",
-                color = IdeMuted,
-                fontSize = 14.sp
-            )
-            Spacer(Modifier.height(4.dp))
-            SetupChoiceCard(
-                title = "Download first, then install",
-                subtitle = "Download the official Ubuntu Base archive, verify its SHA-256, then install it",
-                icon = "↓",
-                selected = selected == "Download Ubuntu from Internet",
-                onClick = { onSelect("Download Ubuntu from Internet") }
-            )
-            SetupChoiceCard(
-                title = "Select downloaded, then install",
-                subtitle = "Choose a Linux rootfs .tar.gz already saved on this phone",
-                icon = "▣",
-                selected = selected == "Use Downloaded Rootfs from Storage",
-                onClick = { onSelect("Use Downloaded Rootfs from Storage") }
-            )
-            Spacer(Modifier.weight(1f))
             Card(
-                colors = CardDefaults.cardColors(containerColor = IdeSurface),
-                shape = RoundedCornerShape(14.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, IdeSurfaceRaised)
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF14263A)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF294764)),
+                shape = RoundedCornerShape(22.dp)
             ) {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Packages stay inside Linux", color = Color(0xFFF2F6FC), fontWeight = FontWeight.SemiBold)
+                Column(
+                    Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF203D59)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("⌘", color = Color(0xFF83C8FF), fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Ubuntu for your IDE", color = Color(0xFFF2F6FC), fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                            Text("A Linux workspace on your device", color = Color(0xFF9CB5CC), fontSize = 12.sp)
+                        }
+                    }
                     Text(
-                        "Install clang, CMake, Git and language servers using the distribution's package manager when supported. Manually extracted toolchains can also be discovered from PATH or configured SDK folders such as /opt/<toolchain>/bin.",
-                        color = IdeMuted,
-                        fontSize = 12.sp
+                        "Choose how to get Ubuntu. Setup will download or import the archive, extract the filesystem and prepare the Linux environment.",
+                        color = Color(0xFFD2DFEC),
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
                     )
-                    Text(
-                        "The archive will be extracted into app-private storage. A real shell still requires the unprivileged Linux runtime to pass validation; extraction alone does not mark Linux ready.",
-                        color = Color(0xFFFFC978),
-                        fontSize = 11.sp
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        SetupInfoPill("Ubuntu Base")
+                        SetupInfoPill("SHA-256 check")
+                        SetupInfoPill("ARM-aware")
+                    }
                 }
             }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("CHOOSE INSTALL METHOD", color = IdeMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                SetupChoiceCard(
+                    title = "Download Ubuntu",
+                    subtitle = "Recommended · Get the official archive and start setup automatically.",
+                    icon = "↓",
+                    selected = downloadSelected,
+                    onClick = { onSelect("Download Ubuntu from Internet") }
+                )
+                SetupChoiceCard(
+                    title = "Choose from storage",
+                    subtitle = "Already have an Ubuntu rootfs .tar.gz? Select it from your device.",
+                    icon = "▣",
+                    selected = !downloadSelected,
+                    onClick = { onSelect("Use Downloaded Rootfs from Storage") }
+                )
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, IdeSurfaceRaised),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                    Text("WHAT HAPPENS NEXT", color = Color(0xFFF2F6FC), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.8.sp)
+                    SetupProgressRow("01", "Get Ubuntu archive", "Download with checksum verification or import from storage")
+                    SetupProgressRow("02", "Extract filesystem", "Unpack Ubuntu into the app's private Linux storage")
+                    SetupProgressRow("03", "Prepare environment", "Create Linux home and workspace, then validate runtime")
+                    HorizontalDivider(color = IdeSurfaceRaised)
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("ⓘ", color = Color(0xFFFFC978), fontSize = 18.sp)
+                        Text(
+                            "The terminal will appear after a compatible Linux runtime successfully launches Ubuntu's /bin/sh. Extracting files alone is not treated as a working Linux installation.",
+                            color = IdeMuted,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
             Button(
                 onClick = onContinue,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp)
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Continue  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (downloadSelected) "Download & set up Ubuntu" else "Choose archive", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Text("→", fontSize = 19.sp)
             }
+            Text(
+                "Packages such as Clang, CMake and Git will be installed inside Linux, not into Android.",
+                Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                color = IdeMuted,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun SetupInfoPill(label: String) {
+    Surface(color = Color(0xFF203D59), shape = RoundedCornerShape(50)) {
+        Text(label, Modifier.padding(horizontal = 9.dp, vertical = 5.dp), color = Color(0xFFB8DFFF), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun SetupProgressRow(number: String, title: String, detail: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).background(Color(0xFF203D59)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(number, color = Color(0xFF83C8FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(detail, color = IdeMuted, fontSize = 11.sp, lineHeight = 15.sp)
         }
     }
 }
