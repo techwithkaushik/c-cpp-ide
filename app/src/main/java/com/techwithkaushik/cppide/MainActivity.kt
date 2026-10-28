@@ -1030,8 +1030,6 @@ private fun WelcomeScreen(onNext: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun SetupScreen(
     selected: String,
     onSelect: (String) -> Unit,
