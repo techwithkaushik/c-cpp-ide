@@ -220,7 +220,7 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
                 "${LinuxSetupConfig.ENV_WORKSPACE}=${LinuxSetupConfig.WORKSPACE_PATH}",
                 "${LinuxSetupConfig.ENV_TMPDIR}=${LinuxSetupConfig.TMP_PATH}",
                 "${LinuxSetupConfig.ENV_PATH}=${LinuxSetupConfig.DEFAULT_PATH}"
-            ).joinToString("\\n", postfix = "\\n")
+            ).joinToString("\n", postfix = "\n")
         )
         config
     }
