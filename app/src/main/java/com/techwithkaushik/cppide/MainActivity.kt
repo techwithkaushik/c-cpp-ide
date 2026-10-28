@@ -1067,7 +1067,7 @@ private fun SetupScreen(
     onContinue: () -> Unit,
     onBack: () -> Unit
 ) {
-    val downloadSelected = selected == "Download Ubuntu from Internet"
+    val downloadSelected = selected == LinuxSetupConfig.DOWNLOAD_METHOD
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
@@ -1075,7 +1075,7 @@ private fun SetupScreen(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Linux environment", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                        Text("INITIAL SETUP  •  STEP 2 OF 3", color = IdeMuted, fontSize = 10.sp, letterSpacing = 1.sp)
+                        Text("Choose a Linux distribution", color = IdeMuted, fontSize = 11.sp)
                     }
                 },
                 navigationIcon = {
@@ -1098,41 +1098,8 @@ private fun SetupScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF14263A)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF294764)),
-                shape = RoundedCornerShape(22.dp)
-            ) {
-                Column(
-                    Modifier.fillMaxWidth().padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF203D59)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("⌘", color = Color(0xFF83C8FF), fontSize = 27.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text("Ubuntu for your IDE", color = Color(0xFFF2F6FC), fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                            Text("A Linux workspace on your device", color = Color(0xFF9CB5CC), fontSize = 12.sp)
-                        }
-                    }
-                    Text(
-                        "Choose how to get Ubuntu. Setup will download or import the archive, extract the filesystem and prepare the Linux environment.",
-                        color = Color(0xFFD2DFEC),
-                        fontSize = 13.sp,
-                        lineHeight = 19.sp
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        SetupInfoPill("Ubuntu Base")
-                        SetupInfoPill("SHA-256 check")
-                        SetupInfoPill("ARM-aware")
-                    }
-                }
-            }
+            Text("Ubuntu Base 24.04 LTS", color = Color(0xFFF2F6FC), fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Text("Choose download or an existing rootfs archive.", color = IdeMuted, fontSize = 12.sp)
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("CHOOSE INSTALL METHOD", color = IdeMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
@@ -1141,38 +1108,15 @@ private fun SetupScreen(
                     subtitle = "Recommended · Get the official archive and start setup automatically.",
                     icon = "↓",
                     selected = downloadSelected,
-                    onClick = { onSelect("Download Ubuntu from Internet") }
+                    onClick = { onSelect(LinuxSetupConfig.DOWNLOAD_METHOD) }
                 )
                 SetupChoiceCard(
                     title = "Choose from storage",
                     subtitle = "Already have an Ubuntu rootfs .tar.gz? Select it from your device.",
                     icon = "▣",
                     selected = !downloadSelected,
-                    onClick = { onSelect("Use Downloaded Rootfs from Storage") }
+                    onClick = { onSelect(LinuxSetupConfig.IMPORT_METHOD) }
                 )
-            }
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = IdeSurface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, IdeSurfaceRaised),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                    Text("WHAT HAPPENS NEXT", color = Color(0xFFF2F6FC), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.8.sp)
-                    SetupProgressRow("01", "Get Ubuntu archive", "Download with checksum verification or import from storage")
-                    SetupProgressRow("02", "Extract filesystem", "Unpack Ubuntu into the app's private Linux storage")
-                    SetupProgressRow("03", "Prepare environment", "Create Linux home and workspace, then validate runtime")
-                    Divider(color = IdeSurfaceRaised)
-                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text("ⓘ", color = Color(0xFFFFC978), fontSize = 18.sp)
-                        Text(
-                            "The terminal will appear after a compatible Linux runtime successfully launches Ubuntu's /bin/sh. Extracting files alone is not treated as a working Linux installation.",
-                            color = IdeMuted,
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
             }
 
             Button(
@@ -1184,13 +1128,6 @@ private fun SetupScreen(
                 Spacer(Modifier.width(8.dp))
                 Text("→", fontSize = 19.sp)
             }
-            Text(
-                "Packages such as Clang, CMake and Git will be installed inside Linux, not into Android.",
-                Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                color = IdeMuted,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
