@@ -44,8 +44,15 @@ jint matching_bracket(std::string_view text, jint cursor) {
     int depth = 0;
     for (jint i = cursor; i >= 0 && static_cast<size_t>(i) < text.size(); i += direction) {
         const char c = text[static_cast<size_t>(i)];
-        if (c == open) ++depth;
-        else if (c == close) --depth;
+        // When scanning backward, the encountered closing bracket is the
+        // opening side of the scan and vice versa.
+        if (direction > 0) {
+            if (c == open) ++depth;
+            else if (c == close) --depth;
+        } else {
+            if (c == close) ++depth;
+            else if (c == open) --depth;
+        }
         if (depth == 0) return i;
     }
     return -1;
