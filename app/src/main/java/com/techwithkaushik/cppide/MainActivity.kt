@@ -96,7 +96,7 @@ private val IdeAccent = Color(0xFF659AD2)
 private val IdeMuted = Color(0xFF9AA8BA)
 private val IdeGreen = Color(0xFF7DDBB0)
 
-private enum class IdeScreen { Welcome, Setup, LinuxInstall, Projects, Workspace }
+private enum class IdeScreen { Welcome, Projects, Workspace }
 private enum class ToolPanel { Terminal, Build, Problems, Output }
 
 private data class IdeProject(val name: String, val language: String, val path: String, val updated: String)
@@ -204,31 +204,16 @@ private fun IdeUiPrototype() {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Reconcile saved Linux files before normal navigation; never reset the user's files.
-    val appContext = LocalContext.current
-    LaunchedEffect(appContext) {
-        if (!startupChecked) {
-            val installer = LinuxDistroInstaller(appContext.filesDir, appContext.contentResolver, File(appContext.applicationInfo.nativeLibraryDir))
-            val rootfs = installer.findInstalledRootfs()
-            val archive = installer.findDownloadedArchive()
-            val interruptedDownload = installer.hasInterruptedDownload()
-            if (rootfs != null) {
-                setupChoice = LinuxSetupConfig.DOWNLOAD_METHOD
-                screen = IdeScreen.LinuxInstall
-            } else if (archive != null || interruptedDownload) {
-                setupChoice = LinuxSetupConfig.DOWNLOAD_METHOD
-                screen = IdeScreen.LinuxInstall
-            }
-            startupChecked = true
-        }
+    // Startup no longer enters the legacy Ubuntu/PRoot installer flow.
+    // Termux runtime readiness is handled by the dedicated integration bootstrap.
+    LaunchedEffect(Unit) {
+        startupChecked = true
     }
 
     BackHandler(enabled = screen != IdeScreen.Welcome) {
         when (screen) {
             IdeScreen.Workspace -> screen = IdeScreen.Projects
-            IdeScreen.LinuxInstall -> screen = IdeScreen.Setup
-            IdeScreen.Setup -> screen = IdeScreen.Welcome
-            IdeScreen.Projects -> screen = IdeScreen.Setup
+            IdeScreen.Projects -> screen = IdeScreen.Welcome
             IdeScreen.Welcome -> Unit
         }
     }
@@ -263,18 +248,7 @@ private fun IdeUiPrototype() {
     if (screen != IdeScreen.Workspace) {
         when (screen) {
             IdeScreen.Welcome -> WelcomeScreen(
-                onNext = { screen = IdeScreen.Setup }
-            )
-            IdeScreen.Setup -> SetupScreen(
-                selected = setupChoice,
-                onSelect = { setupChoice = it },
-                onContinue = { screen = IdeScreen.LinuxInstall },
-                onBack = { screen = IdeScreen.Welcome }
-            )
-            IdeScreen.LinuxInstall -> LinuxInstallScreen(
-                selected = setupChoice,
-                onBack = { screen = IdeScreen.Setup },
-                onInstalled = { screen = IdeScreen.Projects }
+                onNext = { screen = IdeScreen.Projects }
             )
             IdeScreen.Projects -> ProjectListScreen(
                 projects = projects,
@@ -292,7 +266,7 @@ private fun IdeUiPrototype() {
                     screen = IdeScreen.Workspace
                 },
                 onNew = { newProjectDialog = true },
-                onSettings = { screen = IdeScreen.Setup }
+                onSettings = { showSettings = true }
             )
             else -> Unit
         }
@@ -321,7 +295,7 @@ private fun IdeUiPrototype() {
                                     "Recent Files" -> showRecentFiles = true
                                     "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                     "Build / Problems" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                                    "Runtime Setup" -> screen = IdeScreen.Setup
+                                    "Runtime Setup" -> { showSettings = true }
                                     "Settings" -> showSettings = true
                                 }
                                 scope.launch { drawerState.close() }
