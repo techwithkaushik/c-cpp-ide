@@ -9,6 +9,36 @@
 
 This is an integration project, not a from-scratch Termux clone. Prefer the pinned upstream Termux modules and build system over new implementations. Reuse the upstream bootstrap/package build pipeline and packages, and audit/reuse the relevant installer, shell environment, execution compatibility and terminal components where dependencies and Android API constraints allow. Implement only the IDE-specific Android UI, project workflow and narrow glue/adapters. Do not invent a replacement shell, apt/dpkg, libc/linker, compiler toolchain or terminal parser. Record the upstream revision, exact reused components, local patches and licenses. Any component that cannot be reused must have a documented compatibility reason and a test proving the replacement is necessary.
 
+## AndroidIDE Termux source audit (pinned reference)
+
+Reference inspected: [AndroidIDEOfficial/AndroidIDE](https://github.com/AndroidIDEOfficial/AndroidIDE/tree/77ee1a315f34b9ed74a9da94f94a0dc276f72ff6/termux), commit `77ee1a315f34b9ed74a9da94f94a0dc276f72ff6`.
+
+The reference splits Termux into four Gradle library modules. Use this as the integration map, not as permission to copy AndroidIDE's entire application or its unrelated build infrastructure:
+
+| Upstream module | Relevant responsibility | C-Cpp-IDE integration target |
+|---|---|---|
+| `termux/emulator` | Termux terminal emulator, buffer, key handling, JNI terminal/session implementation | Reuse as the terminal engine; preserve upstream JNI and tests |
+| `termux/view` | TerminalView, renderer, touch/gesture and text-selection behavior | Reuse for the terminal UI inside `:feature:terminal`, adapting only the host view/client glue |
+| `termux/shared` | Termux constants, bootstrap installer helpers, shell environment/session utilities and shared Android helpers | Reuse narrowly selected bootstrap/environment/session components in `:integrations:termux-runtime`; avoid dragging unrelated AndroidIDE app dependencies |
+| `termux/application` | Termux application/service/activity integration, installer, bootstrap build integration and setup assets | Audit `TermuxInstaller`, `TermuxApplication`, `TermuxService` and native bootstrap helper; adapt the required lifecycle to the IDE's app-private runtime rather than importing AndroidIDE's activities wholesale |
+
+### Important build compatibility findings
+
+- These modules are **not drop-in standalone Gradle projects**. Their build files import AndroidIDE build configuration/version catalogs and some depend on AndroidIDE projects such as `core.common`, `core.resources`, `utilities.preferences`, `utilities.buildInfo`, plus the AndroidIDE bootstrap Gradle plugin.
+- The upstream `termux/application` module applies `TerminalBootstrapPackagesPlugin` and derives package identity from AndroidIDE build configuration. The custom app must instead build and verify its own `com.techwithkaushik.cppide` bootstrap.
+- Do not add `:termux:application` blindly to this project's settings: first remove/adapt AndroidIDE-only Gradle dependencies, then prove that the module builds and its package prefix, ABI and bootstrap artifact match this app.
+- Keep the upstream license and copyright notices for every reused source file. Record local changes separately and retain upstream tests where practical.
+- Source reference is pinned to the commit above; do not silently track AndroidIDE's moving default branch.
+- This audit records the source/module map only. It does **not** claim the four modules have already been copied, wired into Gradle, or passed CI/device tests.
+
+### Integration sequence
+
+1. Vendor/adapt the emulator and view modules with upstream notices and tests, removing only dependencies proven unnecessary for those modules.
+2. Replace AndroidIDE-specific project references in shared code with either the upstream-compatible dependency or a small IDE adapter; do not rewrite Termux behavior wholesale.
+3. Integrate the upstream bootstrap installer and shell environment semantics with the app-private prefix and verified custom bootstrap artifact.
+4. Wire the terminal view to the runtime's managed interactive session; keep the editor's one-shot build/run path separate from interactive terminal sessions.
+5. Build CI and run emulator unit tests, app unit tests, then device smoke tests for shell, interactive PTY, resize, keyboard/input, cancellation and C/C++ compile/run before reporting the runtime as ready.
+
 ## 1. Non-negotiable architecture decisions
 
 1. Code Studio owns its runtime, prefix, home, temporary files, package database and package lifecycle under its own app-private storage.
