@@ -148,6 +148,8 @@ private fun IdeUiPrototype() {
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showSearch by rememberSaveable { mutableStateOf(false) }
+    var showCommandPalette by rememberSaveable { mutableStateOf(false) }
+    var commandQuery by rememberSaveable { mutableStateOf("") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchInProject by rememberSaveable { mutableStateOf(false) }
     var editorFontSize by rememberSaveable { mutableStateOf(13f) }
@@ -359,6 +361,80 @@ private fun IdeUiPrototype() {
                     )
                 }
             }
+        }
+        if (showCommandPalette) {
+            val commands = listOf(
+                "New File", "Find", "Find in Project", "Save", "Save All",
+                "Build", "Run", "Terminal", "Problems", "Output",
+                "File Explorer", "Settings", "Sync Project"
+            )
+            val matches = commands.filter { it.contains(commandQuery, ignoreCase = true) }
+            AlertDialog(
+                onDismissRequest = { showCommandPalette = false },
+                containerColor = Color(0xFF1B2633),
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Command Palette", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                        OutlinedTextField(
+                            value = commandQuery,
+                            onValueChange = { commandQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("Type a command…") },
+                            leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) }
+                        )
+                    }
+                },
+                text = {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
+                        if (matches.isEmpty()) {
+                            Text("No matching commands", color = IdeMuted, modifier = Modifier.padding(12.dp))
+                        }
+                        matches.forEach { command ->
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        showCommandPalette = false
+                                        when (command) {
+                                            "New File" -> onFile(if (activeFile == "main.c") "main.cpp" else "utils.h")
+                                            "File Explorer" -> showExplorer = !showExplorer
+                                            "Terminal", "Build", "Problems", "Output" -> onAction(command)
+                                            else -> onAction(command)
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IdeIcon(
+                                    when (command) {
+                                        "Terminal" -> "terminal"
+                                        "Build", "Run" -> "build"
+                                        "Problems" -> "problems"
+                                        "File Explorer", "New File" -> "folder"
+                                        "Settings" -> "settings"
+                                        else -> "command"
+                                    }, IdeAccent, 18.dp
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(command, color = Color(0xFFE8EDF5), fontSize = 14.sp)
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    when (command) {
+                                        "Save" -> "Ctrl+S"
+                                        "Find" -> "Ctrl+F"
+                                        "Command Palette" -> "Ctrl+Shift+P"
+                                        else -> ""
+                                    }, color = IdeMuted, fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showCommandPalette = false }) { Text("Close", color = IdeAccent) }
+                }
+            )
         }
         if (showSearch) {
             val pattern = remember(searchQuery) { if (searchQuery.isBlank()) null else Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE) }
@@ -997,10 +1073,10 @@ private fun WorkspaceScreen(
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
                         androidx.compose.material3.DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
-                            listOf("Find", "Find in Project", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", "Settings", "Sync Project", "Cancel Build").forEach { action ->
+                            listOf("Command Palette", "Find", "Find in Project", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", "Settings", "Sync Project", "Cancel Build").forEach { action ->
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = { Text(action) },
-                                    leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; else -> "save" }, IdeAccent, 18.dp) },
+                                    leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project", "Command Palette" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; else -> "save" }, IdeAccent, 18.dp) },
                                     onClick = { showOverflow = false; when (action) { "File Explorer" -> onExplorer(); "Terminal", "Build", "Problems", "Output" -> onAction(action); else -> onAction(action) } }
                                 )
                             }
@@ -1013,14 +1089,31 @@ private fun WorkspaceScreen(
         bottomBar = {
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .padding(start = 10.dp, end = 6.dp, top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BottomToolButton("Terminal", "terminal", selectedPanel == ToolPanel.Terminal) { onPanel(ToolPanel.Terminal) }
-                    BottomToolButton("Build", "build", selectedPanel == ToolPanel.Build) { onPanel(ToolPanel.Build) }
-                    BottomToolButton("Problems", "problems", selectedPanel == ToolPanel.Problems) { onPanel(ToolPanel.Problems) }
-                    BottomToolButton("Output", "output", selectedPanel == ToolPanel.Output) { onPanel(ToolPanel.Output) }
+                    listOf(
+                        Triple("PROBLEMS", ToolPanel.Problems, "problems"),
+                        Triple("OUTPUT", ToolPanel.Output, "output"),
+                        Triple("DEBUG CONSOLE", ToolPanel.Build, "build"),
+                        Triple("TERMINAL", ToolPanel.Terminal, "terminal")
+                    ).forEach { (label, panel, icon) ->
+                        val selected = selectedPanel == panel
+                        Column(
+                            Modifier.clickable { onPanel(panel) }.padding(end = 18.dp, top = 7.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                IdeIcon(icon, if (selected) IdeAccent else IdeMuted, 15.dp)
+                                Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                            }
+                            Spacer(Modifier.height(7.dp))
+                            Box(Modifier.width(28.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("⌃", Modifier.clickable { onPanel(selectedPanel) }.padding(horizontal = 10.dp, vertical = 6.dp), color = IdeMuted, fontSize = 16.sp)
                 }
                 Row(
                     Modifier.fillMaxWidth().background(Color(0xFF007ACC)).padding(horizontal = 10.dp, vertical = 4.dp),
