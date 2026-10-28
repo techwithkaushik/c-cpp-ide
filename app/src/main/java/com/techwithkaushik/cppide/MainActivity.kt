@@ -923,7 +923,8 @@ private fun ProjectListScreen(
         containerColor = IdeBackground,
         topBar = {
             TopAppBar(
-                title = { Column { Text("Projects", fontWeight = FontWeight.Bold); Text("Your coding workspace", color = IdeMuted, fontSize = 12.sp) } },
+                modifier = Modifier.height(52.dp),
+                title = { Column { Text("Projects", fontWeight = FontWeight.SemiBold, fontSize = 16.sp); Text("Your coding workspace", color = IdeMuted, fontSize = 10.sp) } },
                 actions = { Text("⚙", Modifier.clickable(onClick = onSettings).padding(horizontal = 18.dp), fontSize = 22.sp, color = IdeMuted) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)
             )
@@ -932,31 +933,31 @@ private fun ProjectListScreen(
             Button(onClick = onNew) { Text("+  New Project") }
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 18.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp)) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search projects") },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                label = { Text("Search projects", fontSize = 12.sp) },
                 leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) },
                 singleLine = true,
                 shape = RoundedCornerShape(8.dp)
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(8.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF172536)),
                 shape = RoundedCornerShape(8.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF29435D))
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(42.dp).background(Color(0xFF263D55), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(34.dp).background(Color(0xFF263D55), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                             Text("C/C++", color = IdeAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Start coding", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Start coding", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             Text("Create or open a C/C++ workspace", color = IdeMuted, fontSize = 12.sp)
                         }
                     }
@@ -974,32 +975,32 @@ private fun ProjectListScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("RECENT", fontSize = 12.sp, letterSpacing = 1.sp, color = IdeMuted, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Text("${projects.size} projects", color = IdeMuted, fontSize = 12.sp)
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
             val visible = projects.filter { it.name.contains(query, ignoreCase = true) }
             if (visible.isEmpty()) {
                 EmptyProjects(onNew = onNew)
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 76.dp)) {
                     items(visible, key = { it.name }) { project ->
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable { onOpen(project) },
                             colors = CardDefaults.cardColors(containerColor = IdeSurface),
-                            shape = RoundedCornerShape(18.dp)
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.size(44.dp).background(IdeSurfaceRaised, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                                    Box(Modifier.size(36.dp).background(IdeSurfaceRaised, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                                         Text(if (project.language == "C++20") "C++" else "C", color = IdeAccent, fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text(project.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                                        Text(project.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                         Text(project.language, color = IdeAccent, fontSize = 12.sp)
                                     }
                                     Text("›", color = IdeMuted, fontSize = 28.sp)
