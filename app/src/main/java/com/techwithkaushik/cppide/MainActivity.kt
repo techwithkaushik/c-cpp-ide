@@ -517,7 +517,7 @@ private fun IdeUiPrototype() {
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("Editor", "C/C++", "Build", "Appearance").forEach { category ->
+                            listOf("Editor", "Languages", "Build", "Appearance").forEach { category ->
                                 if (settingsCategory == category) {
                                     Button(onClick = { settingsCategory = category }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 7.dp)) { Text(category, fontSize = 11.sp) }
                                 } else {
@@ -543,12 +543,12 @@ private fun IdeUiPrototype() {
                                 }
                                 SettingsInfoRow("Editor engine", "Sora code editor")
                             }
-                            "C/C++" -> {
-                                Text("LANGUAGE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                SettingsInfoRow("Supported source", "C (.c), C++ (.cpp)")
-                                SettingsInfoRow("Header files", ".h / .hpp")
-                                SettingsInfoRow("Language standard", "C17 / C++20 (preview)")
-                                SettingsInfoRow("Language server", "clangd — not connected")
+                            "Languages" -> {
+                                Text("LANGUAGE SUPPORT", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                SettingsInfoRow("Editor scope", "Multi-language code and text editor")
+                                SettingsInfoRow("File types", "C/C++, Python, Java, Kotlin, JS/TS, HTML/CSS, JSON, Markdown, and more")
+                                SettingsInfoRow("Language services", "Syntax highlighting and LSP integration are being expanded")
+                                Text("Language-specific tooling can be enabled per project.", color = IdeMuted, fontSize = 11.sp)
                             }
                             "Build" -> {
                                 Text("BUILD TOOLCHAIN", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
