@@ -1248,7 +1248,10 @@ private fun LinuxInstallScreen(
         installer.prepareEnvironment(rootfs)
         phase = 5
         message = LinuxSetupConfig.VALIDATING
-        check(installer.hasExecutionRuntime(rootfs)) { LinuxSetupConfig.RUNTIME_MISSING }
+        val runtimeValidation = installer.validateExecutionRuntime(rootfs)
+        check(runtimeValidation.active) {
+            listOf(LinuxSetupConfig.RUNTIME_MISSING, runtimeValidation.reason.orEmpty()).filter { it.isNotBlank() }.joinToString(" ")
+        }
         onInstalled()
     }
 
