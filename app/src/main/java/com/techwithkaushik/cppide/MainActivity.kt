@@ -1393,7 +1393,9 @@ private fun LinuxInstallScreen(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(message, color = if (failed) Color(0xFFFFB4AB) else IdeMuted, fontSize = 12.sp)
-                        if (failed && selected == LinuxSetupConfig.DOWNLOAD_METHOD) {
+                        if (failed && selected == LinuxSetupConfig.DOWNLOAD_METHOD &&
+                            (phase == 1 || message == LinuxSetupConfig.INTERRUPTED_DOWNLOAD)
+                        ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 TextButton(
                                     onClick = {
