@@ -364,6 +364,11 @@ private fun IdeUiPrototype() {
                                 "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
                                 "Undo" -> editorController.undo()
                                 "Redo" -> editorController.redo()
+                                "Select All" -> editorController.selectAll()
+                                "Copy" -> editorController.copy()
+                                "Cut" -> editorController.cut()
+                                "Paste" -> editorController.paste()
+                                "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
                                 "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
                                 "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
                                 "Save All" -> { openFiles.forEach { file -> if (file == activeFile) fileContents[file] = code }; dirtyFiles.clear() }
@@ -385,7 +390,8 @@ private fun IdeUiPrototype() {
         }
         if (showCommandPalette) {
             val commands = listOf(
-                "New File", "Find", "Find in Project", "Save", "Save All",
+                "New File", "Find", "Find in Project", "Select All", "Copy", "Cut", "Paste",
+                "Undo", "Redo", "Toggle Word Wrap", "Save", "Save All",
                 "Build", "Run", "Terminal", "Problems", "Output",
                 "File Explorer", "Settings", "Sync Project"
             )
@@ -1086,7 +1092,7 @@ private fun WorkspaceScreen(
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
                         androidx.compose.material3.DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
-                            listOf("Command Palette", "Find", "Find in Project", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", if (fullScreen) "Exit Full Screen" else "Full Screen", "Settings", "Sync Project", "Cancel Build").forEach { action ->
+                            listOf("Command Palette", "Find", "Find in Project", "Select All", "Copy", "Cut", "Paste", "Undo", "Redo", "Toggle Word Wrap", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", if (fullScreen) "Exit Full Screen" else "Full Screen", "Settings", "Sync Project", "Cancel Build").forEach { action ->
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = { Text(action) },
                                     leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project", "Command Palette" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; "Full Screen", "Exit Full Screen" -> "fullscreen"; else -> "save" }, IdeAccent, 18.dp) },
