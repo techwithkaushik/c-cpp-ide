@@ -188,8 +188,17 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
         check(home.mkdirs() || home.isDirectory) { "Could not create Linux HOME." }
         check(workspace.mkdirs() || workspace.isDirectory) { "Could not create Linux workspace." }
         check(tmp.mkdirs() || tmp.isDirectory) { "Could not create Linux temporary directory." }
-        val config = File(filesDir, "linux/environment.properties")
-        config.writeText("DISTRO=ubuntu\\nROOTFS=" + root.absolutePath + "\\nHOME=/home/ide\\nWORKSPACE=/workspace\\nTMPDIR=/tmp\\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\\n")
+        val config = File(File(filesDir, "linux"), LinuxSetupConfig.ENV_FILE_NAME)
+        config.writeText(
+            listOf(
+                "${LinuxSetupConfig.ENV_DISTRO}=${LinuxSetupConfig.DISTRO_ID}",
+                "${LinuxSetupConfig.ENV_ROOTFS}=${root.absolutePath}",
+                "${LinuxSetupConfig.ENV_HOME}=${LinuxSetupConfig.HOME_PATH}",
+                "${LinuxSetupConfig.ENV_WORKSPACE}=${LinuxSetupConfig.WORKSPACE_PATH}",
+                "${LinuxSetupConfig.ENV_TMPDIR}=${LinuxSetupConfig.TMP_PATH}",
+                "${LinuxSetupConfig.ENV_PATH}=${LinuxSetupConfig.DEFAULT_PATH}"
+            ).joinToString("\\n", postfix = "\\n")
+        )
         config
     }
 
