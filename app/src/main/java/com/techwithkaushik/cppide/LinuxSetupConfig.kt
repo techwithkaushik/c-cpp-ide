@@ -6,6 +6,7 @@ internal object LinuxSetupConfig {
     const val IMPORT_METHOD = "Use Downloaded Rootfs from Storage"
 
     const val DOWNLOADING = "Downloading Ubuntu…"
+    const val INTERRUPTED_DOWNLOAD = "The previous download was interrupted. Retry it or select an archive from storage."
     const val VERIFYING = "Checking saved Ubuntu archive…"
     const val EXTRACTING = "Extracting Ubuntu…"
     const val ROOTFS_FOUND = "Existing Ubuntu filesystem found."
