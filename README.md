@@ -60,3 +60,10 @@ The first spike evaluates the documented Termux command API for finite commands.
 The current branch includes a temporary diagnostic screen and a minimal `:integrations:termux` adapter. The screen checks whether Termux is visible, whether its RUN_COMMAND service resolves, whether the IDE permission is granted, and whether a fixed harmless command returns the expected marker.
 
 This remains a **capability spike, not a device-validated production compiler integration**. The adapter has an initial argv-based C/C++ compile-and-run spike using Termux clang/clang++, with bounded arguments and executable output restricted to Termux home or usr/tmp. This is one language adapter, not the IDE's product scope. It does not yet provide workspace synchronization, a code editor flow, persistent LSP streams, terminal PTY, or debugging. The compile/run path has unit tests but still requires a successful CI run and real-device validation. See [the validation matrix](docs/architecture/termux-capability-spike.md) before treating any capability as supported.
+
+
+## Multi-language workspace and tools
+
+Code Studio is intended to be file-first: the active file selects the language service, and missing language tools are installed only when requested. Users can configure absolute executable paths for pre-downloaded tools under Settings → Languages. These paths are persisted per language and tool role; they become active only when the runtime process launcher resolves them.
+
+See [file-aware language tooling and workspace architecture](docs/architecture/language-tooling-and-workspace.md) for the runtime activation gate, on-demand tool installation, LSP diagnostics, and external path contract.
