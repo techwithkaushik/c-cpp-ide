@@ -69,18 +69,18 @@ data class RuntimeLayout private constructor(
     companion object {
         fun fromAppFilesDirectory(filesDirectory: File): RuntimeLayout {
             val appFiles = filesDirectory.canonicalFile
-            val root = File(appFiles, "embedded-termux")
+            val root = appFiles
             val layout = RuntimeLayout(
                 appFilesDirectory = appFiles,
                 rootDirectory = root,
                 prefix = File(root, "usr"),
                 home = File(root, "home"),
-                temporaryDirectory = File(root, "tmp"),
+                temporaryDirectory = File(File(root, "usr"), "tmp"),
             )
             layout.requirePrivateChild(layout.rootDirectory, appFiles)
             layout.requirePrivateChild(layout.prefix, root)
             layout.requirePrivateChild(layout.home, root)
-            layout.requirePrivateChild(layout.temporaryDirectory, root)
+            layout.requirePrivateChild(layout.temporaryDirectory, layout.prefix)
             return layout
         }
     }
