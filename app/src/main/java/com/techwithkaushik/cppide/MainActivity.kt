@@ -1825,8 +1825,26 @@ private fun IdeIcon(name: String, tint: Color, iconSize: androidx.compose.ui.uni
     }
 }
 
-private fun sampleCode(file: String): String = when {
-    file.endsWith(".cpp") -> "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, C++20!\\n\";\n    return 0;\n}"
-    file.endsWith(".h") -> "#ifndef UTILS_H\n#define UTILS_H\n\nvoid greet(void);\n\n#endif"
-    else -> "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}"
+private fun sampleCode(file: String): String {
+    val ext = file.substringAfterLast(".", "").lowercase()
+    return when (ext) {
+        "cpp", "cc", "cxx" -> "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, C++20!\\n\";\n    return 0;\n}"
+        "h", "hpp", "hh", "hxx" -> "#pragma once\n\nvoid greet();"
+        "py" -> "def main():\n    print(\"Hello, Python!\")\n\nif __name__ == \"__main__\":\n    main()\n"
+        "js", "mjs" -> "function main() {\n  console.log(\"Hello, JavaScript!\");\n}\n\nmain();\n"
+        "ts", "tsx" -> "function main(): void {\n  console.log(\"Hello, TypeScript!\");\n}\n\nmain();\n"
+        "html", "htm" -> "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>New page</title>\n</head>\n<body>\n  <h1>Hello, world!</h1>\n</body>\n</html>\n"
+        "css" -> "/* Styles */\n:root {\n  color-scheme: dark;\n}\n"
+        "json" -> "{\n  \"name\": \"new-project\",\n  \"version\": \"1.0.0\"\n}\n"
+        "sh", "bash" -> "#!/usr/bin/env bash\nset -euo pipefail\n\necho \"Hello, world!\"\n"
+        "rs" -> "fn main() {\n    println!(\"Hello, Rust!\");\n}\n"
+        "java" -> "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, Java!\");\n    }\n}\n"
+        "kt", "kts" -> "fun main() {\n    println(\"Hello, Kotlin!\")\n}\n"
+        "md" -> "# Notes\n\nStart writing here.\n"
+        "txt", "log" -> ""
+        "yaml", "yml" -> "name: new-project\nversion: 1.0.0\n"
+        "toml" -> "name = \"new-project\"\nversion = \"1.0.0\"\n"
+        "xml" -> "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root />\n"
+        else -> "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}"
+    }
 }
