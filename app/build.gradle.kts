@@ -6,17 +6,6 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// PRoot is an Android/Bionic executable, not a Linux-host binary. Fetch the official
-// Termux package, verify its SHA256 from the signed-repository metadata, and stage ABI payloads
-// before Android packages jniLibs into nativeLibraryDir.
-val fetchBundledProotRuntime by tasks.registering(Exec::class) {
-    workingDir = rootProject.projectDir
-    commandLine("bash", "scripts/fetch-proot-runtime.sh")
-}
-
-tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(fetchBundledProotRuntime)
-}
 
 android {
     namespace = "com.techwithkaushik.cppide"
@@ -59,12 +48,6 @@ android {
 
     buildFeatures { compose = true }
 
-    // The bundled PRoot executable is packaged as libproot.so and must be extracted to nativeLibraryDir.
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
 }
 
 kotlin {
