@@ -143,9 +143,7 @@ private fun IdeUiPrototype() {
     var setupChoice by rememberSaveable { mutableStateOf(LinuxSetupConfig.DOWNLOAD_METHOD) }
     var selectedProject by rememberSaveable { mutableStateOf("Welcome Workspace") }
     var activeFile by rememberSaveable { mutableStateOf("README.md") }
-    var code by rememberSaveable {
-        mutableStateOf("#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\n\");\n    return 0;\n}")
-    }
+    var code by rememberSaveable { mutableStateOf("# Welcome Workspace\n\nOpen any file to edit it.\n") }
     val openFiles = remember { mutableStateListOf("README.md") }
     val dirtyFiles = remember { mutableStateListOf<String>() }
     // One source of truth for Explorer, tabs, search, and editor.
@@ -282,12 +280,12 @@ private fun IdeUiPrototype() {
                 projects = projects,
                 onOpen = { project ->
                     selectedProject = project.name
-                    val entryFile = if (project.language == "C++20") "main.cpp" else "main.c"
+                    val entryFile = entryFileForLanguage(project.language)
                     workspaceFiles.clear()
-                    workspaceFiles.addAll(listOf(entryFile, "utils.h"))
+                    workspaceFiles.addAll(listOf(entryFile, "README.md").distinct())
                     fileContents.clear()
                     fileContents[entryFile] = sampleCode(entryFile)
-                    fileContents["utils.h"] = sampleCode("utils.h")
+                    fileContents["README.md"] = sampleCode("README.md")
                     openFiles.clear()
                     dirtyFiles.clear()
                     openFile(entryFile)
@@ -831,8 +829,8 @@ private fun IdeUiPrototype() {
                         singleLine = true
                     )
                     Text("Project type", color = IdeMuted, fontSize = 12.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("C17", "C++20").forEach { language ->
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("C17", "C++20", "Python", "JavaScript", "TypeScript", "Rust", "Java", "Kotlin", "HTML/CSS", "Shell", "Markdown").forEach { language ->
                             if (newProjectLanguage == language) {
                                 Button(onClick = { newProjectLanguage = language }) { Text(language) }
                             } else {
@@ -848,12 +846,12 @@ private fun IdeUiPrototype() {
                     val name = newProjectName.trim().ifBlank { "New Project" }
                     projects.add(0, IdeProject(name, newProjectLanguage, "Projects/$name", "Just now"))
                     selectedProject = name
-                    val entryFile = if (newProjectLanguage == "C++20") "main.cpp" else "main.c"
+                    val entryFile = entryFileForLanguage(newProjectLanguage)
                     workspaceFiles.clear()
-                    workspaceFiles.addAll(listOf(entryFile, "utils.h"))
+                    workspaceFiles.addAll(listOf(entryFile, "README.md").distinct())
                     fileContents.clear()
                     fileContents[entryFile] = sampleCode(entryFile)
-                    fileContents["utils.h"] = sampleCode("utils.h")
+                    fileContents["README.md"] = sampleCode("README.md")
                     openFiles.clear()
                     dirtyFiles.clear()
                     activeFile = entryFile
@@ -1718,7 +1716,7 @@ private fun WorkspaceScreen(
                 }
                 Text(
                     "＋",
-                    Modifier.clickable { onFile(if (activeFile == "main.c") "main.cpp" else if (activeFile == "main.cpp") "utils.h" else "main.c") }
+                    Modifier.clickable { onFile(if (activeFile == "README.md") ".gitignore" else "README.md") }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     color = IdeAccent, fontSize = 20.sp
                 )
@@ -2174,6 +2172,21 @@ private fun IdeIcon(name: String, tint: Color, iconSize: androidx.compose.ui.uni
             else -> circle(.5f,.5f,.3f)
         }
     }
+}
+
+private fun entryFileForLanguage(language: String): String = when (language) {
+    "C17" -> "main.c"
+    "C++20" -> "main.cpp"
+    "Python" -> "main.py"
+    "JavaScript" -> "index.js"
+    "TypeScript" -> "index.ts"
+    "Rust" -> "main.rs"
+    "Java" -> "Main.java"
+    "Kotlin" -> "Main.kt"
+    "HTML/CSS" -> "index.html"
+    "Shell" -> "main.sh"
+    "Markdown" -> "README.md"
+    else -> "README.md"
 }
 
 private fun sampleCode(file: String): String {
