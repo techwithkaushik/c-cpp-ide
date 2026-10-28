@@ -2,6 +2,10 @@ package com.techwithkaushik.cppide
 
 import android.os.Bundle
 import android.app.Activity
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import androidx.activity.ComponentActivity
@@ -84,7 +88,7 @@ private val IdeAccent = Color(0xFF659AD2)
 private val IdeMuted = Color(0xFF9AA8BA)
 private val IdeGreen = Color(0xFF7DDBB0)
 
-private enum class IdeScreen { Welcome, Setup, Projects, Workspace }
+private enum class IdeScreen { Welcome, Setup, LinuxInstall, Projects, Workspace }
 private enum class ToolPanel { Terminal, Build, Problems, Output }
 
 private data class IdeProject(val name: String, val language: String, val path: String, val updated: String)
@@ -228,8 +232,13 @@ private fun IdeUiPrototype() {
             IdeScreen.Setup -> SetupScreen(
                 selected = setupChoice,
                 onSelect = { setupChoice = it },
-                onContinue = { screen = IdeScreen.Projects },
+                onContinue = { screen = IdeScreen.LinuxInstall },
                 onBack = { screen = IdeScreen.Welcome }
+            )
+            IdeScreen.LinuxInstall -> LinuxInstallScreen(
+                selected = setupChoice,
+                onBack = { screen = IdeScreen.Setup },
+                onInstalled = { screen = IdeScreen.Projects }
             )
             IdeScreen.Projects -> ProjectListScreen(
                 projects = projects,
