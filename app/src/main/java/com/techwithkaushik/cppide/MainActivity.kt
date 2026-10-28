@@ -225,9 +225,13 @@ private fun IdeUiPrototype() {
             confirmButton = {
                 TextButton(onClick = {
                     if (fileToClose == activeFile) fileContents[fileToClose] = code
-                    dirtyFiles.remove(fileToClose)
-                    pendingCloseFile = null
-                    closeFile(fileToClose)
+                    val contents = fileContents[fileToClose].orEmpty()
+                    runCatching { projectStorage.writeFile(selectedProject, fileToClose, contents) }
+                        .onSuccess {
+                            dirtyFiles.remove(fileToClose)
+                            pendingCloseFile = null
+                            closeFile(fileToClose)
+                        }
                 }) { Text("Save", color = IdeAccent) }
             },
             dismissButton = {
@@ -430,7 +434,17 @@ private fun IdeUiPrototype() {
                                 "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
                                 "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
                                 "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
-                                "Save All" -> { openFiles.forEach { file -> if (file == activeFile) fileContents[file] = code }; dirtyFiles.clear() }
+                                "Save All" -> {
+                                    if (activeFile in openFiles) fileContents[activeFile] = code
+                                    val pending = dirtyFiles.toList()
+                                    var allSaved = true
+                                    pending.forEach { file ->
+                                        val content = fileContents[file] ?: if (file == activeFile) code else ""
+                                        val result = runCatching { projectStorage.writeFile(selectedProject, file, content) }
+                                        if (result.isSuccess) dirtyFiles.remove(file) else allSaved = false
+                                    }
+                                    if (!allSaved) { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                }
                                 "Settings" -> showSettings = true
                                 "File Explorer" -> showExplorer = !showExplorer
                                 "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
@@ -498,7 +512,12 @@ private fun IdeUiPrototype() {
                                             "Cut" -> editorController.cut()
                                             "Paste" -> editorController.paste()
                                             "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
-                                            "Save", "Save All" -> { fileContents[activeFile] = code; dirtyFiles.remove(activeFile) }
+                                            "Save", "Save All" -> {
+                                                fileContents[activeFile] = code
+                                                runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }
+                                                    .onSuccess { dirtyFiles.remove(activeFile) }
+                                                    .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                            }
                                             "Settings" -> showSettings = true
                                             "File Explorer" -> showExplorer = !showExplorer
                                             "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
