@@ -121,6 +121,10 @@ internal class LinuxRuntimeLauncher(private val filesDir: File, private val nati
         environment["TERM"] = "xterm-256color"
         environment["PROOT_TMP_DIR"] = File(filesDir, "linux/runtime-tmp").absolutePath
         environment["LD_LIBRARY_PATH"] = runtimeDir.absolutePath
+        File(runtimeDir, "libproot-loader.so").takeIf { it.isFile }?.let {
+            environment["PROOT_LOADER"] = it.absolutePath
+        }
+        environment["PROOT_NO_SECCOMP"] = "1"
         environment["IDE_ROOTFS"] = root.absolutePath
     }
 
