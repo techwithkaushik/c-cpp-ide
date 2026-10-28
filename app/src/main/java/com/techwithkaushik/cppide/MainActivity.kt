@@ -1098,98 +1098,270 @@ private fun ProjectListScreen(
     onSettings: () -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    val filters = listOf("All", "C/C++", "Python", "Web", "Other")
+    fun category(language: String): String = when (language) {
+        "C17", "C++20" -> "C/C++"
+        "Python" -> "Python"
+        "JavaScript", "TypeScript", "HTML/CSS" -> "Web"
+        else -> "Other"
+    }
+    val visible = projects.filter { project ->
+        (project.name.contains(query, ignoreCase = true) ||
+            project.language.contains(query, ignoreCase = true) ||
+            project.path.contains(query, ignoreCase = true)) &&
+            (selectedFilter == "All" || category(project.language) == selectedFilter)
+    }
+
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
             TopAppBar(
-                modifier = Modifier.height(52.dp),
-                title = { Column { Text("Projects", fontWeight = FontWeight.SemiBold, fontSize = 16.sp); Text("Your coding workspace", color = IdeMuted, fontSize = 10.sp) } },
-                actions = { Text("⚙", Modifier.clickable(onClick = onSettings).padding(horizontal = 18.dp), fontSize = 22.sp, color = IdeMuted) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeBackground)
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text("My workspace", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("Build something great today", color = IdeMuted, fontSize = 11.sp)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onSettings) {
+                        IdeIcon("settings", IdeMuted, 21.dp)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = IdeBackground,
+                    titleContentColor = Color(0xFFF2F6FC)
+                )
             )
         },
         floatingActionButton = {
-            Button(onClick = onNew) { Text("+  New Project") }
+            Button(
+                onClick = onNew,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.height(52.dp)
+            ) {
+                IdeIcon("add", Color.White, 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("New project", fontWeight = FontWeight.SemiBold)
+            }
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp)) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                label = { Text("Search projects", fontSize = 12.sp) },
-                leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF172536)),
-                shape = RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF29435D))
-            ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(34.dp).background(Color(0xFF263D55), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
-                            Text("C/C++", color = IdeAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF172A40)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF294763))
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("YOUR NEXT IDEA\nSTARTS HERE", color = Color(0xFFF2F6FC), fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
+                                Text("Create a project and start coding on your device.", color = Color(0xFFB7C7D9), fontSize = 12.sp, lineHeight = 17.sp)
+                            }
+                            Box(
+                                Modifier.size(70.dp).background(Color(0xFF254663), RoundedCornerShape(20.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("</>", color = IdeGreen, fontFamily = FontFamily.Monospace, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Start coding", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Create or open a coding workspace", color = IdeMuted, fontSize = 12.sp)
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onNew, modifier = Modifier.weight(1f), shape = RoundedCornerShape(6.dp)) {
-                            IdeIcon("add", Color.White, 16.dp)
-                            Spacer(Modifier.width(5.dp))
-                            Text("New project", fontSize = 12.sp)
-                        }
-                        OutlinedButton(onClick = onSettings, modifier = Modifier.weight(1f), shape = RoundedCornerShape(6.dp)) {
-                            IdeIcon("settings", IdeAccent, 16.dp)
-                            Spacer(Modifier.width(5.dp))
-                            Text("Setup", fontSize = 12.sp)
+                        Button(
+                            onClick = onNew,
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            IdeIcon("add", Color.White, 17.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Create new project")
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("RECENT", fontSize = 12.sp, letterSpacing = 1.sp, color = IdeMuted, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Text("${projects.size} projects", color = IdeMuted, fontSize = 12.sp)
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    WorkspaceMetricCard(
+                        modifier = Modifier.weight(1f),
+                        value = projects.size.toString(),
+                        label = "Projects",
+                        icon = "folder",
+                        accent = IdeAccent
+                    )
+                    WorkspaceMetricCard(
+                        modifier = Modifier.weight(1f),
+                        value = projects.map { it.language }.distinct().size.toString(),
+                        label = "Languages",
+                        icon = "code",
+                        accent = IdeGreen
+                    )
+                }
             }
-            Spacer(Modifier.height(6.dp))
-            val visible = projects.filter { it.name.contains(query, ignoreCase = true) }
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search projects, languages or folders", fontSize = 13.sp) },
+                    leadingIcon = { IdeIcon("search", IdeAccent, 19.dp) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            Text("×", Modifier.clickable { query = "" }.padding(horizontal = 12.dp), color = IdeMuted, fontSize = 22.sp)
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = IdeSurface,
+                        focusedContainerColor = IdeSurface,
+                        unfocusedBorderColor = IdeSurfaceRaised,
+                        focusedBorderColor = IdeAccent
+                    )
+                )
+            }
+            item {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { filter ->
+                        val selected = selectedFilter == filter
+                        if (selected) {
+                            Button(
+                                onClick = { selectedFilter = filter },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 7.dp),
+                                shape = RoundedCornerShape(50)
+                            ) { Text(filter, fontSize = 12.sp) }
+                        } else {
+                            OutlinedButton(
+                                onClick = { selectedFilter = filter },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 7.dp),
+                                shape = RoundedCornerShape(50)
+                            ) { Text(filter, fontSize = 12.sp, color = IdeMuted) }
+                        }
+                    }
+                }
+            }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Recent projects", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF2F6FC))
+                        Text("Pick up where you left off", fontSize = 11.sp, color = IdeMuted)
+                    }
+                    Text("${visible.size} shown", color = IdeMuted, fontSize = 11.sp)
+                }
+            }
             if (visible.isEmpty()) {
-                EmptyProjects(onNew = onNew)
+                item { EmptyProjects(onNew = onNew) }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 76.dp)) {
-                    items(visible, key = { it.name }) { project ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onOpen(project) },
-                            colors = CardDefaults.cardColors(containerColor = IdeSurface),
-                            shape = RoundedCornerShape(10.dp)
+                items(visible, key = { it.name }) { project ->
+                    val accent = when (category(project.language)) {
+                        "C/C++" -> Color(0xFF83B8F2)
+                        "Python" -> Color(0xFFE5C56E)
+                        "Web" -> Color(0xFFE58A75)
+                        else -> IdeGreen
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { onOpen(project) },
+                        shape = RoundedCornerShape(17.dp),
+                        colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF263A4D))
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(15.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.size(36.dp).background(IdeSurfaceRaised, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                                        Text(if (project.language == "C++20") "C++" else "C", color = IdeAccent, fontWeight = FontWeight.Bold)
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(project.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        Text(project.language, color = IdeAccent, fontSize = 12.sp)
-                                    }
-                                    Text("›", color = IdeMuted, fontSize = 28.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    Modifier.size(46.dp).background(accent.copy(alpha = 0.13f), RoundedCornerShape(13.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        when (project.language) {
+                                            "C17" -> "C"
+                                            "C++20" -> "C++"
+                                            "Python" -> "Py"
+                                            "JavaScript" -> "JS"
+                                            "TypeScript" -> "TS"
+                                            "Rust" -> "Rs"
+                                            "Java" -> "J"
+                                            "Kotlin" -> "K"
+                                            "HTML/CSS" -> "5"
+                                            "Shell" -> "$"
+                                            else -> "M↓"
+                                        },
+                                        color = accent,
+                                        fontSize = if (project.language == "C++20") 12.sp else 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                                Text(project.path, color = IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Updated ${project.updated}", color = IdeMuted, fontSize = 11.sp)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(project.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFFF2F6FC), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(project.language, color = accent, fontSize = 12.sp)
+                                }
+                                Box(
+                                    Modifier.size(34.dp).background(IdeSurfaceRaised, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) { Text("›", color = Color(0xFFE8EDF5), fontSize = 24.sp) }
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Color(0xFF121D28)).padding(horizontal = 10.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IdeIcon("folder", IdeMuted, 15.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(project.path, Modifier.weight(1f), color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(6.dp).background(IdeGreen, CircleShape))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Updated ${project.updated}", color = IdeMuted, fontSize = 10.sp)
+                                Spacer(Modifier.weight(1f))
+                                Text("OPEN PROJECT", color = IdeAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceMetricCard(
+    modifier: Modifier = Modifier,
+    value: String,
+    label: String,
+    icon: String,
+    accent: Color
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = IdeSurface),
+        shape = RoundedCornerShape(15.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF263A4D))
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(Modifier.size(36.dp).background(accent.copy(alpha = 0.13f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+                IdeIcon(icon, accent, 19.dp)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(value, color = Color(0xFFF2F6FC), fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text(label, color = IdeMuted, fontSize = 11.sp)
             }
         }
     }
