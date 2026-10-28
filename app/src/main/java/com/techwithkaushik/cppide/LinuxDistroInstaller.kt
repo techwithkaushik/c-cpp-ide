@@ -17,7 +17,7 @@ import java.security.MessageDigest
 import java.util.Locale
 
 /** Downloads/imports Ubuntu Base and safely extracts its rootfs. Extraction alone is not runtime validation. */
-internal class LinuxDistroInstaller(private val filesDir: File, private val contentResolver: ContentResolver) {
+internal class LinuxDistroInstaller(private val filesDir: File, private val contentResolver: ContentResolver, private val nativeLibraryDir: File) {
     data class Result(val archive: File, val rootfs: File, val message: String)
     private val downloadDir get() = File(filesDir, "linux/downloads").apply { mkdirs() }
     private val rootfsDir get() = File(filesDir, "linux/rootfs/ubuntu").apply { mkdirs() }
@@ -227,7 +227,7 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
 
     /** A rootfs is active only after the app-managed PRoot process runs a real shell smoke test. */
     suspend fun validateExecutionRuntime(rootfs: File): LinuxRuntimeLauncher.ValidationResult =
-        LinuxRuntimeLauncher(filesDir).validate(rootfs)
+        LinuxRuntimeLauncher(filesDir, nativeLibraryDir).validate(rootfs)
     private fun isGzipArchive(file: File): Boolean =
         file.isFile && file.length() >= 2 && runCatching {
             FileInputStream(file).use { it.read() == 0x1f && it.read() == 0x8b }
