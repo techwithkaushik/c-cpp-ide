@@ -33,9 +33,10 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
     /** Finds a completed archive in app-private Downloads without clearing existing data. */
     fun findDownloadedArchive(): File? {
         val preferred = File(downloadDir, recommendedArchiveName())
-        if (preferred.isFile && preferred.length() > 2) return preferred
+        if (isGzipArchive(preferred)) return preferred
         return downloadDir.listFiles()
-            ?.filter { it.isFile && it.length() > 2 && it.name.endsWith(".tar.gz", ignoreCase = true) }
+            ?.filter { it.isFile && !it.name.endsWith(".part", ignoreCase = true) &&
+                it.name.endsWith(".tar.gz", ignoreCase = true) && isGzipArchive(it) }
             ?.maxByOrNull { it.lastModified() }
     }
 
@@ -60,6 +61,7 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
             match?.groupValues?.get(1)
         } ?: error("Ubuntu SHA256SUMS does not contain $name")
         val destination = File(downloadDir, name)
+        val partial = File(downloadDir, "$name.part")
         val connection = (URL(base + name).openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 45_000
@@ -69,9 +71,9 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
             connection.connect()
             check(connection.responseCode in 200..299) { "Download failed: HTTP ${connection.responseCode}" }
             val total = connection.contentLengthLong
-            if (destination.exists()) destination.delete()
+            if (partial.exists()) partial.delete()
             connection.inputStream.use { input ->
-                FileOutputStream(destination).use { output ->
+                FileOutputStream(partial).use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     var received = 0L
                     while (true) {
@@ -84,20 +86,38 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
                 }
             }
         } finally { connection.disconnect() }
-        val actual = sha256(destination)
-        check(actual.equals(expected, ignoreCase = true)) {
-            destination.delete()
-            "Ubuntu archive checksum mismatch; the downloaded file was discarded."
+        val actual = sha256(partial)
+        if (!actual.equals(expected, ignoreCase = true)) {
+            partial.delete()
+            error("Ubuntu archive checksum mismatch; the downloaded file was discarded.")
+        }
+        validateGzipTar(partial)
+        if (destination.exists() && !destination.delete()) {
+            partial.delete()
+            error("Could not replace the previous Ubuntu archive.")
+        }
+        check(partial.renameTo(destination)) {
+            partial.delete()
+            "Could not finalize the Ubuntu download. Retry the download."
         }
         destination
     }
 
     suspend fun importArchive(uri: Uri): File = withContext(Dispatchers.IO) {
         val destination = File(downloadDir, "selected-rootfs.tar.gz")
+        val partial = File(downloadDir, "selected-rootfs.tar.gz.part")
+        if (partial.exists()) partial.delete()
         val input = contentResolver.openInputStream(uri) ?: error("Could not open selected archive")
-        input.use { source -> FileOutputStream(destination).use { output -> source.copyTo(output) } }
-        validateGzipTar(destination)
-        destination
+        try {
+            input.use { source -> FileOutputStream(partial).use { output -> source.copyTo(output) } }
+            validateGzipTar(partial)
+            if (destination.exists()) check(destination.delete()) { "Could not replace previous selected archive" }
+            check(partial.renameTo(destination)) { "Could not save selected archive. Please select it again." }
+            destination
+        } catch (failure: Throwable) {
+            partial.delete()
+            throw failure
+        }
     }
 
     suspend fun installArchive(archive: File): Result = withContext(Dispatchers.IO) {
@@ -204,11 +224,13 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
 
     /** No compatible runtime is bundled yet; do not claim shell access until it is validated. */
     fun hasExecutionRuntime(rootfs: File): Boolean = false
+    private fun isGzipArchive(file: File): Boolean =
+        file.isFile && file.length() >= 2 && runCatching {
+            FileInputStream(file).use { it.read() == 0x1f && it.read() == 0x8b }
+        }.getOrDefault(false)
+
     private fun validateGzipTar(file: File) {
-        check(file.isFile && file.length() >= 2) { "Selected file is empty or missing" }
-        FileInputStream(file).use {
-            check(it.read() == 0x1f && it.read() == 0x8b) { "Select a gzip-compressed Linux rootfs (.tar.gz)" }
-        }
+        check(isGzipArchive(file)) { "Select a valid gzip-compressed Linux rootfs (.tar.gz)" }
     }
 
     private fun sha256(file: File): String {
