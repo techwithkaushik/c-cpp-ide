@@ -75,7 +75,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativeEditorEngine_nativeCountLines(
     JNIEnv* env, jobject /* thiz */, jstring source) {
     const std::string text = to_utf8(env, source);
     if (text.empty()) return 1;
-    return static_cast<jint>(1 + std::count(text.begin(), text.end(), '\\n'));
+    return static_cast<jint>(1 + std::count(text.begin(), text.end(), '\n'));
 }
 
 extern "C" JNIEXPORT jint JNICALL
