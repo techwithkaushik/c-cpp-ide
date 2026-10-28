@@ -28,7 +28,7 @@ dependencies {
     // Import only the reusable upstream terminal UI library, not the full Termux app.
     // terminal-view exposes terminal-emulator transitively; keep both on the upstream
     // published library version while adapting app/bootstrap code separately.
-    implementation("com.github.termux.termux-app:terminal-view:0.118.0")
+    implementation("com.termux:terminal-view:0.118.0")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
