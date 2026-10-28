@@ -138,6 +138,7 @@ private fun IdeUiPrototype() {
         }
     }
     var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
+    var startupChecked by rememberSaveable { mutableStateOf(false) }
     var setupChoice by rememberSaveable { mutableStateOf("Download Ubuntu from Internet") }
     var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
     var activeFile by rememberSaveable { mutableStateOf("main.c") }
@@ -203,6 +204,21 @@ private fun IdeUiPrototype() {
     val editorController = remember { SoraEditorController() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    // Reconcile saved Linux files before normal navigation; never reset the user's files.
+    val appContext = LocalContext.current
+    LaunchedEffect(appContext) {
+        if (!startupChecked) {
+            val installer = LinuxDistroInstaller(appContext.filesDir, appContext.contentResolver)
+            val rootfs = installer.findInstalledRootfs()
+            val archive = installer.findDownloadedArchive()
+            if (rootfs != null || archive != null) {
+                setupChoice = "Download Ubuntu from Internet"
+                screen = IdeScreen.LinuxInstall
+            }
+            startupChecked = true
+        }
+    }
 
     pendingCloseFile?.let { fileToClose ->
         AlertDialog(
@@ -1207,17 +1223,26 @@ private fun LinuxInstallScreen(
     var phase by rememberSaveable { mutableStateOf(0) }
     var autoStarted by rememberSaveable { mutableStateOf(false) }
 
-    suspend fun installAndPrepare(archive: File) {
-        phase = 3
-        message = "Step 3/5 · Extracting Ubuntu root filesystem…"
-        val result = installer.installArchive(archive)
+    suspend fun installAndPrepare(archive: File?) {
+        var rootfs = installer.findInstalledRootfs()
+        if (rootfs == null) {
+            check(archive != null && archive.isFile && archive.length() > 2) {
+                "No installed Ubuntu rootfs or saved archive was found. Start setup to download or import it."
+            }
+            phase = 3
+            message = "Step 3/5 · Extracting Ubuntu root filesystem…"
+            rootfs = installer.installArchive(archive).rootfs
+        } else {
+            phase = 3
+            message = "Step 3/5 · Existing Ubuntu rootfs verified; extraction skipped."
+        }
         phase = 4
-        message = "Step 4/5 · Preparing Linux HOME and workspace…"
-        installer.prepareEnvironment(result.rootfs)
+        message = "Step 4/5 · Verifying Linux HOME and workspace…"
+        installer.prepareEnvironment(rootfs)
         phase = 5
         message = "Step 5/5 · Validating that Ubuntu /bin/sh can execute…"
-        check(installer.hasExecutionRuntime(result.rootfs)) {
-            "Ubuntu files and environment folders are ready, but this build does not yet include a compatible Linux execution runtime. Terminal access cannot be enabled until Ubuntu /bin/sh can actually run."
+        check(installer.hasExecutionRuntime(rootfs)) {
+            "Ubuntu rootfs and workspace were preserved, but this build has no compatible execution runtime yet. Setup can resume here."
         }
         onInstalled()
     }
@@ -1225,26 +1250,38 @@ private fun LinuxInstallScreen(
     LaunchedEffect(selected) {
         if (autoStarted) return@LaunchedEffect
         autoStarted = true
-        if (selected == "Download Ubuntu from Internet") {
-            busy = true
-            failed = false
-            phase = 1
-            message = "Step 1/3 · Downloading official Ubuntu archive…"
-            runCatching { installer.downloadUbuntu { received, total -> progressBytes = received; totalBytes = total } }
-                .onSuccess { archive ->
-                    archivePath = archive.absolutePath
+        busy = true
+        failed = false
+        runCatching {
+            val installedRootfs = installer.findInstalledRootfs()
+            val savedArchive = installer.findDownloadedArchive()
+            if (installedRootfs != null) {
+                archivePath = savedArchive?.absolutePath
+                installAndPrepare(savedArchive)
+            } else {
+                var archive = savedArchive
+                if (archive == null) {
+                    phase = 1
+                    message = "Step 1/5 · No saved archive found; downloading Ubuntu…"
+                    archive = installer.downloadUbuntu { received, total ->
+                        progressBytes = received
+                        totalBytes = total
+                    }
+                } else {
                     phase = 2
-                    message = "Step 2/5 · SHA-256 checksum verified."
-                    runCatching { installAndPrepare(archive) }
-                        .onFailure { failed = true; message = it.message ?: "Linux setup failed." }
+                    message = "Step 2/5 · Found saved archive; preparing extraction…"
                 }
-                .onFailure { failed = true; message = it.message ?: "Ubuntu download failed." }
-            busy = false
-        } else {
-            message = "Select an Ubuntu rootfs archive to begin automatic installation."
+                archivePath = archive.absolutePath
+                phase = 2
+                message = "Step 2/5 · Archive available; checking filesystem contents."
+                installAndPrepare(archive)
+            }
+        }.onFailure {
+            failed = true
+            message = it.message ?: "Linux setup failed. Existing files were kept for recovery."
         }
+        busy = false
     }
-
     val archivePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
