@@ -6,10 +6,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 
 class LinuxToolchainDiscoveryTest {
-    private val temp = TemporaryFolder()
+    @get:Rule\n    val temp = TemporaryFolder()
 
     @Test
     fun discoversDistroAndManualToolsFromRootfsPath() {
