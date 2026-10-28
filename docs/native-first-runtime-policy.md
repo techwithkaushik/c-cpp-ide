@@ -22,6 +22,18 @@ Match the performance and compatibility characteristics of Termux as closely as 
 
 Native-first does not mean rewriting everything in C/C++ just to reduce Kotlin line count. Keep Kotlin where Android APIs and lifecycle integration are materially better; keep hot paths and process/runtime semantics native.
 
+## Upstream reuse is mandatory (do not reimplement Termux)
+
+The project must reuse the existing upstream Termux ecosystem and implementation wherever technically compatible. This is not a greenfield shell or Linux distribution project.
+
+- Build the bootstrap and packages using the pinned `termux/termux-packages` build system; consume upstream Bash, core utilities, apt/dpkg, compilers, runtimes and language-server packages.
+- Reuse or adapt the relevant upstream Termux app/shared-library code for installation, environment construction, execution compatibility and terminal behavior after auditing source, API compatibility and licenses.
+- Do not write a replacement shell, package manager, libc, linker, compiler toolchain or terminal parser when a suitable upstream component exists.
+- Keep only the IDE-specific Android UI, project/editor workflow, runtime coordinator, and the smallest compatibility adapter that upstream integration actually requires.
+- A copied upstream component must retain its required license and notices. Pin the upstream revision and record local patches; avoid copying large modules until the integration contract and dependencies are understood.
+- The custom app still owns its private prefix, home, package database and lifecycle. Reusing Termux modules does not mean accessing another installed Termux app's private files or depending on its exported command API.
+- Do not assume the official `com.termux` bootstrap or repository artifacts work under `com.techwithkaushik.cppide`; build and validate custom-prefix artifacts against the exact app paths and ABI.
+
 ## Runtime architecture
 
 - Build the Termux-compatible bootstrap and packages for the app's package identity, ABI and prefix.
