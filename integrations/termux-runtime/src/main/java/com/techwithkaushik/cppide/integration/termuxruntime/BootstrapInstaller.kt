@@ -160,10 +160,11 @@ class BootstrapInstaller(
                 val rawLink = line.substring(separator + 1)
                 val linkRelative = validateArchivePath(rawLink)
                 val linkInStage = File(staging, linkRelative)
-                val linkInFinal = File(finalPrefix, linkRelative)
                 val targetFile = if (rawTarget.startsWith("/")) {
-                    val absoluteTarget = File(rawTarget).toPath().toAbsolutePath().normalize().toFile()
-                    val finalNormalized = finalPrefix.toPath().toAbsolutePath().normalize().toFile()
+                    // Resolve Android private-storage aliases (/data/data and /data/user/0)
+                    // before comparing the bootstrap prefix from SYMLINKS.txt.
+                    val absoluteTarget = File(rawTarget).canonicalFile
+                    val finalNormalized = finalPrefix.canonicalFile
                     if (absoluteTarget != finalNormalized &&
                         !absoluteTarget.path.startsWith(finalNormalized.path + File.separator)
                     ) {
