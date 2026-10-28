@@ -38,8 +38,8 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
         val base = "https://cdimage.ubuntu.com/ubuntu-base/releases/noble/release/"
         val sums = URL(base + "SHA256SUMS").openStream().bufferedReader().use { it.readText() }
         val expected = sums.lineSequence().firstNotNullOfOrNull { line ->
-            val match = Regex("^([0-9a-fA-F]{64})\\s+\\*?$name$").find(line.trim())
-                ?: Regex("^([0-9a-fA-F]{64})\\s+$name$").find(line.trim())
+            val match = Regex("^([0-9a-fA-F]{64})\\s+\\*?$name\\z").find(line.trim())
+                ?: Regex("^([0-9a-fA-F]{64})\\s+$name\\z").find(line.trim())
             match?.groupValues?.get(1)
         } ?: error("Ubuntu SHA256SUMS does not contain $name")
         val destination = File(downloadDir, name)
