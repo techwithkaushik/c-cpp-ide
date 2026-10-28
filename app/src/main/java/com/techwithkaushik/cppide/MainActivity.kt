@@ -904,31 +904,45 @@ private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "C/C++ tools will run inside this environment.",
+                "The IDE will use a real Linux userspace for the terminal, compiler, build tools and language servers.",
                 color = IdeMuted,
                 fontSize = 14.sp
             )
             Spacer(Modifier.height(4.dp))
             SetupChoiceCard(
                 title = "Download Ubuntu",
-                subtitle = "Download and configure automatically",
+                subtitle = "Install the app-managed Ubuntu runtime for this device",
                 icon = "↓",
                 selected = selected == "Download Ubuntu from Internet",
                 onClick = { onSelect("Download Ubuntu from Internet") }
             )
             SetupChoiceCard(
                 title = "Import a root filesystem",
-                subtitle = "Choose a Linux rootfs archive from storage",
+                subtitle = "Import a compatible Ubuntu, Debian or other Linux rootfs archive",
                 icon = "▣",
                 selected = selected == "Use Downloaded Rootfs from Storage",
                 onClick = { onSelect("Use Downloaded Rootfs from Storage") }
             )
             Spacer(Modifier.weight(1f))
-            Text(
-                "Setup actions are not connected in this UI prototype yet.",
-                color = IdeMuted,
-                fontSize = 11.sp
-            )
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, IdeSurfaceRaised)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Packages stay inside Linux", color = Color(0xFFF2F6FC), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Install clang, CMake, Git and language servers using the distribution's package manager when supported. Manually extracted toolchains can also be discovered from PATH or configured SDK folders such as /opt/<toolchain>/bin.",
+                        color = IdeMuted,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "Runtime download, extraction and package installation are not wired to this screen yet; setup must not be treated as complete until runtime validation passes.",
+                        color = Color(0xFFFFC978),
+                        fontSize = 11.sp
+                    )
+                }
+            }
             Button(
                 onClick = onContinue,
                 modifier = Modifier
