@@ -144,7 +144,7 @@ private fun IdeUiPrototype() {
     var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
     var activeFile by rememberSaveable { mutableStateOf("main.c") }
     var code by rememberSaveable {
-        mutableStateOf("#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}")
+        mutableStateOf("#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\n\");\n    return 0;\n}")
     }
     val openFiles = remember { mutableStateListOf("main.c") }
     val dirtyFiles = remember { mutableStateListOf<String>() }
@@ -879,8 +879,7 @@ private fun ProjectOverviewSheet(
     onBrowseFiles: () -> Unit,
     onClose: () -> Unit
 ) {
-    val isCpp = projectLanguage.startsWith("C++")
-    val primaryFile = if (isCpp) "main.cpp" else "main.c"
+    val primaryFile = entryFileForLanguage(projectLanguage)
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -898,22 +897,21 @@ private fun ProjectOverviewSheet(
                 Text("Projects/$projectName", color = IdeMuted, fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(projectLanguage, color = IdeAccent, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                    Text("• Sample workspace", color = IdeMuted, fontSize = 11.sp)
+                    Text("• Workspace", color = IdeMuted, fontSize = 11.sp)
                 }
             }
         }
         Text("PROJECT CONTENTS", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OverviewMetric("3", "Sample files", Modifier.weight(1f))
-            OverviewMetric("2", "Source files", Modifier.weight(1f))
-            OverviewMetric("1", "Header", Modifier.weight(1f))
+            OverviewMetric("—", "Files", Modifier.weight(1f))
+            OverviewMetric(projectLanguage, "Language", Modifier.weight(1f))
         }
         Text("Quick open", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
-        OverviewFileRow(primaryFile, if (isCpp) "C++ source · entry point" else "C source · entry point") { onOpenFile(primaryFile) }
-        OverviewFileRow(if (isCpp) "main.c" else "main.cpp", "Alternative language example") { onOpenFile(if (isCpp) "main.c" else "main.cpp") }
-        OverviewFileRow("utils.h", "Shared header declaration") { onOpenFile("utils.h") }
+        OverviewFileRow(primaryFile, "Entry file") { onOpenFile(primaryFile) }
+        OverviewFileRow("README.md", "Project notes") { onOpenFile("README.md") }
+        OverviewFileRow(".gitignore", "Ignored files") { onOpenFile(".gitignore") }
         OutlinedButton(onClick = onBrowseFiles, modifier = Modifier.fillMaxWidth()) { Text("Browse project files") }
-        Text("Preview only: files and metadata are not yet loaded from disk.", color = Color(0xFFE5B978), fontSize = 11.sp)
+        Text("Language services are selected from the active file and workspace configuration.", color = IdeMuted, fontSize = 11.sp)
     }
 }
 
@@ -2181,7 +2179,7 @@ private fun IdeIcon(name: String, tint: Color, iconSize: androidx.compose.ui.uni
 private fun sampleCode(file: String): String {
     val ext = file.substringAfterLast(".", "").lowercase()
     return when (ext) {
-        "cpp", "cc", "cxx" -> "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, C++20!\\n\";\n    return 0;\n}"
+        "cpp", "cc", "cxx" -> "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, C++20!\n\";\n    return 0;\n}"
         "h", "hpp", "hh", "hxx" -> "#pragma once\n\nvoid greet();"
         "py" -> "def main():\n    print(\"Hello, Python!\")\n\nif __name__ == \"__main__\":\n    main()\n"
         "js", "mjs" -> "function main() {\n  console.log(\"Hello, JavaScript!\");\n}\n\nmain();\n"
@@ -2198,6 +2196,6 @@ private fun sampleCode(file: String): String {
         "yaml", "yml" -> "name: new-project\nversion: 1.0.0\n"
         "toml" -> "name = \"new-project\"\nversion = \"1.0.0\"\n"
         "xml" -> "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<root />\n"
-        else -> "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}"
+        else -> ""
     }
 }
