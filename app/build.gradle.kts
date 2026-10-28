@@ -56,6 +56,12 @@ kotlin {
     }
 }
 
+// Android's dependency checker sees this empty compatibility artifact as a duplicate
+// of the real ListenableFuture class already bundled in Guava. Exclude the stub.
+configurations.configureEach {
+    exclude(group = "com.google.guava", module = "listenablefuture")
+}
+
 dependencies {
     implementation(project(":core:aidl"))
     implementation(project(":core:designsystem"))
