@@ -1,0 +1,107 @@
+name: Build Code Studio Termux Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      architectures:
+        description: "Termux architecture names (comma-separated)"
+        required: true
+        default: "aarch64"
+        type: choice
+        options:
+          - aarch64
+          - arm
+          - i686
+          - x86_64
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-studio-bootstrap-${{ inputs.architectures }}
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Build custom bootstrap (${{ inputs.architectures }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      TERMUX_PACKAGES_REF: 21700256be43a0c8aae38bacecdac87c5ded4cc6
+      CODE_STUDIO_PACKAGE: com.techwithkaushik.cppide
+    steps:
+      - name: Checkout pinned Termux packages source
+        uses: actions/checkout@v4
+        with:
+          repository: termux/termux-packages
+          ref: ${{ env.TERMUX_PACKAGES_REF }}
+          path: termux-packages
+
+      - name: Verify source and custom package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
+          grep -q 'TERMUX_APP_PACKAGE' termux-packages/scripts/properties.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("termux-packages/scripts/properties.sh")
+          text = p.read_text()
+          matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP_PACKAGE\s*=.*$', text))
+          if len(matches) != 1:
+              raise SystemExit(f"Expected one TERMUX_APP_PACKAGE assignment; found {len(matches)}. Upstream changed; review required.")
+          old = matches[0].group(0)
+          indent = re.match(r'^\s*', old).group(0)
+          export = "export " if old.lstrip().startswith("export ") else ""
+          text = text[:matches[0].start()] + f'{indent}{export}TERMUX_APP_PACKAGE="{__import__("os").environ["CODE_STUDIO_PACKAGE"]}"' + text[matches[0].end():]
+          p.write_text(text)
+          print("Configured custom application package identity.")
+          PY
+
+      - name: Build bootstrap in upstream Docker environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd termux-packages
+          # Force a clean rebuild: compiled paths may embed the package prefix.
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ inputs.architectures }}" 2>&1 | tee ../bootstrap-build.log
+
+      - name: Create artifact manifest and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          arch="${{ inputs.architectures }}"
+          test "$(printf '%s' "$arch" | tr ',' '\n' | wc -l)" -eq 1
+          archive="termux-packages/bootstrap-$arch.zip"
+          test -s "$archive"
+          cp "$archive" "dist/code-studio-bootstrap-$arch.zip"
+          sha256sum "dist/code-studio-bootstrap-$arch.zip" > dist/SHA256SUMS
+          cat > dist/manifest.json <<EOF
+          {
+            "schemaVersion": 1,
+            "applicationId": "$CODE_STUDIO_PACKAGE",
+            "upstreamRepository": "https://github.com/termux/termux-packages",
+            "upstreamCommit": "$TERMUX_PACKAGES_REF",
+            "architecture": "$arch",
+            "archive": "code-studio-bootstrap-$arch.zip",
+            "sha256File": "SHA256SUMS",
+            "generatedBy": "Build Code Studio Termux Bootstrap workflow",
+            "status": "CI artifact only; not yet approved for app distribution or device execution"
+          }
+          EOF
+          cat dist/manifest.json
+          cat dist/SHA256SUMS
+
+      - name: Upload bootstrap artifact for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-bootstrap-${{ inputs.architectures }}
+          path: |
+            dist/code-studio-bootstrap-*.zip
+            dist/SHA256SUMS
+            dist/manifest.json
+            bootstrap-build.log
+          if-no-files-found: error
+          retention-days: 7
