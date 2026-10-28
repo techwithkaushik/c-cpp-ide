@@ -755,8 +755,8 @@ private fun IdeUiPrototype() {
                                 OutlinedTextField(
                                     value = toolPathValue,
                                     onValueChange = { toolPathValue = it },
-                                    label = { Text("Absolute executable path") },
-                                    placeholder = { Text("/path/to/tool") },
+                                    label = { Text("Absolute Android or Linux path") },
+                                    placeholder = { Text("/usr/bin/clang") },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -765,8 +765,17 @@ private fun IdeUiPrototype() {
                                         val role = LanguageToolingCatalog.Role.valueOf(pathRole)
                                         runCatching {
                                             toolPathPreferences.set(pathLanguage, role, toolPathValue)
-                                            val resolved = toolPathPreferences.resolveExecutable(pathLanguage, role)
-                                            toolPathStatus = if (resolved != null) "Validated: ${resolved.absolutePath}" else "Saved, but the path is missing or not executable."
+                                            val rootfs = LinuxDistroInstaller(
+                                                appContext.filesDir,
+                                                appContext.contentResolver,
+                                                File(appContext.applicationInfo.nativeLibraryDir)
+                                            ).findInstalledRootfs()
+                                            val resolved = toolPathPreferences.resolvePath(pathLanguage, role, rootfs)
+                                            toolPathStatus = when {
+                                                resolved == null -> "Saved, but no executable exists at this path in Android or the installed Linux rootfs."
+                                                resolved.guestPath != null -> "Linux executable found: ${resolved.guestPath}. Runtime execution still needs validation."
+                                                else -> "Host executable found: ${resolved.hostExecutable?.absolutePath}. Runtime compatibility still needs validation."
+                                            }
                                         }.onFailure { toolPathStatus = it.message ?: "Invalid path." }
                                     }) { Text("Save & validate") }
                                     OutlinedButton(onClick = {
