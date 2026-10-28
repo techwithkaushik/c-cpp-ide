@@ -861,11 +861,45 @@ private fun ProjectListScreen(
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Search projects") },
-                singleLine = true
+                leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp)
             )
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(14.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF172536)),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF29435D))
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(42.dp).background(Color(0xFF263D55), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                            Text("C/C++", color = IdeAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Start coding", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Create or open a C/C++ workspace", color = IdeMuted, fontSize = 12.sp)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onNew, modifier = Modifier.weight(1f), shape = RoundedCornerShape(6.dp)) {
+                            IdeIcon("add", Color.White, 16.dp)
+                            Spacer(Modifier.width(5.dp))
+                            Text("New project", fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = onSettings, modifier = Modifier.weight(1f), shape = RoundedCornerShape(6.dp)) {
+                            IdeIcon("settings", IdeAccent, 16.dp)
+                            Spacer(Modifier.width(5.dp))
+                            Text("Setup", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Recent projects", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text("RECENT", fontSize = 12.sp, letterSpacing = 1.sp, color = IdeMuted, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Text("${projects.size} projects", color = IdeMuted, fontSize = 12.sp)
             }
