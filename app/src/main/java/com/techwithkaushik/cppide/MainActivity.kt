@@ -270,7 +270,8 @@ private fun IdeUiPrototype() {
                             projectName = selectedProject,
                             activeFile = activeFile,
                             onOpenFile = { openFile(it) },
-                            onClose = { showExplorer = false }
+                            onClose = { showExplorer = false },
+                            sidebarMode = true
                         )
                     }
                 }
@@ -315,16 +316,41 @@ private fun IdeUiPrototype() {
             }
         }
         if (showSearch) {
-            val searchable = if (searchInProject) fileContents.values.joinToString("\\n") else code
-            val matchCount = if (searchQuery.isBlank()) 0 else Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE).findAll(searchable).count()
-            AlertDialog(onDismissRequest = { showSearch = false }, containerColor = IdeSurface,
-                title = { Text(if (searchInProject) "Find in project" else "Find in file", color = Color(0xFFE8EDF5)) },
-                text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search text") })
-                    Text(if (searchQuery.isBlank()) "Enter text to search" else "$matchCount matches found", color = IdeMuted, fontSize = 12.sp)
-                } },
-                confirmButton = { TextButton(onClick = { showSearch = false }) { Text("Done") } },
-                dismissButton = { TextButton(onClick = { searchQuery = "" }) { Text("Clear") } })
+            val pattern = remember(searchQuery) { if (searchQuery.isBlank()) null else Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE) }
+            val projectResults = if (searchInProject && pattern != null) {
+                fileContents.toMap().mapNotNull { (file, contents) ->
+                    val count = pattern.findAll(if (file == activeFile) code else contents).count()
+                    if (count > 0) file to count else null
+                }.sortedBy { it.first }
+            } else emptyList()
+            val currentMatches = pattern?.findAll(code)?.count() ?: 0
+            val matchCount = if (searchInProject) projectResults.sumOf { it.second } else currentMatches
+            AlertDialog(
+                onDismissRequest = { showSearch = false },
+                containerColor = IdeSurface,
+                title = { Text(if (searchInProject) "Find in project" else "Find in file", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search text") }, leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) })
+                        Text(if (searchQuery.isBlank()) "Type to search " + if (searchInProject) "all project files" else "the current file" else "$matchCount match${if (matchCount == 1) "" else "es"} found", color = IdeMuted, fontSize = 12.sp)
+                        if (searchInProject && pattern != null) {
+                            if (projectResults.isEmpty()) Text("No matches in project files.", color = IdeMuted, fontSize = 12.sp)
+                            else LazyColumn(modifier = Modifier.heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                items(projectResults, key = { it.first }) { (file, count) ->
+                                    Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(9.dp)).clickable { openFile(file); showSearch = false }.padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        IdeIcon(if (file.endsWith(".h") || file.endsWith(".hpp")) "header" else if (file.endsWith(".cpp")) "cpp" else "code", IdeAccent, 17.dp)
+                                        Spacer(Modifier.width(9.dp))
+                                        Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("$count", color = IdeGreen, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showSearch = false }) { Text("Done", color = IdeAccent) } },
+                dismissButton = { TextButton(onClick = { searchQuery = "" }) { Text("Clear", color = IdeMuted) } }
+            )
         }
         if (showSettings) {
             var settingsCategory by rememberSaveable { mutableStateOf("Editor") }
@@ -501,7 +527,7 @@ private fun ProjectOverviewSheet(
                 Text("Project Overview", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("PROJECT SUMMARY", color = IdeMuted, fontSize = 10.sp)
             }
-            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+            Text(if (sidebarMode) "×" else "Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent, fontSize = if (sidebarMode) 22.sp else 14.sp)
         }
         Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(14.dp)) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -981,7 +1007,8 @@ private fun FileExplorerSheet(
     projectName: String,
     activeFile: String,
     onOpenFile: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    sidebarMode: Boolean = false
 ) {
     var query by rememberSaveable(projectName) { mutableStateOf("") }
     var srcExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
@@ -999,12 +1026,12 @@ private fun FileExplorerSheet(
     var entryMessage by rememberSaveable(projectName) { mutableStateOf<String?>(null) }
     val visibleFiles = sourceFiles.filter { it.first.contains(query, ignoreCase = true) || it.second.contains(query, ignoreCase = true) }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        Modifier.fillMaxWidth().padding(horizontal = if (sidebarMode) 10.dp else 18.dp).padding(bottom = if (sidebarMode) 8.dp else 28.dp),
+        verticalArrangement = Arrangement.spacedBy(if (sidebarMode) 6.dp else 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("File Explorer", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("File Explorer", fontSize = if (sidebarMode) 17.sp else 20.sp, fontWeight = FontWeight.Bold)
                 Text("PROJECT  /  $projectName", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
