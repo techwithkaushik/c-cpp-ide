@@ -141,24 +141,24 @@ private fun IdeUiPrototype() {
     var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
     var startupChecked by remember { mutableStateOf(false) }
     var setupChoice by rememberSaveable { mutableStateOf(LinuxSetupConfig.DOWNLOAD_METHOD) }
-    var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
-    var activeFile by rememberSaveable { mutableStateOf("main.c") }
+    var selectedProject by rememberSaveable { mutableStateOf("Welcome Workspace") }
+    var activeFile by rememberSaveable { mutableStateOf("README.md") }
     var code by rememberSaveable {
         mutableStateOf("#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\n\");\n    return 0;\n}")
     }
-    val openFiles = remember { mutableStateListOf("main.c") }
+    val openFiles = remember { mutableStateListOf("README.md") }
     val dirtyFiles = remember { mutableStateListOf<String>() }
     // One source of truth for Explorer, tabs, search, and editor.
-    val workspaceFiles = remember { mutableStateListOf("main.c", "main.cpp", "utils.h") }
+    val workspaceFiles = remember { mutableStateListOf("README.md") }
     val fileContents = remember {
-        mutableStateMapOf("main.c" to code, "main.cpp" to sampleCode("main.cpp"), "utils.h" to sampleCode("utils.h"))
+        mutableStateMapOf("README.md" to code)
     }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
     var newFileDialog by rememberSaveable { mutableStateOf(false) }
     var newFileName by rememberSaveable { mutableStateOf("") }
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
-    var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
+    var newProjectLanguage by rememberSaveable { mutableStateOf("Python") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
     var showExplorer by rememberSaveable { mutableStateOf(false) }
@@ -176,7 +176,7 @@ private fun IdeUiPrototype() {
     fun closeFile(file: String) {
         if (dirtyFiles.contains(file)) { pendingCloseFile = file; return }
         openFiles.remove(file)
-        if (openFiles.isEmpty()) openFiles.add(if (file == "main.c") "main.cpp" else "main.c")
+        if (openFiles.isEmpty()) openFiles.add("README.md")
         if (activeFile == file) {
             val next = openFiles.last()
             activeFile = next
@@ -198,8 +198,8 @@ private fun IdeUiPrototype() {
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember {
         mutableStateListOf(
-            IdeProject("Hello C", "C17", "Projects/Hello-C", "Just now"),
-            IdeProject("Cpp Playground", "C++20", "Projects/Cpp-Playground", "Yesterday")
+            IdeProject("Welcome Workspace", "Markdown", "Projects/Welcome-Workspace", "Just now"),
+            IdeProject("Python Playground", "Python", "Projects/Python-Playground", "Yesterday")
         )
     }
     val editorController = remember { SoraEditorController() }
@@ -845,7 +845,7 @@ private fun IdeUiPrototype() {
             },
             confirmButton = {
                 Button(onClick = {
-                    val name = newProjectName.trim().ifBlank { "New C Project" }
+                    val name = newProjectName.trim().ifBlank { "New Project" }
                     projects.add(0, IdeProject(name, newProjectLanguage, "Projects/$name", "Just now"))
                     selectedProject = name
                     val entryFile = if (newProjectLanguage == "C++20") "main.cpp" else "main.c"
@@ -1039,7 +1039,7 @@ private fun WelcomeScreen(onNext: () -> Unit) {
                 )
             }
             Text(
-                "C/C++ IDE",
+                "Code Studio",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFF2F6FC)
