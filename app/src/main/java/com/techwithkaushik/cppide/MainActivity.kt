@@ -1283,15 +1283,6 @@ private fun ProjectListScreen(
                                 Text("</>", color = IdeGreen, fontFamily = FontFamily.Monospace, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-                        Button(
-                            onClick = onNew,
-                            modifier = Modifier.fillMaxWidth().height(46.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            IdeIcon("add", Color.White, 17.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Create new project")
-                        }
                     }
                 }
             }
