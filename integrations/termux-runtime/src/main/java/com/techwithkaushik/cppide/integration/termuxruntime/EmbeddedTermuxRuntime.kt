@@ -25,7 +25,6 @@ data class RuntimeLayout private constructor(
         ensureDirectory(rootDirectory)
         ensureDirectory(home)
         ensureDirectory(temporaryDirectory)
-        requirePrivateChild(rootDirectory, appFilesDirectory)
         requirePrivateChild(prefix, rootDirectory)
         requirePrivateChild(home, rootDirectory)
         requirePrivateChild(temporaryDirectory, rootDirectory)
@@ -77,7 +76,6 @@ data class RuntimeLayout private constructor(
                 home = File(root, "home"),
                 temporaryDirectory = File(File(root, "usr"), "tmp"),
             )
-            layout.requirePrivateChild(layout.rootDirectory, appFiles)
             layout.requirePrivateChild(layout.prefix, root)
             layout.requirePrivateChild(layout.home, root)
             layout.requirePrivateChild(layout.temporaryDirectory, layout.prefix)
