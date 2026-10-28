@@ -268,7 +268,7 @@ private fun IdeUiPrototype() {
             Row(Modifier.fillMaxSize().background(IdeBackground)) {
                 // VS Code-inspired Activity Bar: compact, icon-first navigation suited to phone screens.
                 Column(
-                    Modifier.width(48.dp).fillMaxSize().background(Color(0xFF111820)).padding(vertical = 6.dp),
+                    Modifier.width(42.dp).fillMaxSize().background(Color(0xFF111820)).padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     listOf(
@@ -311,7 +311,7 @@ private fun IdeUiPrototype() {
                 }
                 if (showExplorer) {
                     Column(
-                        Modifier.width(248.dp).fillMaxSize().background(IdeSurface)
+                        Modifier.width(208.dp).fillMaxSize().background(IdeSurface)
                     ) {
                         FileExplorerSheet(
                             projectName = selectedProject,
@@ -1050,26 +1050,27 @@ private fun WorkspaceScreen(
         containerColor = IdeBackground,
         topBar = {
             TopAppBar(
+                modifier = Modifier.height(52.dp),
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        FileTypeIcon(activeFile, 25.dp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FileTypeIcon(activeFile, 21.dp)
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(activeFile + if (dirtyFiles.contains(activeFile)) "  ●" else "", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text(projectName, fontSize = 11.sp, color = IdeMuted, maxLines = 1)
+                            Text(activeFile + if (dirtyFiles.contains(activeFile)) "  ●" else "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(projectName, fontSize = 10.sp, color = IdeMuted, maxLines = 1)
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onMenu) { IdeIcon("menu", IdeAccent, 23.dp) }
+                    IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) { IdeIcon("menu", IdeAccent, 20.dp) }
                 },
                 actions = {
-                    IconButton(onClick = onExplorer) { IdeIcon("folder", IdeAccent, 20.dp) }
-                    IconButton(onClick = { onAction("Undo") }) { IdeIcon("undo", IdeMuted, 21.dp) }
-                    IconButton(onClick = { onAction("Redo") }) { IdeIcon("redo", IdeMuted, 21.dp) }
-                    IconButton(onClick = { onAction("Save") }) { IdeIcon("save", IdeAccent, 19.dp) }
-                    IconButton(onClick = { onAction("Build") }) { IdeIcon("build", IdeGreen, 19.dp) }
-                    IconButton(onClick = { onAction("Run") }) { IdeIcon("run", IdeGreen, 19.dp) }
-                    IconButton(onClick = { onAction("Find") }) { IdeIcon("search", IdeMuted, 19.dp) }
+                    IconButton(onClick = onExplorer, modifier = Modifier.size(36.dp)) { IdeIcon("folder", IdeAccent, 18.dp) }
+                    IconButton(onClick = { onAction("Undo") }, modifier = Modifier.size(36.dp)) { IdeIcon("undo", IdeMuted, 18.dp) }
+                    IconButton(onClick = { onAction("Redo") }, modifier = Modifier.size(36.dp)) { IdeIcon("redo", IdeMuted, 18.dp) }
+                    IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(36.dp)) { IdeIcon("save", IdeAccent, 17.dp) }
+                    IconButton(onClick = { onAction("Build") }, modifier = Modifier.size(36.dp)) { IdeIcon("build", IdeGreen, 17.dp) }
+                    IconButton(onClick = { onAction("Run") }, modifier = Modifier.size(36.dp)) { IdeIcon("run", IdeGreen, 17.dp) }
+                    IconButton(onClick = { onAction("Find") }, modifier = Modifier.size(36.dp)) { IdeIcon("search", IdeMuted, 17.dp) }
                     var showOverflow by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
@@ -1102,22 +1103,22 @@ private fun WorkspaceScreen(
                     ).forEach { (label, panel, icon) ->
                         val selected = selectedPanel == panel
                         Column(
-                            Modifier.clickable { onPanel(panel) }.padding(end = 18.dp, top = 7.dp),
+                            Modifier.clickable { onPanel(panel) }.padding(end = 12.dp, top = 5.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                                 IdeIcon(icon, if (selected) IdeAccent else IdeMuted, 15.dp)
                                 Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                             }
-                            Spacer(Modifier.height(7.dp))
-                            Box(Modifier.width(28.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
+                            Spacer(Modifier.height(4.dp))
+                            Box(Modifier.width(24.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
                         }
                     }
                     Spacer(Modifier.weight(1f))
                     Text("⌃", Modifier.clickable { onPanel(selectedPanel) }.padding(horizontal = 10.dp, vertical = 6.dp), color = IdeMuted, fontSize = 16.sp)
                 }
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xFF007ACC)).padding(horizontal = 10.dp, vertical = 4.dp),
+                    Modifier.fillMaxWidth().height(22.dp).background(Color(0xFF007ACC)).padding(horizontal = 8.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("⌘", color = Color.White, fontSize = 11.sp)
@@ -1136,7 +1137,7 @@ private fun WorkspaceScreen(
         ) {
             // Compact AndroidIDE-style open-file strip: never let a tab consume the full row width.
             Row(
-                Modifier.fillMaxWidth().height(46.dp).background(Color(0xFF151A22)),
+                Modifier.fillMaxWidth().height(36.dp).background(Color(0xFF151A22)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
@@ -1158,7 +1159,7 @@ private fun WorkspaceScreen(
                 )
             }
             Row(
-                Modifier.fillMaxWidth().height(30.dp).background(Color(0xFF10151C)).padding(horizontal = 12.dp),
+                Modifier.fillMaxWidth().height(24.dp).background(Color(0xFF10151C)).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("workspace", color = IdeMuted, fontSize = 11.sp)
@@ -1413,18 +1414,18 @@ private fun FileTab(name: String, selected: Boolean, dirty: Boolean, onClick: ()
     }
     Column(
         Modifier
-            .widthIn(min = 72.dp, max = 190.dp)
+             .widthIn(min = 64.dp, max = 160.dp)
             .clickable(onClick = onClick)
             .background(if (selected) IdeSurface else Color.Transparent)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             FileTypeIcon(name, 16.dp)
             Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (dirty) Text("●", color = Color(0xFFE5B978), fontSize = 9.sp)
             IdeIcon("close", IdeMuted, 13.dp, Modifier.clickable(onClick = onClose).padding(start = 4.dp))
         }
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(4.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
     }
 }
