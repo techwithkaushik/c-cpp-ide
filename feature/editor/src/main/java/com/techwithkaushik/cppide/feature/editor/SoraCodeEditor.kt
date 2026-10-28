@@ -29,7 +29,12 @@ class SoraEditorController {
     }
 
     fun selectAll() {
-        editor?.text?.selectAll()
+        editor?.let { view ->
+            if (view.lineCount > 0) {
+                val lastLine = view.lineCount - 1
+                view.setSelection(0, 0, lastLine, view.getLine(lastLine).length)
+            }
+        }
     }
 
     fun copy() {
@@ -79,7 +84,10 @@ private fun showEditorContextMenu(anchor: View) {
                 3 -> editor.cutText()
                 4 -> editor.copyText()
                 5 -> editor.pasteText()
-                6 -> editor.text.selectAll()
+                6 -> {
+                    val lastLine = editor.lineCount - 1
+                    if (lastLine >= 0) editor.setSelection(0, 0, lastLine, editor.getLine(lastLine).length)
+                }
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -108,7 +116,6 @@ fun SoraCodeEditor(
                 isWordwrap = wordWrap
                 setLineNumberEnabled(true)
                 setHighlightCurrentLine(true)
-                setAutoCompletionEnabled(true)
                 setTabWidth(4)
                 setScrollBarEnabled(true)
                 setHorizontalScrollBarEnabled(true)
@@ -142,7 +149,6 @@ fun SoraCodeEditor(
             editor.isWordwrap = wordWrap
             editor.setLineNumberEnabled(true)
             editor.setHighlightCurrentLine(true)
-            editor.setAutoCompletionEnabled(true)
             editor.setTabWidth(4)
             editor.setScrollBarEnabled(true)
             editor.setHorizontalScrollBarEnabled(true)
