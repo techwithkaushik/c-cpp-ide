@@ -166,13 +166,13 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
             "Linux root filesystem is not installed."
         }
         val home = File(root, "home/ide")
-        val workspace = File(filesDir, "linux/workspace")
-        val tmp = File(filesDir, "linux/tmp")
+        val workspace = File(root, "workspace")
+        val tmp = File(root, "tmp")
         check(home.mkdirs() || home.isDirectory) { "Could not create Linux HOME." }
         check(workspace.mkdirs() || workspace.isDirectory) { "Could not create Linux workspace." }
         check(tmp.mkdirs() || tmp.isDirectory) { "Could not create Linux temporary directory." }
         val config = File(filesDir, "linux/environment.properties")
-        config.writeText("DISTRO=ubuntu\\nROOTFS=" + root.absolutePath + "\\nHOME=" + home.absolutePath + "\\nWORKSPACE=" + workspace.absolutePath + "\\nTMPDIR=" + tmp.absolutePath + "\\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\\n")
+        config.writeText("DISTRO=ubuntu\\nROOTFS=" + root.absolutePath + "\\nHOME=/home/ide\\nWORKSPACE=/workspace\\nTMPDIR=/tmp\\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\\n")
         config
     }
 
