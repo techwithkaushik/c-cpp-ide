@@ -339,7 +339,7 @@ private fun IdeUiPrototype() {
                             else LazyColumn(modifier = Modifier.heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 items(projectResults, key = { it.first }) { (file, count) ->
                                     Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(9.dp)).clickable { openFile(file); showSearch = false }.padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        IdeIcon(if (file.endsWith(".h") || file.endsWith(".hpp")) "header" else if (file.endsWith(".cpp")) "cpp" else "code", IdeAccent, 17.dp)
+                                        FileTypeIcon(file, 19.dp)
                                         Spacer(Modifier.width(9.dp))
                                         Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text("$count", color = IdeGreen, fontSize = 11.sp)
@@ -1156,6 +1156,44 @@ private fun FileExplorerSheet(
     }
 }
 @Composable
+private fun FileTypeIcon(
+    fileName: String,
+    iconSize: androidx.compose.ui.unit.Dp = 20.dp,
+    modifier: Modifier = Modifier
+) {
+    val ext = fileName.substringAfterLast('.', "").lowercase()
+    val file = fileName.substringAfterLast('/').lowercase()
+    val (label, color) = when {
+        file == "cmakelists.txt" || file == "makefile" -> "⚙" to Color(0xFFB8A1E3)
+        ext == "c" -> "C" to Color(0xFF659AD2)
+        ext == "cpp" || ext == "cc" || ext == "cxx" -> "C++" to Color(0xFF9CBEFF)
+        ext == "h" || ext == "hpp" || ext == "hh" -> "H" to Color(0xFFE5B978)
+        ext == "json" -> "{}" to Color(0xFFE5B978)
+        ext == "xml" -> "X" to Color(0xFFE58A75)
+        ext == "kt" || ext == "kts" -> "K" to Color(0xFFB8A1E3)
+        ext == "java" -> "J" to Color(0xFFE5A16B)
+        ext == "py" -> "Py" to Color(0xFF82B7E8)
+        ext == "rs" -> "Rs" to Color(0xFFE5A16B)
+        ext == "js" || ext == "mjs" -> "JS" to Color(0xFFE5CB70)
+        ext == "ts" || ext == "tsx" -> "TS" to Color(0xFF659AD2)
+        ext == "html" || ext == "htm" -> "5" to Color(0xFFE58A75)
+        ext == "css" -> "#" to Color(0xFF82B7E8)
+        ext == "md" -> "M↓" to Color(0xFF9AA8BA)
+        ext == "sh" || ext == "bash" -> "$" to Color(0xFF7DDBB0)
+        ext == "yaml" || ext == "yml" -> "Y" to Color(0xFFE58A75)
+        ext == "toml" || ext == "ini" -> "⚙" to Color(0xFFB8A1E3)
+        ext == "txt" || ext == "log" -> "≡" to Color(0xFF9AA8BA)
+        else -> "·" to Color(0xFF9AA8BA)
+    }
+    Box(
+        modifier = modifier.size(iconSize).background(color.copy(alpha = 0.13f), RoundedCornerShape(4.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = color, fontSize = if (label.length > 2) 7.sp else if (label.length == 2) 9.sp else 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
 private fun ExplorerFileRow(
     name: String,
     description: String,
@@ -1171,7 +1209,7 @@ private fun ExplorerFileRow(
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IdeIcon(if (name.endsWith(".h")) "header" else if (name.endsWith(".cpp")) "cpp" else "code", IdeAccent, 18.dp, Modifier.width(30.dp))
+        FileTypeIcon(name, 20.dp, Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
             Text(name, color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 13.sp)
             Text(description, color = IdeMuted, fontSize = 10.sp)
@@ -1195,7 +1233,7 @@ private fun FileTab(name: String, selected: Boolean, dirty: Boolean, onClick: ()
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            IdeIcon(if (name.endsWith(".cpp") || name.endsWith(".hpp")) "cpp" else "code", fileAccent, 14.dp)
+            FileTypeIcon(name, 16.dp)
             Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (dirty) Text("●", color = Color(0xFFE5B978), fontSize = 9.sp)
             IdeIcon("close", IdeMuted, 13.dp, Modifier.clickable(onClick = onClose).padding(start = 4.dp))
