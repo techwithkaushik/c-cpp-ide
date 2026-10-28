@@ -144,6 +144,7 @@ private fun IdeUiPrototype() {
     var newFileName by rememberSaveable { mutableStateOf("") }
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
+    var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
     var showExplorer by rememberSaveable { mutableStateOf(true) }
@@ -228,7 +229,19 @@ private fun IdeUiPrototype() {
             )
             IdeScreen.Projects -> ProjectListScreen(
                 projects = projects,
-                onOpen = { project -> selectedProject = project.name; openFile(if (project.language == "C++20") "main.cpp" else "main.c"); screen = IdeScreen.Workspace },
+                onOpen = { project ->
+                    selectedProject = project.name
+                    val entryFile = if (project.language == "C++20") "main.cpp" else "main.c"
+                    workspaceFiles.clear()
+                    workspaceFiles.addAll(listOf(entryFile, "utils.h"))
+                    fileContents.clear()
+                    fileContents[entryFile] = sampleCode(entryFile)
+                    fileContents["utils.h"] = sampleCode("utils.h")
+                    openFiles.clear()
+                    dirtyFiles.clear()
+                    openFile(entryFile)
+                    screen = IdeScreen.Workspace
+                },
                 onNew = { newProjectDialog = true },
                 onSettings = { screen = IdeScreen.Setup }
             )
@@ -661,7 +674,7 @@ private fun IdeUiPrototype() {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { newProjectDialog = false; newProjectName = "" },
             containerColor = IdeSurface,
-            title = { Text("Create project") },
+            title = { Text("Create project", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -670,16 +683,35 @@ private fun IdeUiPrototype() {
                         label = { Text("Project name") },
                         singleLine = true
                     )
-                    Text("Choose the project type on the next setup step.", color = IdeMuted, fontSize = 12.sp)
+                    Text("Project type", color = IdeMuted, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("C17", "C++20").forEach { language ->
+                            if (newProjectLanguage == language) {
+                                Button(onClick = { newProjectLanguage = language }, modifier = Modifier.weight(1f)) { Text(language) }
+                            } else {
+                                OutlinedButton(onClick = { newProjectLanguage = language }, modifier = Modifier.weight(1f)) { Text(language) }
+                            }
+                        }
+                    }
+                    Text("Creates an entry source file and a shared header in the workspace.", color = IdeMuted, fontSize = 12.sp)
                 }
             },
             confirmButton = {
                 Button(onClick = {
                     val name = newProjectName.trim().ifBlank { "New C Project" }
-                    projects.add(0, IdeProject(name, "C17", "Projects/$name", "Just now"))
+                    projects.add(0, IdeProject(name, newProjectLanguage, "Projects/$name", "Just now"))
                     selectedProject = name
-                    activeFile = "main.c"
-                    code = sampleCode("main.c")
+                    val entryFile = if (newProjectLanguage == "C++20") "main.cpp" else "main.c"
+                    workspaceFiles.clear()
+                    workspaceFiles.addAll(listOf(entryFile, "utils.h"))
+                    fileContents.clear()
+                    fileContents[entryFile] = sampleCode(entryFile)
+                    fileContents["utils.h"] = sampleCode("utils.h")
+                    openFiles.clear()
+                    dirtyFiles.clear()
+                    activeFile = entryFile
+                    code = sampleCode(entryFile)
+                    openFile(entryFile)
                     newProjectDialog = false
                     newProjectName = ""
                     screen = IdeScreen.Workspace
