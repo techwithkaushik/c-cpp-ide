@@ -136,6 +136,8 @@ private fun IdeUiPrototype() {
     val dirtyFiles = remember { mutableStateListOf<String>() }
     val fileContents = remember { mutableStateMapOf("main.c" to code) }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
+    var newFileDialog by rememberSaveable { mutableStateOf(false) }
+    var newFileName by rememberSaveable { mutableStateOf("") }
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
@@ -237,7 +239,7 @@ private fun IdeUiPrototype() {
                     drawerContentColor = Color(0xFFE8EDF5)
                 ) {
                     Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                        Text("C/C++ IDE", fontSize = 23.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
+                        Text("Code Studio", fontSize = 23.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
                         Spacer(Modifier.height(4.dp))
                         Text(selectedProject, color = IdeMuted, fontSize = 13.sp)
                     }
@@ -357,6 +359,7 @@ private fun IdeUiPrototype() {
                         onAction = { action ->
                             when (action) {
                                 "Command Palette" -> { commandQuery = ""; showCommandPalette = true }
+                                "New File" -> { newFileName = ""; newFileDialog = true }
                                 "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                 "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                 "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
@@ -424,7 +427,7 @@ private fun IdeUiPrototype() {
                                     .clickable {
                                         showCommandPalette = false
                                         when (command) {
-                                            "New File" -> onFile(if (activeFile == "main.c") "main.cpp" else "utils.h")
+                                            "New File" -> onAction("New File")
                                             "File Explorer" -> showExplorer = !showExplorer
                                             "Terminal", "Build", "Problems", "Output" -> onAction(command)
                                             else -> onAction(command)
@@ -605,6 +608,42 @@ private fun IdeUiPrototype() {
                 )
             }
         }
+    }
+
+    if (newFileDialog) {
+        AlertDialog(
+            onDismissRequest = { newFileDialog = false; newFileName = "" },
+            containerColor = IdeSurface,
+            title = { Text("Create file", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newFileName,
+                        onValueChange = { newFileName = it },
+                        label = { Text("File name") },
+                        placeholder = { Text("e.g. app.py, index.html, notes.md") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Any filename or extension is supported in the editor workspace.", color = IdeMuted, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = newFileName.trim().substringAfterLast('/')
+                    if (name.isNotBlank()) {
+                        if (name !in fileContents.keys) {
+                            val extension = name.substringAfterLast('.', "").lowercase()
+                            fileContents[name] = if (extension in setOf("txt", "md", "json", "yaml", "yml", "toml", "xml", "html", "css", "js", "ts", "py", "rs", "kt", "java", "sh")) "" else sampleCode(name)
+                        }
+                        openFile(name)
+                    }
+                    newFileDialog = false
+                    newFileName = ""
+                }) { Text("Create", color = IdeAccent) }
+            },
+            dismissButton = { TextButton(onClick = { newFileDialog = false; newFileName = "" }) { Text("Cancel", color = IdeMuted) } }
+        )
     }
 
     if (newProjectDialog) {
@@ -970,7 +1009,7 @@ private fun ProjectListScreen(
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Start coding", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Create or open a C/C++ workspace", color = IdeMuted, fontSize = 12.sp)
+                            Text("Create or open a coding workspace", color = IdeMuted, fontSize = 12.sp)
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
