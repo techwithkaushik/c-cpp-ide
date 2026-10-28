@@ -1815,6 +1815,11 @@ private fun IdeIcon(name: String, tint: Color, iconSize: androidx.compose.ui.uni
             "chevronRight" -> { line(.35f,.2f,.65f,.5f); line(.65f,.5f,.35f,.8f) }
             "code", "cpp" -> { line(.32f,.25f,.12f,.5f); line(.12f,.5f,.32f,.75f); line(.68f,.25f,.88f,.5f); line(.88f,.5f,.68f,.75f); line(.58f,.15f,.42f,.85f) }
             "header" -> { rect(.2f,.1f,.8f,.9f); line(.35f,.38f,.65f,.38f); line(.35f,.55f,.65f,.55f); line(.35f,.72f,.55f,.72f) }
+            "git" -> { line(.3f,.2f,.3f,.8f); line(.3f,.38f,.7f,.38f); line(.7f,.38f,.7f,.72f); circle(.3f,.2f,.09f); circle(.3f,.8f,.09f); circle(.7f,.38f,.09f); circle(.7f,.72f,.09f) }
+            "extensions" -> { rect(.12f,.12f,.42f,.42f); rect(.58f,.12f,.88f,.42f); rect(.12f,.58f,.42f,.88f); rect(.58f,.58f,.88f,.88f); line(.42f,.27f,.58f,.27f); line(.42f,.73f,.58f,.73f); line(.27f,.42f,.27f,.58f); line(.73f,.42f,.73f,.58f) }
+            "refresh" -> { circle(.5f,.5f,.34f); line(.63f,.16f,.84f,.18f); line(.84f,.18f,.82f,.39f); line(.18f,.61f,.16f,.82f); line(.16f,.82f,.37f,.8f) }
+            "fullscreen" -> { line(.15f,.38f,.15f,.15f); line(.15f,.15f,.38f,.15f); line(.62f,.15f,.85f,.15f); line(.85f,.15f,.85f,.38f); line(.15f,.62f,.15f,.85f); line(.15f,.85f,.38f,.85f); line(.62f,.85f,.85f,.85f); line(.85f,.85f,.85f,.62f) }
+            "command" -> { line(.22f,.28f,.45f,.5f); line(.45f,.5f,.22f,.72f); line(.55f,.72f,.8f,.72f) }
             else -> circle(.5f,.5f,.3f)
         }
     }
