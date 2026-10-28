@@ -1084,10 +1084,15 @@ private fun FileExplorerSheet(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("File Explorer", fontSize = if (sidebarMode) 17.sp else 20.sp, fontWeight = FontWeight.Bold)
-                Text("PROJECT  /  $projectName", color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("EXPLORER", fontSize = 12.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
+                Text(projectName.uppercase(), color = IdeMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+            IconButton(onClick = { srcExpanded = true; includeExpanded = true; query = "" }, modifier = Modifier.size(32.dp)) {
+                IdeIcon("refresh", IdeMuted, 16.dp)
+            }
+            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                IdeIcon("close", IdeMuted, 16.dp)
+            }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { newEntryName = ""; fileDialog = true }, modifier = Modifier.weight(1f)) {
@@ -1111,15 +1116,16 @@ private fun FileExplorerSheet(
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { IdeIcon("close", IdeMuted, 15.dp) } }
         )
         Row(
-            Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(12.dp),
+            Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(4.dp)).padding(horizontal = 9.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IdeIcon("folder", IdeAccent, 19.dp, Modifier.padding(end = 10.dp))
+            IdeIcon("chevronDown", IdeMuted, 14.dp, Modifier.padding(end = 4.dp))
+            IdeIcon("folder", Color(0xFFE4BE79), 18.dp, Modifier.padding(end = 8.dp))
             Column(Modifier.weight(1f)) {
-                Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("PROJECT ROOT  •  ${visibleFiles.size} matching files", color = IdeMuted, fontSize = 10.sp)
+                Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
+                Text("${visibleFiles.size} files", color = IdeMuted, fontSize = 10.sp)
             }
-            Text("C/C++", color = IdeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("⋯", color = IdeMuted, fontSize = 19.sp)
         }
         if (query.isBlank() || visibleFiles.any { it.third == "src" }) {
             Row(Modifier.fillMaxWidth().clickable { srcExpanded = !srcExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
