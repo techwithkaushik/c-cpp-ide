@@ -147,7 +147,8 @@ private fun IdeUiPrototype() {
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
-    var showExplorer by rememberSaveable { mutableStateOf(true) }
+    // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
+    var showExplorer by rememberSaveable { mutableStateOf(false) }
     var activeActivity by rememberSaveable { mutableStateOf("Explorer") }
     var showProjectOverview by rememberSaveable { mutableStateOf(false) }
     var showRecentFiles by rememberSaveable { mutableStateOf(false) }
