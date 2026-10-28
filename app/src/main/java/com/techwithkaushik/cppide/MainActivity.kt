@@ -140,7 +140,7 @@ private fun IdeUiPrototype() {
     }
     var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
     var startupChecked by remember { mutableStateOf(false) }
-    var setupChoice by rememberSaveable { mutableStateOf("Download Ubuntu from Internet") }
+    var setupChoice by rememberSaveable { mutableStateOf(LinuxSetupConfig.DOWNLOAD_METHOD) }
     var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
     var activeFile by rememberSaveable { mutableStateOf("main.c") }
     var code by rememberSaveable {
@@ -213,10 +213,11 @@ private fun IdeUiPrototype() {
             val installer = LinuxDistroInstaller(appContext.filesDir, appContext.contentResolver)
             val rootfs = installer.findInstalledRootfs()
             val archive = installer.findDownloadedArchive()
+            val interruptedDownload = installer.hasInterruptedDownload()
             if (rootfs != null) {
                 setupChoice = LinuxSetupConfig.DOWNLOAD_METHOD
                 screen = IdeScreen.LinuxInstall
-            } else if (archive != null) {
+            } else if (archive != null || interruptedDownload) {
                 setupChoice = LinuxSetupConfig.DOWNLOAD_METHOD
                 screen = IdeScreen.LinuxInstall
             }
@@ -1173,6 +1174,7 @@ private fun LinuxInstallScreen(
     var failed by rememberSaveable { mutableStateOf(false) }
     var phase by rememberSaveable { mutableStateOf(0) }
     var autoStarted by rememberSaveable { mutableStateOf(false) }
+    var retryNonce by rememberSaveable { mutableStateOf(0) }
 
     suspend fun installAndPrepare(archive: File?) {
         var rootfs = installer.findInstalledRootfs()
@@ -1194,8 +1196,8 @@ private fun LinuxInstallScreen(
         onInstalled()
     }
 
-    LaunchedEffect(selected) {
-        if (autoStarted) return@LaunchedEffect
+    LaunchedEffect(selected, retryNonce) {
+        if (autoStarted && retryNonce == 0) return@LaunchedEffect
         autoStarted = true
         if (selected == LinuxSetupConfig.IMPORT_METHOD) {
             val existing = installer.findDownloadedArchive()
@@ -1296,14 +1298,15 @@ private fun LinuxInstallScreen(
                     if (archivePath != null) {
                         Text("Ready: ${File(archivePath!!).name}", color = IdeGreen, fontSize = 12.sp)
                     }
-                    if (selected == "Download Ubuntu from Internet") {
-                        Text("Download starts automatically. The screen will show download, extraction and environment setup progress.", color = IdeMuted, fontSize = 12.sp)
-                    } else {
+                    if (selected == LinuxSetupConfig.DOWNLOAD_METHOD) {
+                        Text("Download starts automatically. You can retry or choose an archive if it fails.", color = IdeMuted, fontSize = 12.sp)
+                    }
+                    if (selected == LinuxSetupConfig.IMPORT_METHOD || failed) {
                         OutlinedButton(
                             onClick = { archivePicker.launch(arrayOf("*/*")) },
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Select downloaded archive") }
+                        ) { Text("Select from storage") }
                     }
                     if (busy) {
                         if (phase == 1 && totalBytes > 0) {
@@ -1378,7 +1381,33 @@ private fun LinuxInstallScreen(
                     colors = CardDefaults.cardColors(containerColor = if (failed) Color(0xFF3B2529) else IdeSurface),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text(message, Modifier.padding(12.dp), color = if (failed) Color(0xFFFFB4AB) else IdeMuted, fontSize = 12.sp)
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(message, color = if (failed) Color(0xFFFFB4AB) else IdeMuted, fontSize = 12.sp)
+                        if (failed && selected == LinuxSetupConfig.DOWNLOAD_METHOD) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(
+                                    onClick = {
+                                        autoStarted = false
+                                        failed = false
+                                        message = LinuxSetupConfig.DOWNLOADING
+                                        retryNonce++
+                                    },
+                                    enabled = !busy
+                                ) {
+                                    Text("↻ Retry download", fontWeight = FontWeight.SemiBold)
+                                }
+                                TextButton(
+                                    onClick = { archivePicker.launch(arrayOf("*/*")) },
+                                    enabled = !busy
+                                ) { Text("Select from storage") }
+                            }
+                        } else if (failed && selected == LinuxSetupConfig.IMPORT_METHOD) {
+                            TextButton(
+                                onClick = { archivePicker.launch(arrayOf("*/*")) },
+                                enabled = !busy
+                            ) { Text("↻ Select archive again") }
+                        }
+                    }
                 }
             }
             Card(
