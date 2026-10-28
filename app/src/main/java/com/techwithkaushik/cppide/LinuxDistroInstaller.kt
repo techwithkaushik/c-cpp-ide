@@ -22,6 +22,9 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
     private val downloadDir get() = File(filesDir, "linux/downloads").apply { mkdirs() }
     private val rootfsDir get() = File(filesDir, "linux/rootfs/ubuntu").apply { mkdirs() }
 
+    fun hasInterruptedDownload(): Boolean =
+        downloadDir.listFiles()?.any { it.isFile && it.name.endsWith(".part", ignoreCase = true) } == true
+
     /** Returns the installed Ubuntu rootfs only when its identifying metadata is present. */
     fun findInstalledRootfs(): File? {
         val candidate = File(filesDir, "linux/rootfs/ubuntu")
