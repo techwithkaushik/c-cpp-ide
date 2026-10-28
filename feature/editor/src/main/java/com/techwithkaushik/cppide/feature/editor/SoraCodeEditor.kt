@@ -1,6 +1,9 @@
 package com.techwithkaushik.cppide.feature.editor
 
 import android.graphics.Color as AndroidColor
+import android.view.MenuItem
+import android.view.View
+import android.widget.PopupMenu
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -59,6 +62,31 @@ class SoraEditorController {
     }
 }
 
+private fun showEditorContextMenu(anchor: View) {
+    val editor = anchor as? CodeEditor ?: return
+    PopupMenu(anchor.context, anchor).apply {
+        menu.add(0, 1, 0, "Undo")
+        menu.add(0, 2, 1, "Redo")
+        menu.add(0, 3, 2, "Cut")
+        menu.add(0, 4, 3, "Copy")
+        menu.add(0, 5, 4, "Paste")
+        menu.add(0, 6, 5, "Select All")
+        setOnMenuItemClickListener { item: MenuItem ->
+            when (item.itemId) {
+                1 -> editor.undo()
+                2 -> editor.redo()
+                3 -> editor.cutText()
+                4 -> editor.copyText()
+                5 -> editor.pasteText()
+                6 -> editor.text.selectAll()
+                else -> return@setOnMenuItemClickListener false
+            }
+            true
+        }
+        show()
+    }
+}
+
 @Composable
 fun SoraCodeEditor(
     code: String,
@@ -91,6 +119,17 @@ fun SoraCodeEditor(
                 colorScheme.setColor(EditorColorScheme.SELECTION_INSERT, AndroidColor.rgb(74, 132, 196))
                 colorScheme.setColor(EditorColorScheme.SELECTION_HANDLE, AndroidColor.rgb(74, 132, 196))
                 controller?.attach(this)
+                // Touch long-press and mouse right-click both expose familiar editor actions.
+                setOnLongClickListener { view ->
+                    showEditorContextMenu(view)
+                    true
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    setOnContextClickListener { view ->
+                        showEditorContextMenu(view)
+                        true
+                    }
+                }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     currentOnCodeChange.value(text.toString())
                 }
