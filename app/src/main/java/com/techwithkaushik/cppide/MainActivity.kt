@@ -208,7 +208,7 @@ private fun IdeUiPrototype() {
     val appContext = LocalContext.current
     LaunchedEffect(appContext) {
         if (!startupChecked) {
-            val installer = LinuxDistroInstaller(appContext.filesDir, appContext.contentResolver)
+            val installer = LinuxDistroInstaller(appContext.filesDir, appContext.contentResolver, File(appContext.applicationInfo.nativeLibraryDir))
             val rootfs = installer.findInstalledRootfs()
             val archive = installer.findDownloadedArchive()
             val interruptedDownload = installer.hasInterruptedDownload()
@@ -1220,7 +1220,7 @@ private fun LinuxInstallScreen(
     onInstalled: () -> Unit
 ) {
     val context = LocalContext.current
-    val installer = remember(context) { LinuxDistroInstaller(context.filesDir, context.contentResolver) }
+    val installer = remember(context) { LinuxDistroInstaller(context.filesDir, context.contentResolver, File(context.applicationInfo.nativeLibraryDir)) }
     val scope = rememberCoroutineScope()
     var archivePath by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by rememberSaveable { mutableStateOf(false) }
