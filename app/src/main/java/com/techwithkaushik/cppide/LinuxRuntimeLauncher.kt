@@ -120,8 +120,7 @@ internal class LinuxRuntimeLauncher(private val filesDir: File, private val nati
         environment["LANG"] = "C.UTF-8"
         environment["TERM"] = "xterm-256color"
         environment["PROOT_TMP_DIR"] = File(filesDir, "linux/runtime-tmp").absolutePath
-        val bundledLibs = File(runtimeDir, "lib")
-        if (bundledLibs.isDirectory) environment["LD_LIBRARY_PATH"] = bundledLibs.absolutePath
+        environment["LD_LIBRARY_PATH"] = runtimeDir.absolutePath
         environment["IDE_ROOTFS"] = root.absolutePath
     }
 
