@@ -49,15 +49,15 @@ class BootstrapSmokeTest(
                 }
                 .start()
 
-            val stdout = process.inputStream.bufferedReader().use { it.readText() }
-            val stderr = process.errorStream.bufferedReader().use { it.readText() }
             val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
             if (!finished) {
                 process.destroy()
                 if (!process.waitFor(250, TimeUnit.MILLISECONDS)) process.destroyForcibly()
-                return Result(false, null, stdout, stderr, "Bootstrap shell timed out")
+                return Result(false, null, "", "", "Bootstrap shell timed out")
             }
-
+            // The fixed command emits only a tiny payload; read after exit so the timeout guard cannot block on readText().
+            val stdout = process.inputStream.bufferedReader().use { it.readText() }
+            val stderr = process.errorStream.bufferedReader().use { it.readText() }
             val exitCode = process.exitValue()
             val success = exitCode == 0 && stdout.trim() == "CPPIDE_BOOTSTRAP_OK"
             Result(
