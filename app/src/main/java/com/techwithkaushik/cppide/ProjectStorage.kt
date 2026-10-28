@@ -3,6 +3,9 @@ package com.techwithkaushik.cppide
 import android.content.Context
 import java.io.File
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Single source of truth for project metadata and files.
@@ -86,8 +89,18 @@ internal class ProjectStorage(context: Context) {
         val temporary = File(parent, ".${file.name}.tmp-${System.nanoTime()}")
         try {
             temporary.writeText(content)
-            if (file.exists() && !file.delete()) throw IOException("Unable to replace file")
-            if (!temporary.renameTo(file)) throw IOException("Unable to save file")
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                // Some Android filesystems do not support atomic replacement. Keep the old
+                // file intact until the replacement is ready, then use the platform fallback.
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
         } finally {
             temporary.delete()
         }
