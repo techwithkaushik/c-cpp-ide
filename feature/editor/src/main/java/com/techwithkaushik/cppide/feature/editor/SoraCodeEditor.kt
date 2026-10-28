@@ -29,12 +29,7 @@ class SoraEditorController {
     }
 
     fun selectAll() {
-        editor?.let { view ->
-            if (view.lineCount > 0) {
-                val lastLine = view.lineCount - 1
-                view.setSelection(0, 0, lastLine, view.getLine(lastLine).length)
-            }
-        }
+        editor?.selectAll()
     }
 
     fun copy() {
@@ -84,10 +79,7 @@ private fun showEditorContextMenu(anchor: View) {
                 3 -> editor.cutText()
                 4 -> editor.copyText()
                 5 -> editor.pasteText()
-                6 -> {
-                    val lastLine = editor.lineCount - 1
-                    if (lastLine >= 0) editor.setSelection(0, 0, lastLine, editor.getLine(lastLine).length)
-                }
+                6 -> editor.selectAll()
                 else -> return@setOnMenuItemClickListener false
             }
             true
