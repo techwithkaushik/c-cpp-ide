@@ -1111,6 +1111,7 @@ private fun SetupScreen(selected: String, onSelect: (String) -> Unit, onContinue
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LinuxInstallScreen(
     selected: String,
