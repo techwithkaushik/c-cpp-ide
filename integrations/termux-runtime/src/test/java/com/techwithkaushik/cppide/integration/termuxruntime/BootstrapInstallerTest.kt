@@ -1,0 +1,94 @@
+package com.techwithkaushik.cppide.integration.termuxruntime
+
+import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+class BootstrapInstallerTest {
+    private val temp = TemporaryFolder().apply { create() }
+
+    @Test
+    fun installsVerifiedArchiveIntoStagingPrefix() {
+        val archive = createArchive(
+            "bin/bash" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+        val result = BootstrapInstaller().install(archive, sha256(archive), prefix)
+
+        assertTrue(File(prefix, "bin/bash").isFile)
+        assertEquals("shell", File(prefix, "bin/bash").readText())
+        assertEquals(4, result.filesExtracted)
+        assertTrue(result.sha256.matches(Regex("^[a-f0-9]{64}$")))
+        assertFalse(File(temp.root, "runtime/.usr.staging").exists())
+    }
+
+    @Test
+    fun rejectsChecksumMismatchBeforeExtraction() {
+        val archive = createArchive(
+            "bin/bash" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            BootstrapInstaller().install(archive, "0".repeat(64), prefix)
+        }
+        assertFalse(prefix.exists())
+    }
+
+    @Test
+    fun rejectsZipSlipPath() {
+        val archive = createArchive(
+            "../outside.txt" to "must not escape",
+            "bin/bash" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        assertThrows(Exception::class.java) {
+            BootstrapInstaller().install(archive, sha256(archive), prefix)
+        }
+        assertFalse(File(temp.root, "outside.txt").exists())
+        assertFalse(prefix.exists())
+    }
+
+    private fun createArchive(vararg entries: Pair<String, String>): File {
+        val file = File(temp.root, "bootstrap-${System.nanoTime()}.zip")
+        ZipOutputStream(file.outputStream().buffered()).use { zip ->
+            entries.forEach { (name, value) ->
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(value.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return file
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
