@@ -14,7 +14,7 @@ internal object LinuxSetupConfig {
     const val VALIDATING = "Checking Linux runtime…"
     const val SELECT_ARCHIVE = "Select a Linux rootfs archive to continue."
     const val ARCHIVE_MISSING = "No installed Linux filesystem or archive was found."
-    const val RUNTIME_MISSING = "Linux files are preserved, but this build does not yet include a compatible execution runtime."
+    const val RUNTIME_MISSING = "Linux files are preserved, but the Android-compatible PRoot runtime is missing or the shell test failed."
     const val SETUP_FAILED = "Linux setup failed. Existing files were preserved."
 
     const val DISTRO_ID = "ubuntu"
