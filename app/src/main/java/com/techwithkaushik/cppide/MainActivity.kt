@@ -689,7 +689,7 @@ private fun IdeUiPrototype() {
                     }
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf("Editor", "Languages", "Build", "Appearance").forEach { category ->
                                 if (settingsCategory == category) {
