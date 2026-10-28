@@ -1207,12 +1207,14 @@ private fun LinuxInstallScreen(
     var autoStarted by rememberSaveable { mutableStateOf(false) }
 
     suspend fun installAndPrepare(archive: File) {
-        phase = 2
-        message = "Step 2/3 · Extracting Ubuntu root filesystem…"
-        val result = installer.installArchive(archive)
         phase = 3
-        message = "Step 3/3 · Preparing Linux HOME and workspace…"
+        message = "Step 3/5 · Extracting Ubuntu root filesystem…"
+        val result = installer.installArchive(archive)
+        phase = 4
+        message = "Step 4/5 · Preparing Linux HOME and workspace…"
         installer.prepareEnvironment(result.rootfs)
+        phase = 5
+        message = "Step 5/5 · Validating that Ubuntu /bin/sh can execute…"
         check(installer.hasExecutionRuntime(result.rootfs)) {
             "Ubuntu files and environment folders are ready, but this build does not yet include a compatible Linux execution runtime. Terminal access cannot be enabled until Ubuntu /bin/sh can actually run."
         }
@@ -1230,7 +1232,8 @@ private fun LinuxInstallScreen(
             runCatching { installer.downloadUbuntu { received, total -> progressBytes = received; totalBytes = total } }
                 .onSuccess { archive ->
                     archivePath = archive.absolutePath
-                    message = "Download and checksum verification complete."
+                    phase = 2
+                    message = "Step 2/5 · SHA-256 checksum verified."
                     runCatching { installAndPrepare(archive) }
                         .onFailure { failed = true; message = it.message ?: "Linux setup failed." }
                 }
@@ -1248,10 +1251,13 @@ private fun LinuxInstallScreen(
             scope.launch {
                 busy = true
                 failed = false
-                message = "Importing selected archive…"
+                phase = 1
+                message = "Step 1/5 · Importing selected archive…"
                 runCatching { installer.importArchive(uri) }
                     .onSuccess { file ->
                         archivePath = file.absolutePath
+                        phase = 2
+                        message = "Step 2/5 · Archive imported; checking filesystem contents."
                         runCatching { installAndPrepare(file) }
                             .onFailure { failed = true; message = it.message ?: "Linux setup failed." }
                     }
@@ -1318,6 +1324,60 @@ private fun LinuxInstallScreen(
                             Text("${progressBytes / (1024 * 1024)} / ${totalBytes / (1024 * 1024)} MB", color = IdeMuted, fontSize = 11.sp)
                         } else {
                             androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IdeSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, IdeSurfaceRaised),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("INSTALLATION PROGRESS", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.8.sp)
+                    val stages = listOf(
+                        "Download / import archive",
+                        "Verify archive",
+                        "Extract Ubuntu filesystem",
+                        "Prepare HOME and workspace",
+                        "Validate Linux runtime"
+                    )
+                    stages.forEachIndexed { index, title ->
+                        val number = index + 1
+                        val complete = phase > number || (number == 2 && phase >= 2 && !failed)
+                        val active = phase == number && busy
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                Modifier.size(26.dp).clip(CircleShape).background(
+                                    when {
+                                        complete -> Color(0xFF174B3A)
+                                        active -> Color(0xFF203D59)
+                                        failed && number == phase -> Color(0xFF5A2B30)
+                                        else -> IdeSurfaceRaised
+                                    }
+                                ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    when {
+                                        complete -> "✓"
+                                        failed && number == phase -> "!"
+                                        else -> number.toString().padStart(2, '0')
+                                    },
+                                    color = when {
+                                        complete -> Color(0xFF7FE0B2)
+                                        active -> Color(0xFF83C8FF)
+                                        failed && number == phase -> Color(0xFFFFB4AB)
+                                        else -> IdeMuted
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(title, color = if (active) Color(0xFF83C8FF) else Color(0xFFE8EDF5), fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+                            Spacer(Modifier.weight(1f))
+                            if (active) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                         }
                     }
                 }
