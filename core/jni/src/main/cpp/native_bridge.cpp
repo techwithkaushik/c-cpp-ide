@@ -25,8 +25,8 @@ std::string lower_ascii(std::string value) {
 jint matching_bracket(std::string_view text, jint cursor) {
     if (cursor < 0 || static_cast<size_t>(cursor) >= text.size()) return -1;
     const char current = text[static_cast<size_t>(cursor)];
-    char open = '\\0';
-    char close = '\\0';
+    char open = '\0';
+    char close = '\0';
     int direction = 0;
     if (current == '(' || current == '[' || current == '{') {
         open = current;
