@@ -155,7 +155,8 @@ private fun IdeUiPrototype() {
     var newFileName by rememberSaveable { mutableStateOf("") }
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
-    var newProjectLanguage by rememberSaveable { mutableStateOf("Python") }
+    var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
+    var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
     var showExplorer by rememberSaveable { mutableStateOf(false) }
@@ -849,34 +850,86 @@ private fun IdeUiPrototype() {
     }
 
     if (newProjectDialog) {
+        val normalizedProjectName = newProjectName.trim()
+        val projectNameExists = projects.any { it.name.equals(normalizedProjectName, ignoreCase = true) }
+        val projectNameValid = normalizedProjectName.isNotBlank() &&
+            normalizedProjectName.length <= 48 &&
+            normalizedProjectName.none { it == '/' || it == '\\' || it.isISOControl() } &&
+            normalizedProjectName != "." && normalizedProjectName != ".."
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { newProjectDialog = false; newProjectName = "" },
+            onDismissRequest = {
+                newProjectDialog = false
+                newProjectName = ""
+                newProjectError = null
+            },
             containerColor = IdeSurface,
             title = { Text("Create project", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = newProjectName,
-                        onValueChange = { newProjectName = it },
+                        onValueChange = { newProjectName = it; newProjectError = null },
                         label = { Text("Project name") },
-                        singleLine = true
+                        placeholder = { Text("e.g. MyFirstProgram") },
+                        singleLine = true,
+                        isError = newProjectError != null || (normalizedProjectName.isNotEmpty() && projectNameExists),
+                        supportingText = {
+                            Text(
+                                newProjectError ?: if (projectNameExists) "A project with this name already exists." else "Up to 48 characters; slash characters are not allowed.",
+                                color = if (newProjectError != null || projectNameExists) Color(0xFFFF8A80) else IdeMuted,
+                                fontSize = 11.sp
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Project type", color = IdeMuted, fontSize = 12.sp)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("C17", "C++20", "Python", "JavaScript", "TypeScript", "Rust", "Java", "Kotlin", "HTML/CSS", "Shell", "Markdown").forEach { language ->
-                            if (newProjectLanguage == language) {
-                                Button(onClick = { newProjectLanguage = language }) { Text(language) }
-                            } else {
-                                OutlinedButton(onClick = { newProjectLanguage = language }) { Text(language) }
+                    Text("PROJECT TYPE", color = IdeMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            listOf("C17", "C++20", "Python"),
+                            listOf("JavaScript", "TypeScript", "Rust"),
+                            listOf("Java", "Kotlin", "HTML/CSS"),
+                            listOf("Shell", "Markdown")
+                        ).forEach { rowLanguages ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                rowLanguages.forEach { language ->
+                                    val selected = newProjectLanguage == language
+                                    if (selected) {
+                                        Button(onClick = { newProjectLanguage = language },
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                            modifier = Modifier.weight(1f)) { Text(language, fontSize = 11.sp, maxLines = 1) }
+                                    } else {
+                                        OutlinedButton(onClick = { newProjectLanguage = language },
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                            modifier = Modifier.weight(1f)) { Text(language, fontSize = 11.sp, maxLines = 1) }
+                                    }
+                                }
                             }
                         }
                     }
-                    Text("Creates a starter file for the selected language.", color = IdeMuted, fontSize = 12.sp)
+                    Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(12.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            IdeIcon("code", IdeGreen, 24.dp)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(entryFileForLanguage(newProjectLanguage), color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text("Starter file · $newProjectLanguage", color = IdeMuted, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    Text("Preview only: files are currently kept in this editor session. Disk-backed project storage is a separate integration step.",
+                        color = Color(0xFFE5B978), fontSize = 11.sp, lineHeight = 15.sp)
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val name = newProjectName.trim().ifBlank { "New Project" }
+                Button(enabled = projectNameValid && !projectNameExists, onClick = {
+                    val name = normalizedProjectName
+                    if (!projectNameValid || projectNameExists) {
+                        newProjectError = if (name.isBlank()) "Enter a project name." else "Choose a valid, unique project name."
+                        return@Button
+                    }
                     projects.add(0, IdeProject(name, newProjectLanguage, "Projects/$name", "Just now"))
                     selectedProject = name
                     val entryFile = entryFileForLanguage(newProjectLanguage)
@@ -892,11 +945,16 @@ private fun IdeUiPrototype() {
                     openFile(entryFile)
                     newProjectDialog = false
                     newProjectName = ""
+                    newProjectError = null
                     screen = IdeScreen.Workspace
-                }) { Text("Create") }
+                }) { Text("Create project") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { newProjectDialog = false; newProjectName = "" }) { Text("Cancel") }
+                OutlinedButton(onClick = {
+                    newProjectDialog = false
+                    newProjectName = ""
+                    newProjectError = null
+                }) { Text("Cancel") }
             }
         )
     }
