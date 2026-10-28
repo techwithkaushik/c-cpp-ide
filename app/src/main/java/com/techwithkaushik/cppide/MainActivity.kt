@@ -10,6 +10,7 @@ import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
@@ -212,11 +213,24 @@ private fun IdeUiPrototype() {
             val installer = LinuxDistroInstaller(appContext.filesDir, appContext.contentResolver)
             val rootfs = installer.findInstalledRootfs()
             val archive = installer.findDownloadedArchive()
-            if (rootfs != null || archive != null) {
-                setupChoice = "Download Ubuntu from Internet"
+            if (rootfs != null) {
+                setupChoice = LinuxSetupConfig.DOWNLOAD_METHOD
+                screen = IdeScreen.LinuxInstall
+            } else if (archive != null) {
+                setupChoice = LinuxSetupConfig.DOWNLOAD_METHOD
                 screen = IdeScreen.LinuxInstall
             }
             startupChecked = true
+        }
+    }
+
+    BackHandler(enabled = screen != IdeScreen.Welcome) {
+        when (screen) {
+            IdeScreen.Workspace -> screen = IdeScreen.Projects
+            IdeScreen.LinuxInstall -> screen = IdeScreen.Setup
+            IdeScreen.Setup -> screen = IdeScreen.Welcome
+            IdeScreen.Projects -> screen = IdeScreen.Setup
+            IdeScreen.Welcome -> Unit
         }
     }
 
@@ -1226,30 +1240,33 @@ private fun LinuxInstallScreen(
     suspend fun installAndPrepare(archive: File?) {
         var rootfs = installer.findInstalledRootfs()
         if (rootfs == null) {
-            check(archive != null && archive.isFile && archive.length() > 2) {
-                "No installed Ubuntu rootfs or saved archive was found. Start setup to download or import it."
-            }
+            check(archive != null && archive.isFile && archive.length() > 2) { LinuxSetupConfig.ARCHIVE_MISSING }
             phase = 3
-            message = "Step 3/5 · Extracting Ubuntu root filesystem…"
+            message = LinuxSetupConfig.EXTRACTING
             rootfs = installer.installArchive(archive).rootfs
         } else {
             phase = 3
-            message = "Step 3/5 · Existing Ubuntu rootfs verified; extraction skipped."
+            message = LinuxSetupConfig.ROOTFS_FOUND
         }
         phase = 4
-        message = "Step 4/5 · Verifying Linux HOME and workspace…"
+        message = LinuxSetupConfig.PREPARING
         installer.prepareEnvironment(rootfs)
         phase = 5
-        message = "Step 5/5 · Validating that Ubuntu /bin/sh can execute…"
-        check(installer.hasExecutionRuntime(rootfs)) {
-            "Ubuntu rootfs and workspace were preserved, but this build has no compatible execution runtime yet. Setup can resume here."
-        }
+        message = LinuxSetupConfig.VALIDATING
+        check(installer.hasExecutionRuntime(rootfs)) { LinuxSetupConfig.RUNTIME_MISSING }
         onInstalled()
     }
 
     LaunchedEffect(selected) {
         if (autoStarted) return@LaunchedEffect
         autoStarted = true
+        if (selected == LinuxSetupConfig.IMPORT_METHOD) {
+            val existing = installer.findDownloadedArchive()
+            if (existing == null && installer.findInstalledRootfs() == null) {
+                message = LinuxSetupConfig.SELECT_ARCHIVE
+                return@LaunchedEffect
+            }
+        }
         busy = true
         failed = false
         runCatching {
@@ -1260,25 +1277,23 @@ private fun LinuxInstallScreen(
                 installAndPrepare(savedArchive)
             } else {
                 var archive = savedArchive
-                if (archive == null) {
+                if (archive == null && selected == LinuxSetupConfig.DOWNLOAD_METHOD) {
                     phase = 1
-                    message = "Step 1/5 · No saved archive found; downloading Ubuntu…"
-                    archive = installer.downloadUbuntu { received, total ->
-                        progressBytes = received
-                        totalBytes = total
-                    }
-                } else {
-                    phase = 2
-                    message = "Step 2/5 · Found saved archive; preparing extraction…"
+                    message = LinuxSetupConfig.DOWNLOADING
+                    archive = installer.downloadUbuntu { received, total -> progressBytes = received; totalBytes = total }
+                }
+                if (archive == null) {
+                    message = LinuxSetupConfig.SELECT_ARCHIVE
+                    return@runCatching
                 }
                 archivePath = archive.absolutePath
                 phase = 2
-                message = "Step 2/5 · Archive available; checking filesystem contents."
+                message = LinuxSetupConfig.VERIFYING
                 installAndPrepare(archive)
             }
         }.onFailure {
             failed = true
-            message = it.message ?: "Linux setup failed. Existing files were kept for recovery."
+            message = it.message ?: LinuxSetupConfig.SETUP_FAILED
         }
         busy = false
     }
