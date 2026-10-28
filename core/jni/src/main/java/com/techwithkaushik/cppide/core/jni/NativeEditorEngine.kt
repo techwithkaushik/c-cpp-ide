@@ -14,6 +14,6 @@ class NativeEditorEngine {
 
     external fun nativeEngineVersion(): String
     external fun nativeCountLines(source: String): Int
-    external fun nativeFindMatchingBracket(source: String, cursorUtf16Offset: Int): Int
+    external fun nativeFindMatchingBracket(source: String, cursorUtf8ByteOffset: Int): Int
     external fun nativeDetectLanguage(fileName: String): String
 }
