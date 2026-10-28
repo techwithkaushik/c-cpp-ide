@@ -124,7 +124,8 @@ private fun IdeUiPrototype() {
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
-    var showExplorer by rememberSaveable { mutableStateOf(false) }
+    var showExplorer by rememberSaveable { mutableStateOf(true) }
+    var activeActivity by rememberSaveable { mutableStateOf("Explorer") }
     var showProjectOverview by rememberSaveable { mutableStateOf(false) }
     var showRecentFiles by rememberSaveable { mutableStateOf(false) }
     var recentFiles = remember { mutableStateListOf<String>() }
@@ -263,6 +264,49 @@ private fun IdeUiPrototype() {
             }
         ) {
             Row(Modifier.fillMaxSize().background(IdeBackground)) {
+                // VS Code-inspired Activity Bar: compact, icon-first navigation suited to phone screens.
+                Column(
+                    Modifier.width(48.dp).fillMaxSize().background(Color(0xFF111820)).padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    listOf(
+                        Triple("Explorer", "folder", "Open project files"),
+                        Triple("Search", "search", "Search in project"),
+                        Triple("Source Control", "git", "Source control"),
+                        Triple("Run and Debug", "run", "Build and run"),
+                        Triple("Extensions", "extensions", "Extensions")
+                    ).forEach { (label, icon, hint) ->
+                        val selected = activeActivity == label
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .clickable {
+                                    activeActivity = label
+                                    when (label) {
+                                        "Explorer" -> showExplorer = !showExplorer
+                                        "Search" -> { searchInProject = true; searchQuery = ""; showSearch = true }
+                                        "Run and Debug" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                                        "Source Control" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                                        "Extensions" -> showSettings = true
+                                    }
+                                }
+                                .background(if (selected) Color(0xFF202B37) else Color.Transparent)
+                                .padding(vertical = 11.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                if (selected) Box(
+                                    Modifier.align(Alignment.CenterStart).width(2.dp).height(30.dp).background(IdeAccent)
+                                )
+                                IdeIcon(icon, if (selected) Color(0xFFE8EDF5) else IdeMuted, 22.dp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Column(
+                        Modifier.fillMaxWidth().clickable { showSettings = true }.padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) { IdeIcon("settings", IdeMuted, 22.dp) }
+                }
                 if (showExplorer) {
                     Column(
                         Modifier.width(248.dp).fillMaxSize().background(IdeSurface)
