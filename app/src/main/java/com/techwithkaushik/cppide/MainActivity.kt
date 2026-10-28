@@ -1127,6 +1127,43 @@ private fun LinuxInstallScreen(
     var totalBytes by rememberSaveable { mutableStateOf(0L) }
     var message by rememberSaveable { mutableStateOf("") }
     var failed by rememberSaveable { mutableStateOf(false) }
+    var phase by rememberSaveable { mutableStateOf(0) }
+    var autoStarted by rememberSaveable { mutableStateOf(false) }
+
+    suspend fun installAndPrepare(archive: File) {
+        phase = 2
+        message = "Step 2/3 · Extracting Ubuntu root filesystem…"
+        val result = installer.installArchive(archive)
+        phase = 3
+        message = "Step 3/3 · Preparing Linux HOME and workspace…"
+        installer.prepareEnvironment(result.rootfs)
+        check(installer.hasExecutionRuntime(result.rootfs)) {
+            "Ubuntu files and environment folders are ready, but this build does not yet include a compatible Linux execution runtime. Terminal access cannot be enabled until Ubuntu /bin/sh can actually run."
+        }
+        onInstalled()
+    }
+
+    LaunchedEffect(selected) {
+        if (autoStarted) return@LaunchedEffect
+        autoStarted = true
+        if (selected == "Download Ubuntu from Internet") {
+            busy = true
+            failed = false
+            phase = 1
+            message = "Step 1/3 · Downloading official Ubuntu archive…"
+            runCatching { installer.downloadUbuntu { received, total -> progressBytes = received; totalBytes = total } }
+                .onSuccess { archive ->
+                    archivePath = archive.absolutePath
+                    message = "Download and checksum verification complete."
+                    runCatching { installAndPrepare(archive) }
+                        .onFailure { failed = true; message = it.message ?: "Linux setup failed." }
+                }
+                .onFailure { failed = true; message = it.message ?: "Ubuntu download failed." }
+            busy = false
+        } else {
+            message = "Select an Ubuntu rootfs archive to begin automatic installation."
+        }
+    }
 
     val archivePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -1139,7 +1176,8 @@ private fun LinuxInstallScreen(
                 runCatching { installer.importArchive(uri) }
                     .onSuccess { file ->
                         archivePath = file.absolutePath
-                        message = "Archive selected: ${file.name}. Tap Install to extract it."
+                        runCatching { installAndPrepare(file) }
+                            .onFailure { failed = true; message = it.message ?: "Linux setup failed." }
                     }
                     .onFailure {
                         failed = true
