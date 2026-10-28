@@ -1199,6 +1199,16 @@ private fun LinuxInstallScreen(
     LaunchedEffect(selected, retryNonce) {
         if (autoStarted && retryNonce == 0) return@LaunchedEffect
         autoStarted = true
+        if (selected == LinuxSetupConfig.DOWNLOAD_METHOD &&
+            installer.hasInterruptedDownload() &&
+            installer.findInstalledRootfs() == null &&
+            installer.findDownloadedArchive() == null &&
+            retryNonce == 0
+        ) {
+            failed = true
+            message = LinuxSetupConfig.INTERRUPTED_DOWNLOAD
+            return@LaunchedEffect
+        }
         if (selected == LinuxSetupConfig.IMPORT_METHOD) {
             val existing = installer.findDownloadedArchive()
             if (existing == null && installer.findInstalledRootfs() == null) {
