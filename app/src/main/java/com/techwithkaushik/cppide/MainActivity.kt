@@ -847,13 +847,20 @@ private fun IdeUiPrototype() {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val name = newFileName.trim().substringAfterLast('/')
-                    if (name.isNotBlank()) {
-                        if (name !in workspaceFiles) workspaceFiles.add(name)
-                        if (name !in fileContents.keys) {
-                            fileContents[name] = sampleCode(name)
-                        }
-                        openFile(name)
+                    val name = newFileName.trim()
+                    val safeName = name.substringAfterLast('/')
+                    val validName = safeName.isNotBlank() && safeName != "." && safeName != ".." &&
+                        safeName.none { it == '\\\\' || it.isISOControl() }
+                    if (validName && safeName !in workspaceFiles) {
+                        val starter = sampleCode(safeName)
+                        runCatching { projectStorage.writeFile(selectedProject, safeName, starter) }
+                            .onSuccess {
+                                workspaceFiles.add(safeName)
+                                fileContents[safeName] = starter
+                                openFile(safeName)
+                            }
+                    } else if (safeName in workspaceFiles) {
+                        openFile(safeName)
                     }
                     newFileDialog = false
                     newFileName = ""
@@ -944,23 +951,32 @@ private fun IdeUiPrototype() {
                         newProjectError = if (name.isBlank()) "Enter a project name." else "Choose a valid, unique project name."
                         return@Button
                     }
-                    projects.add(0, IdeProject(name, newProjectLanguage, "Projects/$name", "Just now"))
-                    selectedProject = name
                     val entryFile = entryFileForLanguage(newProjectLanguage)
-                    workspaceFiles.clear()
-                    workspaceFiles.addAll(listOf(entryFile, "README.md").distinct())
-                    fileContents.clear()
-                    fileContents[entryFile] = sampleCode(entryFile)
-                    fileContents["README.md"] = sampleCode("README.md")
-                    openFiles.clear()
-                    dirtyFiles.clear()
-                    activeFile = entryFile
-                    code = sampleCode(entryFile)
-                    openFile(entryFile)
-                    newProjectDialog = false
-                    newProjectName = ""
-                    newProjectError = null
-                    screen = IdeScreen.Workspace
+                    runCatching {
+                        projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile))
+                    }.onSuccess { stored ->
+                        projects.add(0, IdeProject(stored.name, stored.language, stored.path, "Just now"))
+                        selectedProject = name
+                        val diskFiles = projectStorage.listFiles(name)
+                        workspaceFiles.clear()
+                        workspaceFiles.addAll(diskFiles)
+                        fileContents.clear()
+                        diskFiles.forEach { file ->
+                            runCatching { projectStorage.readFile(name, file) }
+                                .onSuccess { fileContents[file] = it }
+                        }
+                        openFiles.clear()
+                        dirtyFiles.clear()
+                        activeFile = entryFile
+                        code = fileContents[entryFile] ?: sampleCode(entryFile)
+                        openFile(entryFile)
+                        newProjectDialog = false
+                        newProjectName = ""
+                        newProjectError = null
+                        screen = IdeScreen.Workspace
+                    }.onFailure { error ->
+                        newProjectError = error.message ?: "Could not create project."
+                    }
                 }) { Text("Create project") }
             },
             dismissButton = {
