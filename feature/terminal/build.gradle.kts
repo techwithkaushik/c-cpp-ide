@@ -25,10 +25,9 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:aidl"))
 
-    // Import only the reusable upstream terminal UI library, not the full Termux app.
-    // terminal-view exposes terminal-emulator transitively; keep both on the upstream
-    // published library version while adapting app/bootstrap code separately.
-    implementation("com.termux:terminal-view:0.118.0")
+    // Keep this module self-contained until the upstream terminal sources are vendored
+    // from a reviewed, pinned Termux revision. Termux's app modules are not published
+    // as a public terminal-view Maven artifact.
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
