@@ -743,8 +743,7 @@ private fun IdeUiPrototype() {
                     if (name.isNotBlank()) {
                         if (name !in workspaceFiles) workspaceFiles.add(name)
                         if (name !in fileContents.keys) {
-                            val extension = name.substringAfterLast('.', "").lowercase()
-                            fileContents[name] = if (extension in setOf("txt", "md", "json", "yaml", "yml", "toml", "xml", "html", "css", "js", "ts", "py", "rs", "kt", "java", "sh")) "" else sampleCode(name)
+                            fileContents[name] = sampleCode(name)
                         }
                         openFile(name)
                     }
