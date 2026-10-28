@@ -22,6 +22,23 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
     private val downloadDir get() = File(filesDir, "linux/downloads").apply { mkdirs() }
     private val rootfsDir get() = File(filesDir, "linux/rootfs/ubuntu").apply { mkdirs() }
 
+    /** Returns the installed Ubuntu rootfs only when its identifying metadata is present. */
+    fun findInstalledRootfs(): File? {
+        val candidate = File(filesDir, "linux/rootfs/ubuntu")
+        return candidate.takeIf {
+            it.isDirectory && (File(it, "etc/os-release").isFile || File(it, "usr/lib/os-release").isFile)
+        }
+    }
+
+    /** Finds a completed archive in app-private Downloads without clearing existing data. */
+    fun findDownloadedArchive(): File? {
+        val preferred = File(downloadDir, recommendedArchiveName())
+        if (preferred.isFile && preferred.length() > 2) return preferred
+        return downloadDir.listFiles()
+            ?.filter { it.isFile && it.length() > 2 && it.name.endsWith(".tar.gz", ignoreCase = true) }
+            ?.maxByOrNull { it.lastModified() }
+    }
+
     fun recommendedArchiveName(): String {
         val abi = Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
         val arch = when (abi) {
