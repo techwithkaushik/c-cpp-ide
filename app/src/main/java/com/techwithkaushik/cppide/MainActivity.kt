@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IdeUiPrototype() {
+    val appContext = LocalContext.current
     var fullScreen by rememberSaveable { mutableStateOf(false) }
     val localView = LocalView.current
     val hostActivity = localView.context as? Activity
