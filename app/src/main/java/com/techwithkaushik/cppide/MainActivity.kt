@@ -1089,6 +1089,7 @@ private fun WelcomeScreen(onNext: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProjectListScreen(
     projects: List<IdeProject>,
