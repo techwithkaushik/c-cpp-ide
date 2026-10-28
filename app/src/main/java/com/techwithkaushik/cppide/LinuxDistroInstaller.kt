@@ -225,8 +225,9 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
         config
     }
 
-    /** No compatible runtime is bundled yet; do not claim shell access until it is validated. */
-    fun hasExecutionRuntime(rootfs: File): Boolean = false
+    /** A rootfs is active only after the app-managed PRoot process runs a real shell smoke test. */
+    suspend fun validateExecutionRuntime(rootfs: File): LinuxRuntimeLauncher.ValidationResult =
+        LinuxRuntimeLauncher(filesDir).validate(rootfs)
     private fun isGzipArchive(file: File): Boolean =
         file.isFile && file.length() >= 2 && runCatching {
             FileInputStream(file).use { it.read() == 0x1f && it.read() == 0x8b }
