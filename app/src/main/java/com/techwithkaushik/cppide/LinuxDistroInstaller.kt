@@ -50,7 +50,7 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
         }
         try {
             connection.connect()
-            check(connection.responseCode in 200..299) { "Download failed: HTTP \${connection.responseCode}" }
+            check(connection.responseCode in 200..299) { "Download failed: HTTP ${connection.responseCode}" }
             val total = connection.contentLengthLong
             if (destination.exists()) destination.delete()
             connection.inputStream.use { input ->
@@ -98,11 +98,11 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
                     check(entries <= MAX_ENTRIES) { "Archive contains too many entries" }
                     val normalized = entry.name.replace('\\', '/').removePrefix("./")
                     check(normalized.isNotBlank() && !normalized.startsWith("/") &&
-                        normalized.split('/').none { it == ".." }) { "Unsafe path in archive: \${entry.name}" }
+                        normalized.split('/').none { it == ".." }) { "Unsafe path in archive: ${entry.name}" }
                     val output = File(root, normalized).canonicalFile
                     check(output.toPath().startsWith(root.toPath())) { "Archive path escapes rootfs" }
                     if (entry.isDirectory) {
-                        check(output.isDirectory || output.mkdirs()) { "Could not create \${entry.name}" }
+                        check(output.isDirectory || output.mkdirs()) { "Could not create ${entry.name}" }
                     } else if (entry.isSymbolicLink) {
                         val rawTarget = entry.linkName
                         val targetFile = if (rawTarget.startsWith("/")) File(root, rawTarget.removePrefix("/"))
@@ -115,7 +115,7 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
                         java.nio.file.Files.createSymbolicLink(output.toPath(), java.nio.file.Paths.get(relativeTarget))
                     } else if (entry.isFile) {
                         output.parentFile?.let { check(it.isDirectory || it.mkdirs()) }
-                        check(!output.isSymbolicLink()) { "Archive attempts to overwrite a symlink: \${entry.name}" }
+                        check(!output.isSymbolicLink()) { "Archive attempts to overwrite a symlink: ${entry.name}" }
                         FileOutputStream(output).use { out ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                             var remaining = entry.size
@@ -133,7 +133,7 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
                             targetName.split('/').none { it == ".." }) { "Unsafe hard-link target" }
                         val target = File(root, targetName).canonicalFile
                         check(target.toPath().startsWith(root.toPath()) && target.isFile) {
-                            "Hard-link target is missing or unsafe: \${entry.linkName}"
+                            "Hard-link target is missing or unsafe: ${entry.linkName}"
                         }
                         output.parentFile?.let { check(it.isDirectory || it.mkdirs()) }
                         java.nio.file.Files.createLink(output.toPath(), target.toPath())
