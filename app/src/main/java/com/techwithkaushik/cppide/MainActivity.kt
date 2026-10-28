@@ -345,7 +345,7 @@ private fun IdeUiPrototype() {
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    Text("UI prototype • runtime not connected", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.padding(18.dp))
+                    Text("Linux runtime status: not active", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.padding(18.dp))
                 }
             }
         ) {
@@ -674,6 +674,11 @@ private fun IdeUiPrototype() {
         }
         if (showSettings) {
             var settingsCategory by rememberSaveable { mutableStateOf("Editor") }
+            var pathLanguage by rememberSaveable { mutableStateOf("python") }
+            var pathRole by rememberSaveable { mutableStateOf(LanguageToolingCatalog.Role.LanguageServer.name) }
+            var toolPathValue by rememberSaveable { mutableStateOf("") }
+            var toolPathStatus by rememberSaveable { mutableStateOf("") }
+            val toolPathPreferences = remember(appContext) { ToolPathPreferences(appContext) }
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showSettings = false },
                 containerColor = IdeSurface,
@@ -716,15 +721,70 @@ private fun IdeUiPrototype() {
                                 Text("LANGUAGE SUPPORT", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 SettingsInfoRow("Editor scope", "Multi-language code and text editor")
                                 SettingsInfoRow("File types", "C/C++, Python, Java, Kotlin, JS/TS, HTML/CSS, JSON, Markdown, and more")
-                                SettingsInfoRow("Language services", "Syntax highlighting and LSP integration are being expanded")
-                                Text("Language-specific tooling can be enabled per project.", color = IdeMuted, fontSize = 11.sp)
+                                SettingsInfoRow("Language services", "Completion, diagnostics, formatting and linting use language-specific tools")
+                                Text("EXTERNAL TOOL PATHS", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Select a language and tool role, then enter an absolute executable path for a tool you already downloaded.", color = IdeMuted, fontSize = 11.sp)
+                                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    LanguageToolingCatalog.all().forEach { spec ->
+                                        if (pathLanguage == spec.id) Button(onClick = {
+                                            pathLanguage = spec.id
+                                            toolPathValue = toolPathPreferences.get(pathLanguage, LanguageToolingCatalog.Role.valueOf(pathRole)).orEmpty()
+                                            toolPathStatus = ""
+                                        }) { Text(spec.displayName, fontSize = 10.sp) }
+                                        else OutlinedButton(onClick = {
+                                            pathLanguage = spec.id
+                                            toolPathValue = toolPathPreferences.get(pathLanguage, LanguageToolingCatalog.Role.valueOf(pathRole)).orEmpty()
+                                            toolPathStatus = ""
+                                        }) { Text(spec.displayName, fontSize = 10.sp) }
+                                    }
+                                }
+                                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    LanguageToolingCatalog.Role.entries.forEach { role ->
+                                        if (pathRole == role.name) Button(onClick = {
+                                            pathRole = role.name
+                                            toolPathValue = toolPathPreferences.get(pathLanguage, role).orEmpty()
+                                            toolPathStatus = ""
+                                        }) { Text(role.name, fontSize = 10.sp) }
+                                        else OutlinedButton(onClick = {
+                                            pathRole = role.name
+                                            toolPathValue = toolPathPreferences.get(pathLanguage, role).orEmpty()
+                                            toolPathStatus = ""
+                                        }) { Text(role.name, fontSize = 10.sp) }
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = toolPathValue,
+                                    onValueChange = { toolPathValue = it },
+                                    label = { Text("Absolute executable path") },
+                                    placeholder = { Text("/path/to/tool") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = {
+                                        val role = LanguageToolingCatalog.Role.valueOf(pathRole)
+                                        runCatching {
+                                            toolPathPreferences.set(pathLanguage, role, toolPathValue)
+                                            val resolved = toolPathPreferences.resolveExecutable(pathLanguage, role)
+                                            toolPathStatus = if (resolved != null) "Validated: ${resolved.absolutePath}" else "Saved, but the path is missing or not executable."
+                                        }.onFailure { toolPathStatus = it.message ?: "Invalid path." }
+                                    }) { Text("Save & validate") }
+                                    OutlinedButton(onClick = {
+                                        val role = LanguageToolingCatalog.Role.valueOf(pathRole)
+                                        toolPathPreferences.set(pathLanguage, role, null)
+                                        toolPathValue = ""
+                                        toolPathStatus = "Custom path cleared."
+                                    }) { Text("Clear") }
+                                }
+                                if (toolPathStatus.isNotBlank()) Text(toolPathStatus, color = IdeMuted, fontSize = 11.sp)
+                                Text("Configured paths are stored per language and role. They become active only when the runtime process launcher resolves and uses them.", color = IdeMuted, fontSize = 11.sp)
                             }
                             "Build" -> {
                                 Text("BUILD TOOLCHAIN", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                SettingsInfoRow("Compiler", "Clang / LLVM — not connected")
-                                SettingsInfoRow("Build system", "CMake — not connected")
+                                SettingsInfoRow("Toolchain", "Selected from the active file and workspace configuration")
+                                SettingsInfoRow("Build system", "Detected from workspace files when supported")
                                 SettingsInfoRow("Execution target", "Linux environment")
-                                Text("Toolchain options are informational until runtime integration is implemented.", color = Color(0xFFE5B978), fontSize = 11.sp)
+                                Text("Configure executable paths under Languages. Runtime execution is validated separately.", color = Color(0xFFE5B978), fontSize = 11.sp)
                             }
                             else -> {
                                 Text("WORKSPACE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -1877,11 +1937,7 @@ private fun FileExplorerSheet(
                             if (creatingFolder) entryMessage = "Folder '$name' previewed; filesystem is not connected."
                             else {
                                 val folder = if (name.endsWith(".h") || name.endsWith(".hpp")) "include" else "src"
-                                val description = when {
-                                    name.endsWith(".cpp") || name.endsWith(".cc") || name.endsWith(".cxx") -> "C++ source file"
-                                    name.endsWith(".h") || name.endsWith(".hpp") -> "C/C++ header"
-                                    else -> "C source file"
-                                }
+                                val description = LanguageToolingCatalog.detect(name)?.displayName?.plus(" file") ?: "Text or configuration file"
                                 onCreateFile(name)
                                 entryMessage = "Created '$name' in the workspace."
                             }
@@ -1911,8 +1967,8 @@ private fun FileExplorerSheet(
         }
         Divider(color = IdeSurfaceRaised)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Sample project tree", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-            Text("Runtime not connected", color = Color(0xFFE5B978), fontSize = 10.sp)
+            Text("Workspace files", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            Text("Linux runtime inactive", color = Color(0xFFE5B978), fontSize = 10.sp)
         }
     }
 }
@@ -2057,13 +2113,13 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         when (selected) {
             ToolPanel.Terminal -> {
                 ToolStatusCard("TERMINAL SESSION", "Not connected", "The shell runtime has not been started.", "›  Waiting for runtime integration", IdeAccent)
-                Text("Terminal commands will be available after the Termux runtime bridge is connected.", color = IdeMuted, fontSize = 11.sp)
+                Text("Terminal commands will be available when the managed Linux runtime is active.", color = IdeMuted, fontSize = 11.sp)
             }
             ToolPanel.Build -> {
-                ToolStatusCard("BUILD STATUS", "Ready to configure", "No build has been run in this UI preview.", "Compiler: Clang / LLVM · Not connected", IdeAccent)
+                ToolStatusCard("BUILD STATUS", "Waiting for runtime", "Build tools are resolved from the active file and workspace.", "Language toolchain · Not active", IdeAccent)
                 Text("Build steps", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 PanelInfoRow("1", "Resolve project configuration", "Waiting for build integration")
-                PanelInfoRow("2", "Compile C/C++ sources", "Compiler not connected")
+                PanelInfoRow("2", "Resolve and run the active language", "Toolchain is selected from the file type")
                 PanelInfoRow("3", "Link executable", "Not started")
             }
             ToolPanel.Problems -> {
