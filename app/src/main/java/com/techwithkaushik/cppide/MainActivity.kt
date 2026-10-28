@@ -73,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,6 +122,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IdeUiPrototype() {
+    var fullScreen by rememberSaveable { mutableStateOf(false) }
     val localView = LocalView.current
     val hostActivity = localView.context as? Activity
     SideEffect {
@@ -152,7 +154,6 @@ private fun IdeUiPrototype() {
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
-    var fullScreen by rememberSaveable { mutableStateOf(false) }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
     var showExplorer by rememberSaveable { mutableStateOf(false) }
     var activeActivity by rememberSaveable { mutableStateOf("Explorer") }
@@ -465,10 +466,25 @@ private fun IdeUiPrototype() {
                                     .clickable {
                                         showCommandPalette = false
                                         when (command) {
-                                            "New File" -> onAction("New File")
+                                            "New File" -> { newFileName = ""; newFileDialog = true }
                                             "File Explorer" -> showExplorer = !showExplorer
-                                            "Terminal", "Build", "Problems", "Output" -> onAction(command)
-                                            else -> onAction(command)
+                                            "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
+                                            "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                                            "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                            "Output", "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                                            "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
+                                            "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
+                                            "Select All" -> editorController.selectAll()
+                                            "Undo" -> editorController.undo()
+                                            "Redo" -> editorController.redo()
+                                            "Copy" -> editorController.copy()
+                                            "Cut" -> editorController.cut()
+                                            "Paste" -> editorController.paste()
+                                            "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
+                                            "Save", "Save All" -> { fileContents[activeFile] = code; dirtyFiles.remove(activeFile) }
+                                            "Settings" -> showSettings = true
+                                            "File Explorer" -> showExplorer = !showExplorer
+                                            "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                                         }
                                     }
                                     .padding(horizontal = 10.dp, vertical = 11.dp),
