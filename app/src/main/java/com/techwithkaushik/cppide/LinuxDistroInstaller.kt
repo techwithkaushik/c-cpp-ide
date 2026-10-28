@@ -116,7 +116,16 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
                     } else if (entry.isFile) {
                         output.parentFile?.let { check(it.isDirectory || it.mkdirs()) }
                         check(!output.isSymbolicLink()) { "Archive attempts to overwrite a symlink: \${entry.name}" }
-                        FileOutputStream(output).use { out -> tar.copyTo(out) }
+                        FileOutputStream(output).use { out ->
+                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                            var remaining = entry.size
+                            while (remaining > 0) {
+                                val count = tar.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                                check(count > 0) { "Unexpected end of archive entry: ${entry.name}" }
+                                out.write(buffer, 0, count)
+                                remaining -= count
+                            }
+                        }
                         if (entry.mode and 0b001001001 != 0) output.setExecutable(true, false)
                     } else if (entry.isLink) {
                         val targetName = entry.linkName.removePrefix("./")
