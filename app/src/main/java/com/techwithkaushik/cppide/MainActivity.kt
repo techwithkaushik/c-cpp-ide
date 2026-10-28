@@ -374,6 +374,10 @@ private fun IdeUiPrototype() {
                             }
                         },
                         selectedPanel = selectedPanel,
+                        showToolPanel = showToolPanel,
+                        fullScreen = fullScreen,
+                        onToggleFullScreen = { fullScreen = !fullScreen },
+                        onCloseToolPanel = { showToolPanel = false },
                         onPanel = { selectedPanel = it; showToolPanel = true }
                     )
                 }
