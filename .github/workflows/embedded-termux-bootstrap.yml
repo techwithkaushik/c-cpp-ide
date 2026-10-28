@@ -48,13 +48,13 @@ jobs:
           import re
           p = Path("termux-packages/scripts/properties.sh")
           text = p.read_text()
-          matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP_PACKAGE\s*=.*$', text))
+          matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP__PACKAGE_NAME\s*=.*$', text))
           if len(matches) != 1:
               raise SystemExit(f"Expected one TERMUX_APP__PACKAGE_NAME assignment; found {len(matches)}. Upstream changed; review required.")
           old = matches[0].group(0)
           indent = re.match(r'^\s*', old).group(0)
           export = "export " if old.lstrip().startswith("export ") else ""
-          text = text[:matches[0].start()] + f'{indent}{export}TERMUX_APP_PACKAGE="{__import__("os").environ["CODE_STUDIO_PACKAGE"]}"' + text[matches[0].end():]
+          text = text[:matches[0].start()] + f'{indent}{export}TERMUX_APP__PACKAGE_NAME="{__import__("os").environ["CODE_STUDIO_PACKAGE"]}"' + text[matches[0].end():]
           p.write_text(text)
           print("Configured custom application package identity.")
           PY
