@@ -128,6 +128,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun IdeUiPrototype() {
     val appContext = LocalContext.current
+    val projectStorage = remember(appContext) { ProjectStorage(appContext) }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
     val localView = LocalView.current
     val hostActivity = localView.context as? Activity
@@ -194,11 +195,12 @@ private fun IdeUiPrototype() {
     var editorWordWrap by rememberSaveable { mutableStateOf(false) }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
-    val projects = remember {
-        mutableStateListOf(
-            IdeProject("Welcome Workspace", "Markdown", "Projects/Welcome-Workspace", "Just now"),
-            IdeProject("Python Playground", "Python", "Projects/Python-Playground", "Yesterday")
-        )
+    val projects = remember(projectStorage) {
+        mutableStateListOf<IdeProject>().apply {
+            projectStorage.listProjects().forEach { project ->
+                add(IdeProject(project.name, project.language, project.path, "Saved"))
+            }
+        }
     }
     val editorController = remember { SoraEditorController() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
