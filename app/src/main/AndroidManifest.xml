@@ -8,7 +8,7 @@
     </queries>
     <application
         android:allowBackup="false"
-        android:label="C/C++ IDE"
+        android:label="Code Studio"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
