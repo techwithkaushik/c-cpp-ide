@@ -134,7 +134,11 @@ private fun IdeUiPrototype() {
     }
     val openFiles = remember { mutableStateListOf("main.c") }
     val dirtyFiles = remember { mutableStateListOf<String>() }
-    val fileContents = remember { mutableStateMapOf("main.c" to code) }
+    // One source of truth for Explorer, tabs, search, and editor.
+    val workspaceFiles = remember { mutableStateListOf("main.c", "main.cpp", "utils.h") }
+    val fileContents = remember {
+        mutableStateMapOf("main.c" to code, "main.cpp" to sampleCode("main.cpp"), "utils.h" to sampleCode("utils.h"))
+    }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
     var newFileDialog by rememberSaveable { mutableStateOf(false) }
     var newFileName by rememberSaveable { mutableStateOf("") }
@@ -334,7 +338,13 @@ private fun IdeUiPrototype() {
                         FileExplorerSheet(
                             projectName = selectedProject,
                             activeFile = activeFile,
+                            files = workspaceFiles.toList(),
                             onOpenFile = { openFile(it) },
+                            onCreateFile = { file ->
+                                if (file !in workspaceFiles) workspaceFiles.add(file)
+                                if (file !in fileContents) fileContents[file] = sampleCode(file)
+                                openFile(file)
+                            },
                             onClose = { showExplorer = false },
                             sidebarMode = true
                         )
@@ -632,6 +642,7 @@ private fun IdeUiPrototype() {
                 TextButton(onClick = {
                     val name = newFileName.trim().substringAfterLast('/')
                     if (name.isNotBlank()) {
+                        if (name !in workspaceFiles) workspaceFiles.add(name)
                         if (name !in fileContents.keys) {
                             val extension = name.substringAfterLast('.', "").lowercase()
                             fileContents[name] = if (extension in setOf("txt", "md", "json", "yaml", "yml", "toml", "xml", "html", "css", "js", "ts", "py", "rs", "kt", "java", "sh")) "" else sampleCode(name)
@@ -1273,19 +1284,30 @@ private fun WorkspaceScreen(
 private fun FileExplorerSheet(
     projectName: String,
     activeFile: String,
+    files: List<String>,
     onOpenFile: (String) -> Unit,
+    onCreateFile: (String) -> Unit,
     onClose: () -> Unit,
     sidebarMode: Boolean = false
 ) {
     var query by rememberSaveable(projectName) { mutableStateOf("") }
     var srcExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
     var includeExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
-    val sourceFiles = remember(projectName) {
-        mutableStateListOf(
-            Triple("main.c", "C source file", "src"),
-            Triple("main.cpp", "C++ source file", "src"),
-            Triple("utils.h", "C/C++ header", "include")
-        )
+    val sourceFiles = files.map { name ->
+        val ext = name.substringAfterLast(".", "").lowercase()
+        val folder = if (ext in setOf("h", "hpp", "hh", "hxx")) "include" else "src"
+        val description = when (ext) {
+            "c" -> "C source file"
+            "cpp", "cc", "cxx" -> "C++ source file"
+            "h", "hpp", "hh", "hxx" -> "C/C++ header"
+            "md" -> "Markdown document"
+            "json" -> "JSON configuration"
+            "py" -> "Python source file"
+            "rs" -> "Rust source file"
+            "kt", "kts" -> "Kotlin source file"
+            else -> (ext.ifBlank { "plain text" }) + " file"
+        }
+        Triple(name, description, folder)
     }
     var fileDialog by rememberSaveable(projectName) { mutableStateOf(false) }
     var folderDialog by rememberSaveable(projectName) { mutableStateOf(false) }
@@ -1393,8 +1415,8 @@ private fun FileExplorerSheet(
                                     name.endsWith(".h") || name.endsWith(".hpp") -> "C/C++ header"
                                     else -> "C source file"
                                 }
-                                sourceFiles.add(Triple(name, description, folder))
-                                entryMessage = "Created '$name' in the preview tree."
+                                onCreateFile(name)
+                                entryMessage = "Created '$name' in the workspace."
                             }
                         } else if (name.isBlank()) entryMessage = "Enter a name first."
                         else entryMessage = "'$name' already exists."
