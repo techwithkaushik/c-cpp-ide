@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1131,7 +1133,7 @@ private fun SetupScreen(
                     SetupProgressRow("01", "Get Ubuntu archive", "Download with checksum verification or import from storage")
                     SetupProgressRow("02", "Extract filesystem", "Unpack Ubuntu into the app's private Linux storage")
                     SetupProgressRow("03", "Prepare environment", "Create Linux home and workspace, then validate runtime")
-                    HorizontalDivider(color = IdeSurfaceRaised)
+                    Divider(color = IdeSurfaceRaised)
                     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text("ⓘ", color = Color(0xFFFFC978), fontSize = 18.sp)
                         Text(
