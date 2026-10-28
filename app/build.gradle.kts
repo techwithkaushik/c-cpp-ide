@@ -46,6 +46,13 @@ android {
     }
 
     buildFeatures { compose = true }
+
+    // The bundled PRoot executable is packaged as libproot.so and must be extracted to nativeLibraryDir.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {
