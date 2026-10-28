@@ -1267,9 +1267,7 @@ private fun LinuxInstallScreen(
                     Text("The unprivileged runtime must still launch /bin/sh successfully before Linux packages, terminal, compiler or LSP can be enabled.", color = IdeMuted, fontSize = 12.sp)
                 }
             }
-            OutlinedButton(onClick = onInstalled, modifier = Modifier.fillMaxWidth()) {
-                Text("Continue to projects (runtime validation pending)")
-            }
+            Text("Terminal access is enabled only after the Linux runtime passes an actual /bin/sh execution check.", color = Color(0xFFFFC978), fontSize = 11.sp)
         }
     }
 }
