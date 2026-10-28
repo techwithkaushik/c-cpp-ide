@@ -27,3 +27,4 @@ include(":feature:terminal")
 include(":feature:explorer")
 
 include(":integrations:toolchain")
+include(":integrations:termux-runtime")
