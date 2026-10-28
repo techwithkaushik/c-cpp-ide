@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -527,7 +528,7 @@ private fun ProjectOverviewSheet(
                 Text("Project Overview", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("PROJECT SUMMARY", color = IdeMuted, fontSize = 10.sp)
             }
-            Text(if (sidebarMode) "×" else "Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent, fontSize = if (sidebarMode) 22.sp else 14.sp)
+            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
         }
         Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(14.dp)) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
