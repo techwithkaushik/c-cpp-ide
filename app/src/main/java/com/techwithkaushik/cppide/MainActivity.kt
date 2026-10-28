@@ -834,13 +834,13 @@ private fun IdeUiPrototype() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("C17", "C++20").forEach { language ->
                             if (newProjectLanguage == language) {
-                                Button(onClick = { newProjectLanguage = language }, modifier = Modifier.weight(1f)) { Text(language) }
+                                Button(onClick = { newProjectLanguage = language }) { Text(language) }
                             } else {
-                                OutlinedButton(onClick = { newProjectLanguage = language }, modifier = Modifier.weight(1f)) { Text(language) }
+                                OutlinedButton(onClick = { newProjectLanguage = language }) { Text(language) }
                             }
                         }
                     }
-                    Text("Creates an entry source file and a shared header in the workspace.", color = IdeMuted, fontSize = 12.sp)
+                    Text("Creates a starter file for the selected language.", color = IdeMuted, fontSize = 12.sp)
                 }
             },
             confirmButton = {
