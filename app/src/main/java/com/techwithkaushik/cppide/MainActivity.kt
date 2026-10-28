@@ -261,43 +261,58 @@ private fun IdeUiPrototype() {
                 }
             }
         ) {
-            WorkspaceScreen(
-                projectName = selectedProject,
-                activeFile = activeFile,
-                code = code,
-                openFiles = openFiles,
-                dirtyFiles = dirtyFiles,
-                onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
-                onSelectFile = { openFile(it) },
-                onCloseFile = { closeFile(it) },
-                editorController = editorController,
-                editorFontSize = editorFontSize,
-                editorWordWrap = editorWordWrap,
-                onMenu = { scope.launch { drawerState.open() } },
-                onExplorer = { showExplorer = true },
-                onFile = { file ->
-                    openFile(file)
-                },
-                onAction = { action ->
-                    when (action) {
-                        "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
-                        "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                        "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
-                        "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                        "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
-                        "Undo" -> editorController.undo()
-                        "Redo" -> editorController.redo()
-                        "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
-                        "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
-                        "Save All" -> { openFiles.forEach { file -> if (file == activeFile) fileContents[file] = code }; dirtyFiles.clear() }
-                        "Settings" -> showSettings = true
-                        "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
-                        "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+            Row(Modifier.fillMaxSize().background(IdeBackground)) {
+                if (showExplorer) {
+                    Column(
+                        Modifier.width(248.dp).fillMaxSize().background(IdeSurface)
+                    ) {
+                        FileExplorerSheet(
+                            projectName = selectedProject,
+                            activeFile = activeFile,
+                            onOpenFile = { openFile(it) },
+                            onClose = { showExplorer = false }
+                        )
                     }
-                },
-                selectedPanel = selectedPanel,
-                onPanel = { selectedPanel = it; showToolPanel = true }
-            )
+                }
+                Box(Modifier.weight(1f).fillMaxSize()) {
+                    WorkspaceScreen(
+                        projectName = selectedProject,
+                        activeFile = activeFile,
+                        code = code,
+                        openFiles = openFiles,
+                        dirtyFiles = dirtyFiles,
+                        onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
+                        onSelectFile = { openFile(it) },
+                        onCloseFile = { closeFile(it) },
+                        editorController = editorController,
+                        editorFontSize = editorFontSize,
+                        editorWordWrap = editorWordWrap,
+                        onMenu = { scope.launch { drawerState.open() } },
+                        onExplorer = { showExplorer = !showExplorer },
+                        onFile = { file -> openFile(file) },
+                        onAction = { action ->
+                            when (action) {
+                                "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
+                                "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                                "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                                "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                                "Save" -> { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
+                                "Undo" -> editorController.undo()
+                                "Redo" -> editorController.redo()
+                                "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
+                                "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
+                                "Save All" -> { openFiles.forEach { file -> if (file == activeFile) fileContents[file] = code }; dirtyFiles.clear() }
+                                "Settings" -> showSettings = true
+                                "File Explorer" -> showExplorer = !showExplorer
+                                "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                                "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                            }
+                        },
+                        selectedPanel = selectedPanel,
+                        onPanel = { selectedPanel = it; showToolPanel = true }
+                    )
+                }
+            }
         }
         if (showSearch) {
             val searchable = if (searchInProject) fileContents.values.joinToString("\\n") else code
@@ -377,24 +392,6 @@ private fun IdeUiPrototype() {
                 },
                 confirmButton = { Button(onClick = { showSettings = false }) { Text("Done") } }
             )
-        }
-        if (showExplorer) {
-            ModalBottomSheet(
-                onDismissRequest = { showExplorer = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
-                containerColor = IdeSurface,
-                contentWindowInsets = { WindowInsets.navigationBars }
-            ) {
-                FileExplorerSheet(
-                    projectName = selectedProject,
-                    activeFile = activeFile,
-                    onOpenFile = { file ->
-                        openFile(file)
-                        showExplorer = false
-                    },
-                    onClose = { showExplorer = false }
-                )
-            }
         }
         if (showProjectOverview) {
             ModalBottomSheet(
