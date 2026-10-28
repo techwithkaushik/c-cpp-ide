@@ -138,7 +138,7 @@ private fun IdeUiPrototype() {
         }
     }
     var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
-    var startupChecked by rememberSaveable { mutableStateOf(false) }
+    var startupChecked by remember { mutableStateOf(false) }
     var setupChoice by rememberSaveable { mutableStateOf("Download Ubuntu from Internet") }
     var selectedProject by rememberSaveable { mutableStateOf("Hello C") }
     var activeFile by rememberSaveable { mutableStateOf("main.c") }
