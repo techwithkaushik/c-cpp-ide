@@ -112,6 +112,6 @@ internal class ProjectStorage(context: Context) {
 
     private fun validateName(name: String) {
         require(name.isNotBlank() && name.length <= 48 && name != "." && name != ".." &&
-            name.none { it == '/' || it == '\\\\' || it.isISOControl() }) { "Invalid project name" }
+            name.none { it == '/' || it == 92.toChar() || it.isISOControl() }) { "Invalid project name" }
     }
 }
