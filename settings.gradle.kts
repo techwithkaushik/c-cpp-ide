@@ -26,5 +26,4 @@ include(":feature:editor")
 include(":feature:terminal")
 include(":feature:explorer")
 
-include(":integrations:termux")
 include(":integrations:toolchain")
