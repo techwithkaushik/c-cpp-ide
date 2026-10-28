@@ -159,6 +159,25 @@ internal class LinuxDistroInstaller(private val filesDir: File, private val cont
         }
     }
 
+    /** Prepare persistent HOME/workspace and deterministic environment metadata after extraction. */
+    suspend fun prepareEnvironment(rootfs: File): File = withContext(Dispatchers.IO) {
+        val root = rootfs.canonicalFile
+        check(root.isDirectory && (File(root, "etc/os-release").isFile || File(root, "usr/lib/os-release").isFile)) {
+            "Linux root filesystem is not installed."
+        }
+        val home = File(root, "home/ide")
+        val workspace = File(filesDir, "linux/workspace")
+        val tmp = File(filesDir, "linux/tmp")
+        check(home.mkdirs() || home.isDirectory) { "Could not create Linux HOME." }
+        check(workspace.mkdirs() || workspace.isDirectory) { "Could not create Linux workspace." }
+        check(tmp.mkdirs() || tmp.isDirectory) { "Could not create Linux temporary directory." }
+        val config = File(filesDir, "linux/environment.properties")
+        config.writeText("DISTRO=ubuntu\\nROOTFS=" + root.absolutePath + "\\nHOME=" + home.absolutePath + "\\nWORKSPACE=" + workspace.absolutePath + "\\nTMPDIR=" + tmp.absolutePath + "\\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\\n")
+        config
+    }
+
+    /** No compatible runtime is bundled yet; do not claim shell access until it is validated. */
+    fun hasExecutionRuntime(rootfs: File): Boolean = false
     private fun validateGzipTar(file: File) {
         check(file.isFile && file.length() >= 2) { "Selected file is empty or missing" }
         FileInputStream(file).use {
