@@ -1,6 +1,6 @@
-# C/C++ IDE for Android
+# Code Studio — Multi-language IDE for Android
 
-A native Android C/C++ IDE foundation built with Kotlin, Jetpack Compose, Kotlin DSL, Version Catalogs, AIDL, and JNI/C++.
+A VS Code-inspired, multi-language Android IDE built with Kotlin, Jetpack Compose, AIDL, and native integrations. The architecture targets file-aware language tooling, a managed Linux userspace, terminal sessions, and project-level toolchain configuration.
 
 ## Module architecture
 
@@ -39,7 +39,7 @@ This commit establishes the module registry, dependency catalog, and initial com
 
 ## Runtime and bootstrap direction
 
-The standalone IDE must work without requiring a separately installed Termux app and must not ask users to paste a compiler/rootfs URL. The selected direction is an app-managed Ubuntu rootfs bootstrap with ABI selection and a project-controlled, versioned manifest. The rootfs is only a userspace base: the execution layer and Android-compatible compiler/runtime must be proven before it can be marked ready.
+The standalone IDE must work without requiring a separately installed Termux app and must not ask users to paste a compiler/rootfs URL. Linux setup completion must mean the selected userspace and Android-compatible execution runtime have passed a real shell smoke test—not just that a rootfs archive was extracted. The selected direction is an app-managed Ubuntu rootfs bootstrap with ABI selection and a project-controlled, versioned manifest. The rootfs is only a userspace base: the execution layer and Android-compatible compiler/runtime must be proven before it can be marked ready.
 
 Read [ADR 0002 — Ubuntu rootfs bootstrap](docs/architecture/adr-0002-ubuntu-rootfs-bootstrap.md) for the bootstrap flow, security constraints, and device validation gates. The first-run setup has two paths—[Download from Internet or Use Downloaded Rootfs from Storage](docs/architecture/rootfs-setup-screen.md)—and both use the same validation and installation pipeline. The existing `:integrations:toolchain` implementation contains archive/download safety primitives, but no production Ubuntu rootfs artifacts or validated Android execution layer are claimed yet.
 
@@ -59,4 +59,4 @@ The first spike evaluates the documented Termux command API for finite commands.
 
 The current branch includes a temporary diagnostic screen and a minimal `:integrations:termux` adapter. The screen checks whether Termux is visible, whether its RUN_COMMAND service resolves, whether the IDE permission is granted, and whether a fixed harmless command returns the expected marker.
 
-This remains a **capability spike, not a device-validated production compiler integration**. The adapter now includes an initial argv-based C/C++ compile-and-run runner using Termux clang/clang++, with bounded arguments and executable output restricted to Termux home or usr/tmp. It does not yet provide workspace synchronization, a code editor flow, persistent LSP streams, terminal PTY, or debugging. The compile/run path has unit tests but still requires a successful CI run and real-device validation. See [the validation matrix](docs/architecture/termux-capability-spike.md) before treating any capability as supported.
+This remains a **capability spike, not a device-validated production compiler integration**. The adapter has an initial argv-based C/C++ compile-and-run spike using Termux clang/clang++, with bounded arguments and executable output restricted to Termux home or usr/tmp. This is one language adapter, not the IDE's product scope. It does not yet provide workspace synchronization, a code editor flow, persistent LSP streams, terminal PTY, or debugging. The compile/run path has unit tests but still requires a successful CI run and real-device validation. See [the validation matrix](docs/architecture/termux-capability-spike.md) before treating any capability as supported.
