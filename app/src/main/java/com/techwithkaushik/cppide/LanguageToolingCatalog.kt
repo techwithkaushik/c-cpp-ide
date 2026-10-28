@@ -113,11 +113,34 @@ internal class ToolPathPreferences(context: Context) {
         }.apply()
     }
 
-    /** Return the configured executable only when it exists and is executable. */
-    fun resolveExecutable(languageId: String, role: LanguageToolingCatalog.Role): File? {
+    data class ResolvedToolPath(
+        val configuredPath: String,
+        val hostExecutable: File? = null,
+        val guestPath: String? = null
+    )
+
+    /**
+     * Resolve Linux paths inside the selected rootfs before checking host paths. A guest executable
+     * must be launched through PRoot; callers must not pass guestPath directly to ProcessBuilder.
+     */
+    fun resolvePath(
+        languageId: String,
+        role: LanguageToolingCatalog.Role,
+        rootfs: File?
+    ): ResolvedToolPath? {
         val configured = get(languageId, role) ?: return null
-        val file = File(configured).canonicalFile
-        return file.takeIf { it.isFile && it.canExecute() }
+        if (rootfs != null && configured.startsWith("/")) {
+            val canonicalRoot = rootfs.canonicalFile
+            val guestFile = File(canonicalRoot, configured.removePrefix("/")).canonicalFile
+            if (guestFile.toPath().startsWith(canonicalRoot.toPath()) && guestFile.isFile && guestFile.canExecute()) {
+                return ResolvedToolPath(configuredPath = configured, guestPath = configured)
+            }
+        }
+        val hostFile = File(configured).canonicalFile
+        if (hostFile.isFile && hostFile.canExecute()) {
+            return ResolvedToolPath(configuredPath = configured, hostExecutable = hostFile)
+        }
+        return null
     }
 
     private fun key(languageId: String, role: LanguageToolingCatalog.Role) =
