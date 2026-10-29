@@ -73,6 +73,8 @@ dependencies {
     implementation(project(":integrations:termux-runtime"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
+    // ProfileInstaller requires this class at runtime on API 29 as well as newer Android.
+    implementation(libs.androidx.concurrent.futures)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
