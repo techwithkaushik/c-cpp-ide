@@ -1621,11 +1621,9 @@ private fun FileExplorerSheet(
     sidebarMode: Boolean = false
 ) {
     var query by rememberSaveable(projectName) { mutableStateOf("") }
-    var srcExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
-    var includeExpanded by rememberSaveable(projectName) { mutableStateOf(true) }
     val sourceFiles = files.map { name ->
         val ext = name.substringAfterLast(".", "").lowercase()
-        val folder = if (ext in setOf("h", "hpp", "hh", "hxx")) "include" else "src"
+        val folder = name.substringBeforeLast('/', "").ifBlank { "." }
         val description = when (ext) {
             "c" -> "C source file"
             "cpp", "cc", "cxx" -> "C++ source file"
@@ -1656,7 +1654,7 @@ private fun FileExplorerSheet(
                 Text("EXPLORER", fontSize = 12.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
                 Text(projectName.uppercase(), color = IdeMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            IconButton(onClick = { srcExpanded = true; includeExpanded = true; query = "" }, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = { query = "" }, modifier = Modifier.size(32.dp)) {
                 IdeIcon("refresh", IdeMuted, 16.dp)
             }
             IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
@@ -1696,27 +1694,13 @@ private fun FileExplorerSheet(
             }
             Text("⋯", color = IdeMuted, fontSize = 19.sp)
         }
-        if (query.isBlank() || visibleFiles.any { it.third == "src" }) {
-            Row(Modifier.fillMaxWidth().clickable { srcExpanded = !srcExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IdeIcon(if (srcExpanded || query.isNotBlank()) "chevronDown" else "chevronRight", IdeAccent, 15.dp, Modifier.width(24.dp))
-                Text("src", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(8.dp))
-                Text("${visibleFiles.count { it.third == "src" }} files", color = IdeMuted, fontSize = 10.sp)
-            }
-            if (srcExpanded || query.isNotBlank()) visibleFiles.filter { it.third == "src" }.forEach { file ->
-                ExplorerFileRow(file.first, file.second, activeFile == file.first, 28.dp) { onOpenFile(file.first) }
-            }
-        }
-        if (query.isBlank() || visibleFiles.any { it.third == "include" }) {
-            Row(Modifier.fillMaxWidth().clickable { includeExpanded = !includeExpanded }.padding(start = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IdeIcon(if (includeExpanded || query.isNotBlank()) "chevronDown" else "chevronRight", IdeAccent, 15.dp, Modifier.width(24.dp))
-                Text("include", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(8.dp))
-                Text("${visibleFiles.count { it.third == "include" }} files", color = IdeMuted, fontSize = 10.sp)
-            }
-            if (includeExpanded || query.isNotBlank()) visibleFiles.filter { it.third == "include" }.forEach { file ->
-                ExplorerFileRow(file.first, file.second, activeFile == file.first, 28.dp) { onOpenFile(file.first) }
-            }
+        visibleFiles.forEach { file ->
+            ExplorerFileRow(
+                file.first,
+                file.second,
+                activeFile == file.first,
+                28.dp
+            ) { onOpenFile(file.first) }
         }
         if (fileDialog || folderDialog) {
             val creatingFolder = folderDialog
@@ -1733,22 +1717,24 @@ private fun FileExplorerSheet(
                             label = { Text(if (creatingFolder) "Folder name" else "File name") },
                             placeholder = { Text(if (creatingFolder) "e.g. tests" else "e.g. helper.c") }
                         )
-                        Text(if (creatingFolder) "Folders are preview-only in this UI stage." else "New files are added to the sample project tree.", color = IdeMuted, fontSize = 11.sp)
+                        Text(if (creatingFolder) "Folder name relative to the project root." else "File path relative to the project root.", color = IdeMuted, fontSize = 11.sp)
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        val name = newEntryName.trim().substringAfterLast('/')
-                        if (name.isNotBlank() && name !in sourceFiles.map { it.first }) {
-                            if (creatingFolder) entryMessage = "Folder '$name' previewed; filesystem is not connected."
-                            else {
-                                val folder = if (name.endsWith(".h") || name.endsWith(".hpp")) "include" else "src"
-                                val description = LanguageToolingCatalog.detect(name)?.displayName?.plus(" file") ?: "Text or configuration file"
-                                onCreateFile(name)
-                                entryMessage = "Created '$name' in the workspace."
-                            }
-                        } else if (name.isBlank()) entryMessage = "Enter a name first."
-                        else entryMessage = "'$name' already exists."
+                        val name = newEntryName.trim().replace('\\', '/').trim('/')
+                        if (name.isBlank()) {
+                            entryMessage = "Enter a name first."
+                        } else if (name.split('/').any { it.isBlank() || it == "." || it == ".." }) {
+                            entryMessage = "Enter a valid project-relative path."
+                        } else if (name in sourceFiles.map { it.first }) {
+                            entryMessage = "'$name' already exists."
+                        } else if (creatingFolder) {
+                            entryMessage = "Folder creation is not available from this action yet."
+                        } else {
+                            onCreateFile(name)
+                            entryMessage = "Created '$name' in the project."
+                        }
                         fileDialog = false
                         folderDialog = false
                     }) { Text("Create", color = IdeAccent) }
