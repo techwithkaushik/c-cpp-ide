@@ -10,12 +10,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name=".CrashReportActivity"
-            android:exported="false"
-            android:excludeFromRecents="false"
-            android:label="Crash Report"
-            android:theme="@style/AppTheme" />
-        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
