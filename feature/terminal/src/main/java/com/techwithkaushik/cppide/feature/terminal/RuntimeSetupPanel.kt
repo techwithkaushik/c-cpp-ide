@@ -109,12 +109,21 @@ internal fun RuntimeSetupPanel(
                                 }
                             }
                             val runtime = EmbeddedTermuxRuntime(context.filesDir)
-                            val installed = runtime.installBootstrap(stagedArchive, sha256)
-                            val smoke = BootstrapSmokeTest(runtime).run()
-                            if (!smoke.success) {
-                                "Files were installed, but the shell could not execute: ${smoke.failureReason ?: "unknown error"}. Check device ABI and Android compatibility."
-                            } else {
+                            var smoke: BootstrapSmokeTest.Result? = null
+                            try {
+                                val installed = runtime.installBootstrap(stagedArchive, sha256) {
+                                    runtime.layout.ensurePrivateDirectories()
+                                    smoke = BootstrapSmokeTest(runtime).run()
+                                    smoke?.success == true
+                                }
                                 "Bootstrap verified (${installed.sha256.take(12)}…). Shell execution test passed."
+                            } catch (error: Exception) {
+                                val reason = smoke?.failureReason
+                                if (reason != null) {
+                                    "Setup failed: $reason. The previous runtime, if any, was restored."
+                                } else {
+                                    throw error
+                                }
                             }
                         } catch (error: Exception) {
                             "Setup failed: ${error.message ?: error.javaClass.simpleName}"
