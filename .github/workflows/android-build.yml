@@ -27,7 +27,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add integrations/termux-upstream/terminal-view integrations/termux-upstream/terminal-emulator integrations/termux-upstream/termux-shared integrations/termux-upstream/LICENSE.md
+          git add integrations/termux-upstream/terminal-view integrations/termux-upstream/terminal-emulator integrations/termux-upstream/termux-shared integrations/termux-upstream/termux-am-library integrations/termux-upstream/LICENSE.md
           if ! git diff --cached --quiet; then
             git commit -m "Vendor upstream Termux terminal source modules"
             git push origin HEAD:${GITHUB_REF_NAME}
