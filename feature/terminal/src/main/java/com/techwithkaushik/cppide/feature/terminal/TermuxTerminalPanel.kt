@@ -183,14 +183,15 @@ private class IdeTermuxSessionClient(
     override fun onTerminalCursorStateChange(state: Boolean) = Unit
     override fun setTerminalShellPid(session: TerminalSession, pid: Int) = Unit
     override fun getTerminalCursorStyle(): Int? = null
-    override fun logError(tag: String, message: String) = android.util.Log.e(tag, message)
-    override fun logWarn(tag: String, message: String) = android.util.Log.w(tag, message)
-    override fun logInfo(tag: String, message: String) = android.util.Log.i(tag, message)
-    override fun logDebug(tag: String, message: String) = android.util.Log.d(tag, message)
-    override fun logVerbose(tag: String, message: String) = android.util.Log.v(tag, message)
-    override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) =
+    override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
+    override fun logWarn(tag: String, message: String): Unit { android.util.Log.w(tag, message) }
+    override fun logInfo(tag: String, message: String): Unit { android.util.Log.i(tag, message) }
+    override fun logDebug(tag: String, message: String): Unit { android.util.Log.d(tag, message) }
+    override fun logVerbose(tag: String, message: String): Unit { android.util.Log.v(tag, message) }
+    override fun logStackTraceWithMessage(tag: String, message: String, e: Exception): Unit {
         android.util.Log.e(tag, message, e)
-    override fun logStackTrace(tag: String, e: Exception) = android.util.Log.e(tag, e.message, e)
+    }
+    override fun logStackTrace(tag: String, e: Exception): Unit { android.util.Log.e(tag, e.message, e) }
 }
 
 private class IdeTermuxViewClient(
@@ -212,12 +213,13 @@ private class IdeTermuxViewClient(
     override fun readFnKey(): Boolean = false
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
     override fun onEmulatorSet() = Unit
-    override fun logError(tag: String, message: String) = android.util.Log.e(tag, message)
-    override fun logWarn(tag: String, message: String) = android.util.Log.w(tag, message)
-    override fun logInfo(tag: String, message: String) = android.util.Log.i(tag, message)
-    override fun logDebug(tag: String, message: String) = android.util.Log.d(tag, message)
-    override fun logVerbose(tag: String, message: String) = android.util.Log.v(tag, message)
-    override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) =
+    override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
+    override fun logWarn(tag: String, message: String): Unit { android.util.Log.w(tag, message) }
+    override fun logInfo(tag: String, message: String): Unit { android.util.Log.i(tag, message) }
+    override fun logDebug(tag: String, message: String): Unit { android.util.Log.d(tag, message) }
+    override fun logVerbose(tag: String, message: String): Unit { android.util.Log.v(tag, message) }
+    override fun logStackTraceWithMessage(tag: String, message: String, e: Exception): Unit {
         android.util.Log.e(tag, message, e)
-    override fun logStackTrace(tag: String, e: Exception) = android.util.Log.e(tag, e.message, e)
+    }
+    override fun logStackTrace(tag: String, e: Exception): Unit { android.util.Log.e(tag, e.message, e) }
 }
