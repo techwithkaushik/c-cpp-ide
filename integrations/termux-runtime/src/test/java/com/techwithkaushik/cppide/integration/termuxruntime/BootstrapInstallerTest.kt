@@ -34,6 +34,27 @@ class BootstrapInstallerTest {
     }
 
     @Test
+    fun restoresPreviousRuntimeWhenPostInstallValidationFails() {
+        val prefix = File(temp.root, "runtime/usr")
+        assertTrue(prefix.mkdirs())
+        File(prefix, "existing-runtime.txt").writeText("known-good")
+        val archive = createArchive(
+            "bin/sh" to "new shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+        )
+
+        assertThrows(java.io.IOException::class.java) {
+            BootstrapInstaller().install(archive, sha256(archive), prefix) { false }
+        }
+
+        assertEquals("known-good", File(prefix, "existing-runtime.txt").readText())
+        assertFalse(File(prefix, "bin/sh").exists())
+        assertTrue(temp.root.walkTopDown().none { it.name.startsWith(".usr.backup-") })
+    }
+
+    @Test
     fun remapsAppSpecificAbsoluteSymlinkIntoPrivatePrefix() {
         val archive = createArchive(
             "bin/sh" to "shell",
