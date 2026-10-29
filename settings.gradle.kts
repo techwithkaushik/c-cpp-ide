@@ -11,6 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Official Termux terminal libraries are published from the upstream project.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
