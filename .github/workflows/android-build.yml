@@ -49,13 +49,26 @@ jobs:
       - name: Run runtime installer tests
         run: gradle --no-daemon :integrations:termux-runtime:testDebugUnitTest
 
-      - name: Run app unit tests and assemble debug APK
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      - name: Run unit tests and assemble ABI-specific debug APKs
+        run: >-
+          gradle --no-daemon
+          :app:testArm32DebugUnitTest
+          :app:testArm64DebugUnitTest
+          :app:testX86DebugUnitTest
+          :app:testX64DebugUnitTest
+          :app:assembleArm32Debug
+          :app:assembleArm64Debug
+          :app:assembleX86Debug
+          :app:assembleX64Debug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: code-studio-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            app/build/outputs/apk/arm32/debug/*.apk
+            app/build/outputs/apk/arm64/debug/*.apk
+            app/build/outputs/apk/x86/debug/*.apk
+            app/build/outputs/apk/x64/debug/*.apk
           if-no-files-found: error
           retention-days: 14
