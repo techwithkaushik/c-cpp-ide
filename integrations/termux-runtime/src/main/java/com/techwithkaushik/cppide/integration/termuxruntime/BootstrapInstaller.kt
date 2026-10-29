@@ -161,16 +161,31 @@ class BootstrapInstaller(
                 val linkRelative = validateArchivePath(rawLink)
                 val linkInStage = File(staging, linkRelative)
                 val targetFile = if (rawTarget.startsWith("/")) {
-                    // Resolve Android private-storage aliases (/data/data and /data/user/0)
-                    // before comparing the bootstrap prefix from SYMLINKS.txt.
-                    val absoluteTarget = File(rawTarget).canonicalFile
-                    val finalNormalized = finalPrefix.canonicalFile
-                    if (absoluteTarget != finalNormalized &&
-                        !absoluteTarget.path.startsWith(finalNormalized.path + File.separator)
+                    // Official Termux bootstrap archives encode absolute links for
+                    // Termux's own package prefix. Remap only these known prefixes
+                    // into this IDE's private prefix; never permit arbitrary absolute
+                    // links to escape the staged runtime.
+                    val sourcePrefixes = listOf(
+                        "/data/data/com.termux/files/usr",
+                        "/data/user/0/com.termux/files/usr",
+                    )
+                    val sourcePrefix = sourcePrefixes.firstOrNull { source ->
+                        rawTarget == source || rawTarget.startsWith(source + "/")
+                    }
+                    val candidate = if (sourcePrefix != null) {
+                        val suffix = rawTarget.removePrefix(sourcePrefix).trimStart('/')
+                        if (suffix.isEmpty()) finalPrefix.absoluteFile.normalize()
+                        else File(finalPrefix, suffix).absoluteFile.normalize()
+                    } else {
+                        File(rawTarget).absoluteFile.normalize()
+                    }
+                    val finalNormalized = finalPrefix.absoluteFile.normalize()
+                    if (candidate != finalNormalized &&
+                        !candidate.path.startsWith(finalNormalized.path + File.separator)
                     ) {
                         throw IOException("Absolute symlink target escapes runtime prefix")
                     }
-                    absoluteTarget
+                    candidate
                 } else {
                     if (rawTarget.contains('\\')) throw IOException("Invalid symlink target")
                     val resolved = File(File(finalPrefix, linkRelative).parentFile, rawTarget).toPath().toAbsolutePath().normalize().toFile()
