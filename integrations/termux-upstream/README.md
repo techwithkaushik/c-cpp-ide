@@ -14,8 +14,8 @@ The IDE compiles the following upstream source modules directly from this reposi
 
 Source and applicable license files are checked into this repository. Android CI verifies the checked-in files and compiles them without cloning upstream repositories or pushing generated source changes. `scripts/vendor-termux-source.sh` is a maintainer tool for refreshing the pinned copies; review any upstream change before committing it.
 
-There are no Termux Maven or JitPack artifacts in the IDE's Gradle dependencies. Google Maven and Maven Central remain configured for ordinary Android and Java libraries used by these modules.
+There are no Termux Maven or JitPack artifacts in the IDE's Gradle dependencies. Google Maven and Maven Central remain configured for ordinary Android and Java libraries used by these modules. `scripts/verify-termux-vendor.sh` checks that the required source, native build files, manifests, and licenses are present and fails CI if a Termux Maven/JitPack dependency is reintroduced.
 
 ## Runtime status
 
-Vendoring the terminal UI/emulator code does not by itself install a usable Linux userland. The app-private bootstrap must still be provisioned for package `com.techwithkaushik.cppide`, and the terminal process must be validated on-device. The existing Termux installation is not modified or required.
+Vendoring the terminal UI/emulator code does not by itself install a usable Linux userland. The app-private bootstrap must still be provisioned for package `com.techwithkaushik.cppide`, and the terminal process must be validated on-device. The existing Termux installation is not modified or required. CI separately compiles all four vendored Android library modules and runs `:integrations:termux-runtime:testDebugUnitTest`, including checks for checksum validation, path traversal rejection, official Termux symlink remapping, archive-size limits, and entry-count limits.
