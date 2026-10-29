@@ -1,74 +1,254 @@
-name: Android Release Build
+name: Code Studio CI
 
 on:
-  # Run once per pushed commit. Avoid duplicate push + pull_request builds
-  # for the same branch; PRs still display the commit's push check.
   push:
-    branches: [main, architecture/termux-integration]
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  # A branch push and any manual run on that branch share one active build.
-  group: android-release-${{ github.workflow }}-${{ github.ref_name }}
+  group: code-studio-ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+env:
+  JAVA_VERSION: "17"
+  GRADLE_VERSION: "8.13"
+  TERMUX_PACKAGES_REF: "21700256be43a0c8aae38bacecdac87c5ded4cc6"
+  CODE_STUDIO_PACKAGE: "com.techwithkaushik.cppide"
+  BOOTSTRAP_VERSION: "0.1.0-ci.${{ github.run_number }}"
+
 jobs:
-  release:
-    name: Build signed release APK
+  verify:
+    name: 1 · Verify source and Gradle configuration
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Verify vendored Termux source
+      - name: Verify vendored Termux source and dependencies
         run: bash scripts/verify-termux-vendor.sh
 
-
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.13"
+          gradle-version: ${{ env.GRADLE_VERSION }}
 
-      - name: Compile vendored Termux modules
+      - name: Validate Gradle project configuration
+        run: gradle --no-daemon help
+
+  test:
+    name: 2 · Test all modules and ABI variants
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: verify
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Compile vendored Termux modules and run integration tests
         run: >-
           gradle --no-daemon
           :integrations:termux-upstream:terminal-emulator:assembleDebug
           :integrations:termux-upstream:terminal-view:assembleDebug
           :integrations:termux-upstream:termux-am-library:assembleDebug
           :integrations:termux-upstream:termux-shared:assembleDebug
+          :integrations:toolchain:testDebugUnitTest
+          :integrations:termux-runtime:testDebugUnitTest
 
-      - name: Run runtime installer tests
-        run: gradle --no-daemon :integrations:termux-runtime:testDebugUnitTest
+      - name: Run app unit tests for every supported ABI
+        run: >-
+          gradle --no-daemon
+          :app:testArm32DebugUnitTest
+          :app:testArm64DebugUnitTest
+          :app:testX86DebugUnitTest
+          :app:testX64DebugUnitTest
 
-      - name: Restore development signing key
-        id: keystore
-        uses: timheuer/base64-to-file@v2.0
+  build-bootstrap:
+    name: 3 · Build and verify custom bootstrap for all ABIs
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    needs: test
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned Termux packages source
+        uses: actions/checkout@v4
         with:
-          fileName: dev_keystore.jks
-          encodedString: ${{ secrets.SIGNING_KEYSTORE }}
+          repository: termux/termux-packages
+          ref: ${{ env.TERMUX_PACKAGES_REF }}
+          path: termux-packages
 
-      - name: Assemble release APK
-        env:
-          SIGN_KEY_STORE: ${{ steps.keystore.outputs.filePath }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: gradle --no-daemon :app:assembleRelease
+      - name: Verify pinned source and configure app package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
 
-      - name: Upload release APK
+          path = Path("termux-packages/scripts/properties.sh")
+          text = path.read_text(encoding="utf-8")
+          matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP__PACKAGE_NAME\s*=.*$', text))
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"Expected exactly one TERMUX_APP__PACKAGE_NAME assignment; found {len(matches)}. "
+                  "Upstream changed; stop and review instead of building an incorrectly prefixed runtime."
+              )
+          old = matches[0].group(0)
+          indent = re.match(r'^\s*', old).group(0)
+          export = "export " if old.lstrip().startswith("export ") else ""
+          replacement = f'{indent}{export}TERMUX_APP__PACKAGE_NAME="{os.environ["CODE_STUDIO_PACKAGE"]}"'
+          path.write_text(text[:matches[0].start()] + replacement + text[matches[0].end():], encoding="utf-8")
+          print(f"Configured custom package identity: {os.environ['CODE_STUDIO_PACKAGE']}")
+          PY
+
+      - name: Build all four bootstrap architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd termux-packages
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f \
+            --architectures "arm,aarch64,i686,x86_64" 2>&1 | tee ../bootstrap-build.log
+
+      - name: Validate archives and generate pinned ABI metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/bootstrap-artifacts"
+          mkdir -p "$root"
+          declare -A ARCH_MAP=(
+            [armeabi-v7a]=arm
+            [arm64-v8a]=aarch64
+            [x86]=i686
+            [x86_64]=x86_64
+          )
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            upstream_arch="${ARCH_MAP[$abi]}"
+            source="termux-packages/bootstrap-${upstream_arch}.zip"
+            destination="$root/$abi"
+            [[ -s "$source" ]] || { echo "::error::Missing generated bootstrap: $source"; exit 1; }
+            mkdir -p "$destination"
+            cp "$source" "$destination/bootstrap.zip"
+            python3 - "$abi" "$destination/bootstrap.zip" "$CODE_STUDIO_PACKAGE" <<'PY'
+          import pathlib, sys, zipfile
+          abi, archive, package = sys.argv[1:]
+          with zipfile.ZipFile(archive) as zf:
+              names = {name.rstrip("/") for name in zf.namelist()}
+              if not names:
+                  raise SystemExit(f"{archive}: empty archive")
+              if zf.testzip() is not None:
+                  raise SystemExit(f"{archive}: corrupt ZIP entry")
+              for required in ("bin", "etc", "lib", "share"):
+                  if not any(name == required or name.startswith(required + "/") for name in names):
+                      raise SystemExit(f"{archive}: missing {required}/")
+              if not any(name in names for name in ("bin/sh", "bin/bash")):
+                  raise SystemExit(f"{archive}: missing shell executable")
+              if "SYMLINKS.txt" not in names:
+                  raise SystemExit(f"{archive}: missing SYMLINKS.txt")
+              symlinks = zf.read("SYMLINKS.txt").decode("utf-8", errors="strict")
+              if "/data/data/com.termux/files/usr" in symlinks:
+                  raise SystemExit(f"{archive}: contains stock Termux prefix")
+              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries")
+          PY
+            sha="$(sha256sum "$destination/bootstrap.zip" | cut -d ' ' -f 1)"
+            cat > "$destination/bootstrap.json" <<EOF
+          {
+            "abi": "$abi",
+            "version": "$BOOTSTRAP_VERSION",
+            "sha256": "$sha"
+          }
+          EOF
+          done
+          find "$root" -type f -maxdepth 2 -print
+
+      - name: Upload verified ABI bootstrap artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          name: abi-bootstrap-artifacts
+          path: |
+            bootstrap-artifacts/armeabi-v7a/
+            bootstrap-artifacts/arm64-v8a/
+            bootstrap-artifacts/x86/
+            bootstrap-artifacts/x86_64/
+            bootstrap-build.log
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    name: 4 · Build APKs and verify embedded bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [test, build-bootstrap]
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Download verified bootstrap artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: abi-bootstrap-artifacts
+          path: bootstrap-artifacts
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Re-validate and stage ABI-matched assets
+        run: bash scripts/prepare-bootstrap-assets.sh
+
+      - name: Assemble all four ABI APKs
+        run: >-
+          gradle --no-daemon
+          :app:assembleArm32Debug
+          :app:assembleArm64Debug
+          :app:assembleX86Debug
+          :app:assembleX64Debug
+
+      - name: Verify each APK contains its matching bootstrap and checksum
+        run: bash scripts/verify-bootstrap-apks.sh
+
+      - name: Upload verified APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-abi-debug-apks
+          path: |
+            app/build/outputs/apk/arm32/debug/*.apk
+            app/build/outputs/apk/arm64/debug/*.apk
+            app/build/outputs/apk/x86/debug/*.apk
+            app/build/outputs/apk/x64/debug/*.apk
           if-no-files-found: error
           retention-days: 14
