@@ -27,6 +27,14 @@ jobs:
       - name: Verify vendored Termux source
         run: bash scripts/verify-termux-vendor.sh
 
+      - name: Compile vendored Termux modules
+        run: >-
+          gradle --no-daemon
+          :integrations:termux-upstream:terminal-emulator:assembleDebug
+          :integrations:termux-upstream:terminal-view:assembleDebug
+          :integrations:termux-upstream:termux-am-library:assembleDebug
+          :integrations:termux-upstream:termux-shared:assembleDebug
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
