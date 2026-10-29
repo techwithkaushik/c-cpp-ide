@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.feature.editor
 
 import android.graphics.Color as AndroidColor
+import android.graphics.Typeface
 import android.view.MenuItem
 import android.view.View
 import android.widget.PopupMenu
@@ -88,14 +89,62 @@ private fun showEditorContextMenu(anchor: View) {
     }
 }
 
+
+/** VS Code-inspired editor palettes. Keep the editor canvas and gutter in sync. */
+private fun configureEditorTheme(editor: CodeEditor, themeName: String) {
+    val colors = when (themeName) {
+        "Light+ (VS Code)" -> intArrayOf(
+            AndroidColor.rgb(243, 243, 243), // background
+            AndroidColor.rgb(30, 30, 30),    // text
+            AndroidColor.rgb(237, 237, 237), // gutter
+            AndroidColor.rgb(133, 133, 133), // line number
+            AndroidColor.rgb(232, 232, 232), // current line
+            AndroidColor.rgb(220, 235, 252)  // selection/caret
+        )
+        "Monokai" -> intArrayOf(
+            AndroidColor.rgb(39, 40, 34),
+            AndroidColor.rgb(248, 248, 242),
+            AndroidColor.rgb(45, 46, 40),
+            AndroidColor.rgb(144, 145, 133),
+            AndroidColor.rgb(55, 56, 48),
+            AndroidColor.rgb(73, 72, 62)
+        )
+        "Solarized Dark" -> intArrayOf(
+            AndroidColor.rgb(0, 43, 54),
+            AndroidColor.rgb(131, 148, 150),
+            AndroidColor.rgb(7, 54, 66),
+            AndroidColor.rgb(101, 123, 131),
+            AndroidColor.rgb(7, 54, 66),
+            AndroidColor.rgb(38, 70, 83)
+        )
+        else -> intArrayOf(
+            AndroidColor.rgb(30, 30, 30),
+            AndroidColor.rgb(212, 212, 212),
+            AndroidColor.rgb(37, 37, 38),
+            AndroidColor.rgb(133, 133, 133),
+            AndroidColor.rgb(42, 45, 46),
+            AndroidColor.rgb(38, 79, 120)
+        )
+    }
+    editor.colorScheme.setColor(EditorColorScheme.WHOLE_BACKGROUND, colors[0])
+    editor.colorScheme.setColor(EditorColorScheme.TEXT_NORMAL, colors[1])
+    editor.colorScheme.setColor(EditorColorScheme.LINE_NUMBER_BACKGROUND, colors[2])
+    editor.colorScheme.setColor(EditorColorScheme.LINE_NUMBER_PANEL, colors[2])
+    editor.colorScheme.setColor(EditorColorScheme.LINE_NUMBER, colors[3])
+    editor.colorScheme.setColor(EditorColorScheme.CURRENT_LINE, colors[4])
+    editor.colorScheme.setColor(EditorColorScheme.SELECTION_INSERT, colors[5])
+    editor.colorScheme.setColor(EditorColorScheme.SELECTION_HANDLE, colors[5])
+}
+
 @Composable
 fun SoraCodeEditor(
     code: String,
     onCodeChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     controller: SoraEditorController? = null,
-    fontSize: Float = 13f,
-    wordWrap: Boolean = false
+    fontSize: Float = 14f,
+    wordWrap: Boolean = false,
+    themeName: String = "Dark+ (VS Code)"
 ) {
     val currentOnCodeChange = rememberUpdatedState(onCodeChange)
     val suppressProgrammaticChanges = androidx.compose.runtime.remember { AtomicBoolean(false) }
@@ -105,20 +154,14 @@ fun SoraCodeEditor(
             CodeEditor(context).apply {
                 setText(code)
                 setTextSize(fontSize)
+                setTypefaceText(Typeface.MONOSPACE)
                 isWordwrap = wordWrap
                 setLineNumberEnabled(true)
                 setHighlightCurrentLine(true)
                 setTabWidth(4)
                 setScrollBarEnabled(true)
                 setHorizontalScrollBarEnabled(true)
-                colorScheme.setColor(EditorColorScheme.WHOLE_BACKGROUND, AndroidColor.rgb(16, 19, 25))
-                colorScheme.setColor(EditorColorScheme.TEXT_NORMAL, AndroidColor.rgb(217, 228, 244))
-                colorScheme.setColor(EditorColorScheme.LINE_NUMBER_BACKGROUND, AndroidColor.rgb(20, 25, 34))
-                colorScheme.setColor(EditorColorScheme.LINE_NUMBER, AndroidColor.rgb(154, 168, 186))
-                colorScheme.setColor(EditorColorScheme.CURRENT_LINE, AndroidColor.rgb(27, 35, 47))
-                colorScheme.setColor(EditorColorScheme.LINE_NUMBER_PANEL, AndroidColor.rgb(20, 25, 34))
-                colorScheme.setColor(EditorColorScheme.SELECTION_INSERT, AndroidColor.rgb(74, 132, 196))
-                colorScheme.setColor(EditorColorScheme.SELECTION_HANDLE, AndroidColor.rgb(74, 132, 196))
+                configureEditorTheme(this, themeName)
                 controller?.attach(this)
                 // Touch long-press and mouse right-click both expose familiar editor actions.
                 setOnLongClickListener { view ->
@@ -138,6 +181,8 @@ fun SoraCodeEditor(
         },
         update = { editor ->
             editor.setTextSize(fontSize)
+            editor.setTypefaceText(Typeface.MONOSPACE)
+            configureEditorTheme(editor, themeName)
             editor.isWordwrap = wordWrap
             editor.setLineNumberEnabled(true)
             editor.setHighlightCurrentLine(true)
