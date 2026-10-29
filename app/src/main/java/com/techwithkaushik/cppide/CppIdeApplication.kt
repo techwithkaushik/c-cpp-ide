@@ -18,20 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class CppIdeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            try {
-                val reportFile = writeCrashReport(this, thread, error)
-                launchCrashReportImmediately(this, reportFile)
-            } catch (_: Throwable) {
-                // Never let crash-reporting failure hide the original exception.
-            }
-            if (previous != null) previous.uncaughtException(thread, error)
-            else {
-                Process.killProcess(Process.myPid())
-                kotlin.system.exitProcess(10)
-            }
-        }
+        // Use Android's default crash handling. Logcat captures uncaught exceptions.
     }
 
     private fun writeCrashReport(context: Context, thread: Thread, error: Throwable): File {
