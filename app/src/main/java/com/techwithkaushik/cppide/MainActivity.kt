@@ -286,228 +286,120 @@ private fun IdeUiPrototype() {
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = IdeSurface,
-                    drawerContentColor = Color(0xFFE8EDF5)
+                    drawerContentColor = Color(0xFFE8EDF5),
+                    modifier = Modifier.width(304.dp)
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                        Text("Code Studio", fontSize = 23.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
-                        Spacer(Modifier.height(4.dp))
-                        Text(selectedProject, color = IdeMuted, fontSize = 13.sp)
-                    }
-                    Divider(color = IdeSurfaceRaised)
-                    listOf("File Explorer", "Terminal", "Build / Problems", "Project Overview", "Recent Files", "Settings", "Runtime Setup").forEach { item ->
-                        val active = drawerDestination == item
-                        Row(
-                            Modifier.fillMaxWidth().clickable {
-                                drawerDestination = item
-                                when (item) {
-                                    "File Explorer" -> showExplorer = true
-                                    "Project Overview" -> showProjectOverview = true
-                                    "Recent Files" -> showRecentFiles = true
-                                    "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
-                                    "Build / Problems" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                                    "Runtime Setup" -> { showSettings = true }
-                                    "Settings" -> showSettings = true
-                                }
-                                scope.launch { drawerState.close() }
-                            }.background(if (active) IdeSurfaceRaised else Color.Transparent)
-                                .padding(horizontal = 20.dp, vertical = 15.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IdeIcon(
-                                when (item) {
-                                    "File Explorer" -> "folder"
-                                    "Terminal" -> "terminal"
-                                    "Build / Problems" -> "problems"
-                                    "Project Overview" -> "home"
-                                    "Recent Files" -> "history"
-                                    "Settings" -> "settings"
-                                    else -> "build"
-                                },
-                                if (active) IdeAccent else IdeMuted, 20.dp, Modifier.width(32.dp)
-                            )
-                            Text(item, color = if (active) IdeAccent else Color(0xFFE8EDF5))
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text("Linux runtime status: not active", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.padding(18.dp))
-                }
-            }
-        ) {
-            Row(Modifier.fillMaxSize().background(IdeBackground)) {
-                // VS Code-inspired Activity Bar: compact, icon-first navigation suited to phone screens.
-                Column(
-                    Modifier.width(42.dp).fillMaxSize().background(Color(0xFF111820)).padding(vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    listOf(
-                        Triple("Explorer", "folder", "Open project files"),
-                        Triple("Search", "search", "Search in project"),
-                        Triple("Source Control", "git", "Source control"),
-                        Triple("Run and Debug", "run", "Build and run"),
-                        Triple("Extensions", "extensions", "Extensions")
-                    ).forEach { (label, icon, hint) ->
-                        val selected = activeActivity == label
-                        Column(
-                            Modifier.fillMaxWidth()
-                                .clickable {
-                                    // Every Activity Bar destination opens in the same VS Code-style left sidebar.
-                                    showExplorer = activeActivity != label || !showExplorer
-                                    activeActivity = label
-                                }
-                                .background(if (selected) Color(0xFF202B37) else Color.Transparent)
-                                .padding(vertical = 11.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                if (selected) Box(
-                                    Modifier.align(Alignment.CenterStart).width(2.dp).height(30.dp).background(IdeAccent)
-                                )
-                                IdeIcon(icon, if (selected) Color(0xFFE8EDF5) else IdeMuted, 22.dp)
+                    Column(Modifier.fillMaxSize()) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Code Studio", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
+                                Text(selectedProject, color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Column(
-                        Modifier.fillMaxWidth().clickable { showSettings = true }.padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) { IdeIcon("settings", IdeMuted, 22.dp) }
-                }
-                if (showExplorer) {
-                    Column(
-                        Modifier.width(224.dp).fillMaxSize().background(IdeSurface)
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().height(42.dp).padding(start = 14.dp, end = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(activeActivity.uppercase(), modifier = Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            IconButton(onClick = { showExplorer = false }, modifier = Modifier.size(32.dp)) {
-                                IdeIcon("close", IdeMuted, 16.dp)
-                            }
+                            IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, 16.dp) }
                         }
                         Divider(color = IdeSurfaceRaised)
-                        when (activeActivity) {
-                            "Explorer" -> FileExplorerSheet(
-                                projectName = selectedProject,
-                                activeFile = activeFile,
-                                files = workspaceFiles.toList(),
-                                onOpenFile = { openFile(it) },
-                                onCreateFile = { file ->
-                                    if (file !in workspaceFiles) workspaceFiles.add(file)
-                                    if (file !in fileContents) fileContents[file] = sampleCode(file)
-                                    openFile(file)
-                                },
-                                onClose = { showExplorer = false },
-                                sidebarMode = true
-                            )
-                            "Search" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedTextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    label = { Text("Search in project") },
-                                    leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) }
-                                )
-                                Button(onClick = { searchInProject = true; showSearch = true }, modifier = Modifier.fillMaxWidth()) { Text("Show Results") }
-                                Text("Search across project files", color = IdeMuted, fontSize = 12.sp)
-                            }
-                            "Source Control" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("Changes", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
-                                if (dirtyFiles.isEmpty()) Text("No unsaved changes", color = IdeMuted, fontSize = 12.sp)
-                                else dirtyFiles.forEach { file -> Text("M  $file", color = IdeGreen, fontSize = 12.sp) }
-                                Button(onClick = {
-                                    val pending = dirtyFiles.toList()
-                                    pending.forEach { file ->
-                                        val textToSave = if (file == activeFile) code else fileContents[file].orEmpty()
-                                        runCatching { projectStorage.writeFile(selectedProject, file, textToSave) }
-                                            .onSuccess { dirtyFiles.remove(file) }
+                        Row(Modifier.fillMaxSize()) {
+                            Column(Modifier.width(48.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                listOf(
+                                    Triple("File Explorer", "folder", "Explorer"),
+                                    Triple("Search", "search", "Search"),
+                                    Triple("Source Control", "git", "Source Control"),
+                                    Triple("Run and Debug", "run", "Run and Debug"),
+                                    Triple("Extensions", "extensions", "Extensions"),
+                                    Triple("Settings", "settings", "Settings")
+                                ).forEach { (destination, icon, _) ->
+                                    val active = drawerDestination == destination
+                                    Column(
+                                        Modifier.fillMaxWidth().clickable { drawerDestination = destination }
+                                            .background(if (active) Color(0xFF202B37) else Color.Transparent).padding(vertical = 10.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                            if (active) Box(Modifier.align(Alignment.CenterStart).width(2.dp).height(25.dp).background(IdeAccent))
+                                            IdeIcon(icon, if (active) Color(0xFFE8EDF5) else IdeMuted, 20.dp)
+                                        }
                                     }
-                                }, modifier = Modifier.fillMaxWidth()) { Text("Save All Changes") }
+                                }
                             }
-                            "Run and Debug" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("Run and Debug", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
-                                Button(onClick = { selectedPanel = ToolPanel.Build; showToolPanel = true }, modifier = Modifier.fillMaxWidth()) { Text("Build") }
-                                OutlinedButton(onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true }, modifier = Modifier.fillMaxWidth()) { Text("Run / Output") }
-                                Text("Build and run integration is not connected yet.", color = IdeMuted, fontSize = 11.sp)
-                            }
-                            "Extensions" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                OutlinedTextField(
-                                    value = extensionQuery,
-                                    onValueChange = { extensionQuery = it },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    label = { Text("Find extensions") },
-                                    leadingIcon = { IdeIcon("extensions", IdeAccent, 18.dp) }
-                                )
-                                Text("Extension installation is not available yet.", color = IdeMuted, fontSize = 12.sp)
+                            Column(Modifier.weight(1f).fillMaxHeight().background(IdeSurface).padding(horizontal = 10.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(drawerDestination.uppercase(), color = Color(0xFFE8EDF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Divider(color = IdeSurfaceRaised)
+                                when (drawerDestination) {
+                                    "File Explorer" -> FileExplorerSheet(
+                                        projectName = selectedProject, activeFile = activeFile, files = workspaceFiles.toList(),
+                                        onOpenFile = { openFile(it); scope.launch { drawerState.close() } },
+                                        onCreateFile = { file -> if (file !in workspaceFiles) workspaceFiles.add(file); if (file !in fileContents) fileContents[file] = sampleCode(file); openFile(file) },
+                                        onClose = { scope.launch { drawerState.close() } }, sidebarMode = true
+                                    )
+                                    "Search" -> {
+                                        OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search files") }, leadingIcon = { IdeIcon("search", IdeAccent, 17.dp) })
+                                        Button(onClick = { searchInProject = true; showSearch = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Search project") }
+                                    }
+                                    "Source Control" -> {
+                                        Text(if (dirtyFiles.isEmpty()) "No changes" else "${dirtyFiles.size} changed file(s)", color = IdeMuted, fontSize = 12.sp)
+                                        dirtyFiles.forEach { Text("M  $it", color = IdeGreen, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                        Button(onClick = {
+                                            dirtyFiles.toList().forEach { file ->
+                                                val contents = if (file == activeFile) code else fileContents[file].orEmpty()
+                                                runCatching { projectStorage.writeFile(selectedProject, file, contents) }.onSuccess { dirtyFiles.remove(file) }
+                                            }
+                                        }, modifier = Modifier.fillMaxWidth()) { Text("Save all") }
+                                    }
+                                    "Run and Debug" -> {
+                                        Button(onClick = { selectedPanel = ToolPanel.Build; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Build") }
+                                        OutlinedButton(onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Run / Output") }
+                                    }
+                                    "Extensions" -> Text("Extension installation is not available yet.", color = IdeMuted, fontSize = 12.sp)
+                                    "Settings" -> Button(onClick = { showSettings = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Open settings") }
+                                }
                             }
                         }
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxSize()) {
-                    WorkspaceScreen(
-                        projectName = selectedProject,
-                        activeFile = activeFile,
-                        code = code,
-                        openFiles = openFiles,
-                        dirtyFiles = dirtyFiles,
-                        onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
-                        onSelectFile = { openFile(it) },
-                        onCloseFile = { closeFile(it) },
-                        editorController = editorController,
-                        editorFontSize = editorFontSize,
-                        editorWordWrap = editorWordWrap,
-                        onMenu = { scope.launch { drawerState.open() } },
-                        onExplorer = { showExplorer = !showExplorer },
-                        onFile = { file -> openFile(file) },
-                        onAction = { action ->
-                            when (action) {
-                                "Command Palette" -> { commandQuery = ""; showCommandPalette = true }
-                                "New File" -> { newFileName = ""; newFileDialog = true }
-                                "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
-                                "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                                "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
-                                "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                                "Save" -> {
-                                    runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }
-                                        .onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }
-                                        .onFailure { error -> selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                                }
-                                "Undo" -> editorController.undo()
-                                "Redo" -> editorController.redo()
-                                "Select All" -> editorController.selectAll()
-                                "Copy" -> editorController.copy()
-                                "Cut" -> editorController.cut()
-                                "Paste" -> editorController.paste()
-                                "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
-                                "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
-                                "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
-                                "Save All" -> {
-                                    if (activeFile in openFiles) fileContents[activeFile] = code
-                                    val pending = dirtyFiles.toList()
-                                    var allSaved = true
-                                    pending.forEach { file ->
-                                        val content = fileContents[file] ?: if (file == activeFile) code else ""
-                                        val result = runCatching { projectStorage.writeFile(selectedProject, file, content) }
-                                        if (result.isSuccess) dirtyFiles.remove(file) else allSaved = false
-                                    }
-                                    if (!allSaved) { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                                }
-                                "Settings" -> showSettings = true
-                                "File Explorer" -> showExplorer = !showExplorer
-                                "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
-                                "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+        ) {
+            Box(Modifier.fillMaxSize().background(IdeBackground)) {
+                WorkspaceScreen(
+                    projectName = selectedProject, activeFile = activeFile, code = code,
+                    openFiles = openFiles, dirtyFiles = dirtyFiles,
+                    onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
+                    onSelectFile = { openFile(it) }, onCloseFile = { closeFile(it) },
+                    editorController = editorController, editorFontSize = editorFontSize, editorWordWrap = editorWordWrap,
+                    onMenu = { scope.launch { drawerState.open() } },
+                    onExplorer = { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } },
+                    onFile = { file -> openFile(file) },
+                    onAction = { action ->
+                        when (action) {
+                            "Command Palette" -> { commandQuery = ""; showCommandPalette = true }
+                            "New File" -> { newFileName = ""; newFileDialog = true }
+                            "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
+                            "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                            "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                            "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                            "Save" -> runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                            "Undo" -> editorController.undo()
+                            "Redo" -> editorController.redo()
+                            "Select All" -> editorController.selectAll()
+                            "Copy" -> editorController.copy()
+                            "Cut" -> editorController.cut()
+                            "Paste" -> editorController.paste()
+                            "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
+                            "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
+                            "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
+                            "Save All" -> {
+                                fileContents[activeFile] = code
+                                dirtyFiles.toList().forEach { file -> runCatching { projectStorage.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
                             }
-                        },
-                        selectedPanel = selectedPanel,
-                        showToolPanel = showToolPanel,
-                        fullScreen = fullScreen,
-                        onToggleFullScreen = { fullScreen = !fullScreen },
-                        onCloseToolPanel = { showToolPanel = false },
-                        onPanel = { selectedPanel = it; showToolPanel = true }
-                    )
-                }
+                            "Settings" -> showSettings = true
+                            "File Explorer" -> { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } }
+                            "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                            "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
+                        }
+                    },
+                    selectedPanel = selectedPanel, showToolPanel = showToolPanel, fullScreen = fullScreen,
+                    onToggleFullScreen = { fullScreen = !fullScreen },
+                    onCloseToolPanel = { showToolPanel = false },
+                    onPanel = { selectedPanel = it; showToolPanel = true }
+                )
             }
         }
         if (showCommandPalette) {
@@ -1571,8 +1463,9 @@ private fun WorkspaceScreen(
                     IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) { IdeIcon("menu", IdeAccent, 20.dp) }
                 },
                 actions = {
-                    IconButton(onClick = onExplorer, modifier = Modifier.size(36.dp)) { IdeIcon("folder", IdeAccent, 18.dp) }
-                    IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(36.dp)) { IdeIcon("save", IdeAccent, 17.dp) }
+                    IconButton(onClick = { onAction("Undo") }, modifier = Modifier.size(32.dp)) { IdeIcon("undo", IdeAccent, 17.dp) }
+                    IconButton(onClick = { onAction("Redo") }, modifier = Modifier.size(32.dp)) { IdeIcon("redo", IdeAccent, 17.dp) }
+                    IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(32.dp)) { IdeIcon("save", IdeAccent, 16.dp) }
                     var showOverflow by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
@@ -1594,7 +1487,7 @@ private fun WorkspaceScreen(
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
                 if (showToolPanel) {
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = 170.dp, max = 230.dp)
+                        Modifier.fillMaxWidth().heightIn(min = 112.dp, max = 176.dp)
                             .background(Color(0xFF10151C)),
                         verticalAlignment = Alignment.Top
                     ) {
@@ -1608,19 +1501,19 @@ private fun WorkspaceScreen(
                     }
                 }
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                        .padding(start = 10.dp, end = 6.dp, top = 2.dp),
+                    Modifier.fillMaxWidth().height(30.dp).horizontalScroll(rememberScrollState())
+                        .padding(start = 8.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     listOf(
                         Triple("PROBLEMS", ToolPanel.Problems, "problems"),
                         Triple("OUTPUT", ToolPanel.Output, "output"),
-                        Triple("DEBUG CONSOLE", ToolPanel.Build, "build"),
+                        Triple("BUILD", ToolPanel.Build, "build"),
                         Triple("TERMINAL", ToolPanel.Terminal, "terminal")
                     ).forEach { (label, panel, icon) ->
                         val selected = selectedPanel == panel
                         Column(
-                            Modifier.clickable { onPanel(panel) }.padding(end = 12.dp, top = 5.dp),
+                            Modifier.clickable { onPanel(panel) }.padding(end = 10.dp, top = 3.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1635,7 +1528,7 @@ private fun WorkspaceScreen(
                     Text(if (showToolPanel) "⌄" else "⌃", Modifier.clickable { if (showToolPanel) onCloseToolPanel() else onPanel(selectedPanel) }.padding(horizontal = 10.dp, vertical = 6.dp), color = IdeMuted, fontSize = 16.sp)
                 }
                 Row(
-                    Modifier.fillMaxWidth().height(22.dp).background(Color(0xFF007ACC)).padding(horizontal = 8.dp, vertical = 2.dp),
+                    Modifier.fillMaxWidth().height(20.dp).background(Color(0xFF007ACC)).padding(horizontal = 7.dp, vertical = 1.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(if (fullScreen) "⛶" else "⌘", Modifier.clickable(onClick = onToggleFullScreen), color = Color.White, fontSize = 11.sp)
