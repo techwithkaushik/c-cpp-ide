@@ -21,6 +21,7 @@ android {
 
     // Keep Java and Kotlin output compatible across CI and local builds.
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -82,6 +83,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.hilt.android)
     implementation(libs.commons.compress)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
 }
