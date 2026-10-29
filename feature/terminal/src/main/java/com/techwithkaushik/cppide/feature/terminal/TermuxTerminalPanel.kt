@@ -6,8 +6,6 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,29 +24,72 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.techwithkaushik.cppide.integration.termuxruntime.BootstrapSmokeTest
+import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
 import com.techwithkaushik.cppide.integration.termuxruntime.RuntimeLayout
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+
+private data class RuntimeStatus(
+    val ready: Boolean,
+    val message: String
+)
 
 /**
  * Hosts the upstream Termux terminal emulator in the IDE's bottom panel.
  *
- * It deliberately refuses to fall back to Android's /system/bin/sh: only a
- * successfully installed app-private Termux prefix is allowed to start.
+ * The runtime is checked on an IO dispatcher before creating a terminal session.
+ * A shell file existing on disk is not enough: it must successfully execute a
+ * fixed smoke-test command. Android's /system/bin/sh is never used as fallback.
  */
 @Composable
 fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val layout = remember(context) { RuntimeLayout.fromAppFilesDirectory(context.filesDir) }
-    val shell = remember(layout) {
-        listOf(File(layout.prefix, "bin/sh"), File(layout.prefix, "bin/bash"))
+    val appContext = remember(context) { context.applicationContext }
+    val layout = remember(appContext) { RuntimeLayout.fromAppFilesDirectory(appContext.filesDir) }
+    val runtimeStatus = produceState(
+        initialValue = RuntimeStatus(false, "Checking the embedded runtime…"),
+        key1 = appContext
+    ) {
+        value = withContext(Dispatchers.IO) {
+            val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
+            if (!runtime.hasBootstrapLayout()) {
+                RuntimeStatus(
+                    ready = false,
+                    message = "Runtime not installed. Install a bootstrap built for this app before starting a shell."
+                )
+            } else {
+                val smokeTest = BootstrapSmokeTest(runtime).run()
+                if (smokeTest.success) {
+                    RuntimeStatus(true, "")
+                } else {
+                    RuntimeStatus(
+                        ready = false,
+                        message = smokeTest.failureReason
+                            ?: "The embedded shell failed its execution test."
+                    )
+                }
+            }
+        }
+    }.value
+
+    val shell = remember(layout, runtimeStatus.ready) {
+        if (!runtimeStatus.ready) null
+        else listOf(File(layout.prefix, "bin/sh"), File(layout.prefix, "bin/bash"))
             .firstOrNull { it.isFile && it.canExecute() }
     }
 
-    if (shell == null) {
+    if (!runtimeStatus.ready || shell == null) {
+        val message = if (runtimeStatus.ready) {
+            "Runtime smoke test passed, but no executable shell entry point was found."
+        } else {
+            runtimeStatus.message
+        }
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -59,24 +101,20 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Termux terminal module connected", color = Color(0xFF8CC8FF), fontSize = 14.sp)
+                Text("Embedded terminal", color = Color(0xFF8CC8FF), fontSize = 14.sp)
                 Text(
-                    "Runtime not installed",
+                    if (runtimeStatus.message.startsWith("Checking")) "Checking runtime" else "Terminal unavailable",
                     color = Color(0xFFE8EDF5),
                     fontSize = 13.sp
                 )
-                Text(
-                    "The app-private Termux bootstrap must be provisioned for this app's package path before a shell can start. Android's host shell is intentionally not used as a fallback.",
-                    color = Color(0xFF9AA7B5),
-                    fontSize = 11.sp
-                )
+                Text(message, color = Color(0xFF9AA7B5), fontSize = 11.sp)
             }
         }
         return
     }
 
-    val home = layout.home.apply { mkdirs() }
-    val terminalClient = remember(context) { IdeTermuxSessionClient(context) }
+    val home = remember(layout) { layout.home.apply { mkdirs() } }
+    val terminalClient = remember(appContext) { IdeTermuxSessionClient(appContext) }
     val environment = remember(layout, shell) {
         layout.environment(
             inherited = mapOf("TERM" to "xterm-256color", "COLORTERM" to "truecolor"),
