@@ -210,10 +210,14 @@ private fun IdeUiPrototype() {
     // Startup no longer enters the legacy Ubuntu/PRoot installer flow.
     // Termux runtime readiness is handled by the dedicated integration bootstrap.
     BackHandler(enabled = screen != IdeScreen.Welcome) {
-        when (screen) {
-            IdeScreen.Workspace -> screen = IdeScreen.Projects
-            IdeScreen.Projects -> screen = IdeScreen.Welcome
-            IdeScreen.Welcome -> Unit
+        if (drawerState.isOpen) {
+            scope.launch { drawerState.close() }
+        } else {
+            when (screen) {
+                IdeScreen.Workspace -> screen = IdeScreen.Projects
+                IdeScreen.Projects -> screen = IdeScreen.Welcome
+                IdeScreen.Welcome -> Unit
+            }
         }
     }
 
