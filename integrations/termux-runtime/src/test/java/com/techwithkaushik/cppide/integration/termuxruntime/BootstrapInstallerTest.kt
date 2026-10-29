@@ -53,6 +53,23 @@ class BootstrapInstallerTest {
     }
 
     @Test
+    fun rejectsAbsoluteSymlinkOutsideRuntimePrefix() {
+        val archive = createArchive(
+            "bin/sh" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+            "SYMLINKS.txt" to "/etc/passwd ← bin/bash\n",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        assertThrows(java.io.IOException::class.java) {
+            BootstrapInstaller().install(archive, sha256(archive), prefix)
+        }
+        assertFalse(prefix.exists())
+    }
+
+    @Test
     fun rejectsChecksumMismatchBeforeExtraction() {
         val archive = createArchive(
             "bin/bash" to "shell",
