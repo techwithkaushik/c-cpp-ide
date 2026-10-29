@@ -14,17 +14,35 @@ for flavor in arm32 arm64 x86 x64; do
   apk="$APK_ROOT/$flavor/debug/app-$flavor-debug.apk"
   [[ -s "$apk" ]] || fail "Expected APK missing: $apk"
   temp="$(mktemp -d)"
-  trap 'rm -rf "$temp"' EXIT
-  unzip -p "$apk" assets/bootstrap/bootstrap.zip > "$temp/bootstrap.zip" || fail "$apk does not contain bundled bootstrap.zip"
-  unzip -p "$apk" assets/bootstrap/bootstrap.json > "$temp/bootstrap.json" || fail "$apk does not contain bootstrap.json"
-  python3 - "$abi" "$temp/bootstrap.json" <<'PY'
-import json, pathlib, sys
-expected, path = sys.argv[1:]
-data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
-if data.get("abi") != expected:
-    raise SystemExit(f"APK ABI/bootstrap mismatch: APK flavor expects {expected}, bundle declares {data.get('abi')!r}")
-print(f"APK contains matching {expected} bootstrap")
+  if ! unzip -p "$apk" assets/bootstrap/bootstrap.zip > "$temp/bootstrap.zip"; then
+    rm -rf "$temp"
+    fail "$apk does not contain bundled bootstrap.zip"
+  fi
+  if ! unzip -p "$apk" assets/bootstrap/bootstrap.json > "$temp/bootstrap.json"; then
+    rm -rf "$temp"
+    fail "$apk does not contain bootstrap.json"
+  fi
+  python3 - "$abi" "$temp/bootstrap.zip" "$temp/bootstrap.json" <<'PY'
+import hashlib, json, pathlib, sys, zipfile
+expected_abi, archive, metadata = sys.argv[1:]
+data = json.loads(pathlib.Path(metadata).read_text(encoding="utf-8"))
+if data.get("abi") != expected_abi:
+    raise SystemExit(f"APK ABI/bootstrap mismatch: expected {expected_abi}, got {data.get('abi')!r}")
+expected_hash = data.get("sha256", "")
+digest = hashlib.sha256()
+with open(archive, "rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+actual_hash = digest.hexdigest()
+if actual_hash.lower() != expected_hash.lower():
+    raise SystemExit(f"Embedded bootstrap digest mismatch for {expected_abi}")
+try:
+    with zipfile.ZipFile(archive) as bundle:
+        if not bundle.infolist() or bundle.testzip() is not None:
+            raise SystemExit(f"Embedded bootstrap ZIP is empty or corrupt for {expected_abi}")
+except zipfile.BadZipFile as exc:
+    raise SystemExit(f"Embedded bootstrap is not a valid ZIP for {expected_abi}: {exc}")
+print(f"APK contains the verified {expected_abi} bootstrap ({data.get('version')})")
 PY
   rm -rf "$temp"
-  trap - EXIT
 done
