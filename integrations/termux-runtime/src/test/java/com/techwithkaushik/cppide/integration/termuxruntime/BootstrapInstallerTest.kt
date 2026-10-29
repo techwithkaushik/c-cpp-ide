@@ -86,6 +86,40 @@ class BootstrapInstallerTest {
     }
 
     @Test
+    fun rejectsArchiveLargerThanConfiguredLimit() {
+        val archive = createArchive(
+            "bin/sh" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            BootstrapInstaller(maxArchiveBytes = 2L).install(archive, sha256(archive), prefix)
+        }
+        assertFalse(prefix.exists())
+    }
+
+    @Test
+    fun rejectsTooManyArchiveEntriesAndCleansStagingDirectory() {
+        val archive = createArchive(
+            "bin/sh" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+            "share/doc/extra" to "extra",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        assertThrows(java.io.IOException::class.java) {
+            BootstrapInstaller(maxEntries = 4).install(archive, sha256(archive), prefix)
+        }
+        assertFalse(prefix.exists())
+        assertTrue(temp.root.walkTopDown().none { it.name.startsWith(".usr.staging-") })
+    }
+
+    @Test
     fun rejectsZipSlipPath() {
         val archive = createArchive(
             "../outside.txt" to "must not escape",
