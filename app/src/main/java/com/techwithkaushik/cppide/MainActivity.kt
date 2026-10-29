@@ -1701,7 +1701,7 @@ private fun FileExplorerSheet(
                 IdeIcon(if (srcExpanded || query.isNotBlank()) "chevronDown" else "chevronRight", IdeAccent, 15.dp, Modifier.width(24.dp))
                 Text("src", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(8.dp))
-                Text("${visibleFiles.count { it.third == \"src\" }} files", color = IdeMuted, fontSize = 10.sp)
+                Text("${visibleFiles.count { it.third == "src" }} files", color = IdeMuted, fontSize = 10.sp)
             }
             if (srcExpanded || query.isNotBlank()) visibleFiles.filter { it.third == "src" }.forEach { file ->
                 ExplorerFileRow(file.first, file.second, activeFile == file.first, 28.dp) { onOpenFile(file.first) }
@@ -1712,7 +1712,7 @@ private fun FileExplorerSheet(
                 IdeIcon(if (includeExpanded || query.isNotBlank()) "chevronDown" else "chevronRight", IdeAccent, 15.dp, Modifier.width(24.dp))
                 Text("include", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(8.dp))
-                Text("${visibleFiles.count { it.third == \"include\" }} files", color = IdeMuted, fontSize = 10.sp)
+                Text("${visibleFiles.count { it.third == "include" }} files", color = IdeMuted, fontSize = 10.sp)
             }
             if (includeExpanded || query.isNotBlank()) visibleFiles.filter { it.third == "include" }.forEach { file ->
                 ExplorerFileRow(file.first, file.second, activeFile == file.first, 28.dp) { onOpenFile(file.first) }
