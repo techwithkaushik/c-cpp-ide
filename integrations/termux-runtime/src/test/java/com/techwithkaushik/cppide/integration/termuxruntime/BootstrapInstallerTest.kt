@@ -34,13 +34,13 @@ class BootstrapInstallerTest {
     }
 
     @Test
-    fun remapsOfficialTermuxAbsoluteSymlinkIntoAppPrefix() {
+    fun remapsAppSpecificAbsoluteSymlinkIntoPrivatePrefix() {
         val archive = createArchive(
             "bin/sh" to "shell",
             "etc/profile" to "profile",
             "lib/runtime.so" to "library",
             "share/doc/readme" to "docs",
-            "SYMLINKS.txt" to "/data/data/com.termux/files/usr/bin/sh ← bin/bash\n",
+            "SYMLINKS.txt" to "${BootstrapInstaller.DEFAULT_BOOTSTRAP_PREFIX}/bin/sh ← bin/bash\n",
         )
         val prefix = File(temp.root, "runtime/usr")
 
@@ -50,6 +50,23 @@ class BootstrapInstallerTest {
         assertTrue(java.nio.file.Files.isSymbolicLink(bash.toPath()))
         assertEquals("shell", bash.readText())
         assertEquals(1, result.symlinksCreated)
+    }
+
+    @Test
+    fun rejectsStockTermuxPrefixInsteadOfPretendingArchiveIsRelocatable() {
+        val archive = createArchive(
+            "bin/sh" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+            "SYMLINKS.txt" to "/data/data/com.termux/files/usr/bin/sh ← bin/bash\n",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        assertThrows(java.io.IOException::class.java) {
+            BootstrapInstaller().install(archive, sha256(archive), prefix)
+        }
+        assertFalse(prefix.exists())
     }
 
     @Test
