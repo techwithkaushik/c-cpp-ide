@@ -57,23 +57,30 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
         key1 = appContext
     ) {
         value = withContext(Dispatchers.IO) {
-            val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
-            if (!runtime.hasBootstrapLayout()) {
-                RuntimeStatus(
-                    ready = false,
-                    message = "Runtime not installed. Install a bootstrap built for this app before starting a shell."
-                )
-            } else {
-                val smokeTest = BootstrapSmokeTest(runtime).run()
-                if (smokeTest.success) {
-                    RuntimeStatus(true, "")
-                } else {
+            try {
+                val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
+                if (!runtime.hasBootstrapLayout()) {
                     RuntimeStatus(
                         ready = false,
-                        message = smokeTest.failureReason
-                            ?: "The embedded shell failed its execution test."
+                        message = "Runtime not installed. Install a bootstrap built for this app before starting a shell."
                     )
+                } else {
+                    val smokeTest = BootstrapSmokeTest(runtime).run()
+                    if (smokeTest.success) {
+                        RuntimeStatus(true, "")
+                    } else {
+                        RuntimeStatus(
+                            ready = false,
+                            message = smokeTest.failureReason
+                                ?: "The embedded shell failed its execution test."
+                        )
+                    }
                 }
+            } catch (error: Exception) {
+                RuntimeStatus(
+                    ready = false,
+                    message = "Runtime check failed: ${error.message ?: error.javaClass.simpleName}"
+                )
             }
         }
     }.value
