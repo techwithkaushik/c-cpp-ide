@@ -174,10 +174,10 @@ class BootstrapInstaller(
                     }
                     val candidate = if (sourcePrefix != null) {
                         val suffix = rawTarget.removePrefix(sourcePrefix).trimStart('/')
-                        if (suffix.isEmpty()) finalPrefix.absoluteFile.normalize()
-                        else File(finalPrefix, suffix).absoluteFile.normalize()
+                        if (suffix.isEmpty()) finalPrefix.toPath().toAbsolutePath().normalize().toFile()
+                        else File(finalPrefix, suffix).toPath().toAbsolutePath().normalize().toFile()
                     } else {
-                        File(rawTarget).absoluteFile.normalize()
+                        File(rawTarget).toPath().toAbsolutePath().normalize().toFile()
                     }
                     val finalNormalized = finalPrefix.absoluteFile.normalize()
                     if (candidate != finalNormalized &&
