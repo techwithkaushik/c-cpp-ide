@@ -20,6 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Vendor pinned Termux source modules
+        run: bash scripts/vendor-termux-source.sh
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
