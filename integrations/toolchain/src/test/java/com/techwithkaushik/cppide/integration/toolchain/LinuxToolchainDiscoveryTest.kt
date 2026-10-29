@@ -10,7 +10,8 @@ import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 
 class LinuxToolchainDiscoveryTest {
-    @get:Rule\n    val temp = TemporaryFolder()
+    @get:Rule
+    val temp = TemporaryFolder()
 
     @Test
     fun discoversDistroAndManualToolsFromRootfsPath() {
