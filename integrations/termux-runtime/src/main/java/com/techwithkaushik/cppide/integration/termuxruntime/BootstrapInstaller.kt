@@ -22,6 +22,7 @@ class BootstrapInstaller(
     private val maxArchiveBytes: Long = DEFAULT_MAX_ARCHIVE_BYTES,
     private val maxExpandedBytes: Long = DEFAULT_MAX_EXPANDED_BYTES,
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
+    private val expectedBootstrapPrefix: String = DEFAULT_BOOTSTRAP_PREFIX,
 ) {
     data class Result(
         val prefix: File,
@@ -165,9 +166,11 @@ class BootstrapInstaller(
                     // Termux's own package prefix. Remap only these known prefixes
                     // into this IDE's private prefix; never permit arbitrary absolute
                     // links to escape the staged runtime.
+                    // The bootstrap must be built for this app package. Remapping
+                    // another app's symlinks does not rewrite hard-coded ELF paths.
                     val sourcePrefixes = listOf(
-                        "/data/data/com.termux/files/usr",
-                        "/data/user/0/com.termux/files/usr",
+                        expectedBootstrapPrefix,
+                        expectedBootstrapPrefix.replace("/data/data/", "/data/user/0/"),
                     )
                     val sourcePrefix = sourcePrefixes.firstOrNull { source ->
                         rawTarget == source || rawTarget.startsWith(source + "/")
@@ -267,5 +270,6 @@ class BootstrapInstaller(
         const val DEFAULT_MAX_ARCHIVE_BYTES = 512L * 1024 * 1024
         const val DEFAULT_MAX_EXPANDED_BYTES = 2L * 1024 * 1024 * 1024
         const val DEFAULT_MAX_ENTRIES = 100_000
+        const val DEFAULT_BOOTSTRAP_PREFIX = "/data/data/com.techwithkaushik.cppide/files/usr"
     }
 }
