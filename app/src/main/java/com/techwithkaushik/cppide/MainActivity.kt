@@ -1043,9 +1043,11 @@ private fun IdeUiPrototype() {
                         dirtyFiles.clear()
                         activeFile = entryFile
                         code = fileContents[entryFile] ?: sampleCode(entryFile)
-                        openFile(entryFile)                        newProjectDialog = false
+                        openFile(entryFile)
+                        newProjectDialog = false
                         newProjectName = ""
-                        newProjectError = null                        screen = IdeScreen.Workspace
+                        newProjectError = null
+                        screen = IdeScreen.Workspace
                     }.onFailure { error ->
                         newProjectError = error.message ?: "Could not create project."
                     }
