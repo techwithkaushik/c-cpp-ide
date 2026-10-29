@@ -24,6 +24,7 @@ kotlin {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:aidl"))
+    implementation(project(":integrations:termux-runtime"))
 
     // Use the upstream Termux terminal view + native PTY emulator, not a Compose mock.
     // Version is pinned so native/JNI behavior remains reproducible in CI.
