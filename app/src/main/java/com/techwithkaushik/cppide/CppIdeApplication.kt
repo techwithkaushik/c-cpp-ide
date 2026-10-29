@@ -58,9 +58,6 @@ class CppIdeApplication : Application() {
             appendLine("Thread: ${thread.name} (id=${thread.id})")
             appendLine()
             appendLine("Exception:")
-            error.printStackTrace(java.io.PrintWriter(java.io.StringWriter()).also { writer ->
-                // Print separately below so the full stack trace is retained.
-            })
             val trace = java.io.StringWriter()
             error.printStackTrace(java.io.PrintWriter(trace))
             append(trace.toString())
