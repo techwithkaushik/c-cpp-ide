@@ -497,8 +497,7 @@ private fun IdeUiPrototype() {
                                     .clickable {
                                         showCommandPalette = false
                                         when (command) {
-                                            "New File" -> { newFileName = ""; newFileDialog = true }
-                                            "File Explorer" -> showExplorer = !showExplorer
+                                            "New File" -> { newFileName = ""; newFileDialog = true }                                            "File Explorer" -> showExplorer = !showExplorer
                                             "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                             "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                             "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
@@ -528,7 +527,6 @@ private fun IdeUiPrototype() {
                                                 }
                                             }
                                             "Settings" -> showSettings = true
-                                            "File Explorer" -> showExplorer = !showExplorer
                                             "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                                         }
                                     }
@@ -997,8 +995,7 @@ private fun IdeUiPrototype() {
                         dirtyFiles.clear()
                         activeFile = entryFile
                         code = fileContents[entryFile] ?: sampleCode(entryFile)
-                        openFile(entryFile)
-                        newProjectDialog = false
+                        openFile(entryFile)                        newProjectDialog = false
                         newProjectName = ""
                         newProjectError = null
                         screen = IdeScreen.Workspace
@@ -1497,8 +1494,7 @@ private fun WorkspaceScreen(
     onCloseFile: (String) -> Unit,
     editorController: SoraEditorController,
     editorFontSize: Float,
-    editorWordWrap: Boolean,
-    onMenu: () -> Unit,
+    editorWordWrap: Boolean,    onMenu: () -> Unit,
     onExplorer: () -> Unit,
     onFile: (String) -> Unit,
     onAction: (String) -> Unit,
@@ -1528,12 +1524,7 @@ private fun WorkspaceScreen(
                 },
                 actions = {
                     IconButton(onClick = onExplorer, modifier = Modifier.size(36.dp)) { IdeIcon("folder", IdeAccent, 18.dp) }
-                    IconButton(onClick = { onAction("Undo") }, modifier = Modifier.size(36.dp)) { IdeIcon("undo", IdeMuted, 18.dp) }
-                    IconButton(onClick = { onAction("Redo") }, modifier = Modifier.size(36.dp)) { IdeIcon("redo", IdeMuted, 18.dp) }
                     IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(36.dp)) { IdeIcon("save", IdeAccent, 17.dp) }
-                    IconButton(onClick = { onAction("Build") }, modifier = Modifier.size(36.dp)) { IdeIcon("build", IdeGreen, 17.dp) }
-                    IconButton(onClick = { onAction("Run") }, modifier = Modifier.size(36.dp)) { IdeIcon("run", IdeGreen, 17.dp) }
-                    IconButton(onClick = { onAction("Find") }, modifier = Modifier.size(36.dp)) { IdeIcon("search", IdeMuted, 17.dp) }
                     var showOverflow by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
@@ -1635,17 +1626,6 @@ private fun WorkspaceScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     color = IdeAccent, fontSize = 20.sp
                 )
-            }
-            Row(
-                Modifier.fillMaxWidth().height(24.dp).background(Color(0xFF10151C)).padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("workspace", color = IdeMuted, fontSize = 11.sp)
-                Text("  ›  $projectName  ›  ", color = IdeMuted, fontSize = 11.sp)
-                FileTypeIcon(activeFile, 15.dp)
-                Text(" $activeFile", color = Color(0xFFCAD4E0), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.weight(1f))
-                Text("⋯", color = IdeMuted, fontSize = 20.sp)
             }
             // The editor owns all remaining vertical space, like AndroidIDE's workspace.
             Box(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0F1218))) {
@@ -1997,8 +1977,7 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
 @Composable
 private fun ToolStatusCard(
     eyebrow: String,
-    status: String,
-    description: String,
+    status: String,    description: String,
     detail: String,
     accent: Color
 ) {
