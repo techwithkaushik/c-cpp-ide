@@ -193,8 +193,9 @@ private fun IdeUiPrototype() {
     var commandQuery by rememberSaveable { mutableStateOf("") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchInProject by rememberSaveable { mutableStateOf(false) }
-    var editorFontSize by rememberSaveable { mutableStateOf(13f) }
+    var editorFontSize by rememberSaveable { mutableStateOf(14f) }
     var editorWordWrap by rememberSaveable { mutableStateOf(false) }
+    var editorTheme by rememberSaveable { mutableStateOf("Dark+ (VS Code)") }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember(projectStorage) {
@@ -390,7 +391,7 @@ private fun IdeUiPrototype() {
                     openFiles = openFiles, dirtyFiles = dirtyFiles,
                     onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
                     onSelectFile = { openFile(it) }, onCloseFile = { closeFile(it) },
-                    editorController = editorController, editorFontSize = editorFontSize, editorWordWrap = editorWordWrap,
+                    editorController = editorController, editorFontSize = editorFontSize, editorWordWrap = editorWordWrap, editorTheme = editorTheme,
                     onMenu = { scope.launch { drawerState.open() } },
                     onExplorer = { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } },
                     onFile = { file -> openFile(file) },
@@ -692,6 +693,31 @@ private fun IdeUiPrototype() {
                                     }
                                     androidx.compose.material3.Switch(checked = editorWordWrap, onCheckedChange = { editorWordWrap = it })
                                 }
+                                Text("Color theme", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Medium)
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
+                                        Row(
+                                            Modifier.fillMaxWidth()
+                                                .background(if (editorTheme == theme) IdeSurfaceRaised else Color.Transparent, RoundedCornerShape(8.dp))
+                                                .clickable { editorTheme = theme }
+                                                .padding(horizontal = 10.dp, vertical = 9.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(Modifier.size(18.dp).background(
+                                                when (theme) {
+                                                    "Light+ (VS Code)" -> Color(0xFFF3F3F3)
+                                                    "Monokai" -> Color(0xFF272822)
+                                                    "Solarized Dark" -> Color(0xFF002B36)
+                                                    else -> Color(0xFF1E1E1E)
+                                                }, CircleShape
+                                            ))
+                                            Spacer(Modifier.width(10.dp))
+                                            Text(theme, color = Color(0xFFE8EDF5), fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                            if (editorTheme == theme) IdeIcon("check", IdeAccent, 17.dp)
+                                        }
+                                    }
+                                }
+                                SettingsInfoRow("Editor font", "Monospace · fixed-width characters")
                                 SettingsInfoRow("Editor engine", "Sora code editor")
                             }
                             "Languages" -> {
@@ -770,9 +796,11 @@ private fun IdeUiPrototype() {
                             else -> {
                                 Text("WORKSPACE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 SettingsInfoRow("Theme", "Dark IDE")
+                                Text("EDITOR THEME", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Selected: $editorTheme", color = Color(0xFFE8EDF5), fontSize = 13.sp)
+                                Text("Theme changes apply immediately to the editor. Font size and word wrap are available under Editor.", color = IdeMuted, fontSize = 12.sp)
                                 SettingsInfoRow("Accent", "Blue")
                                 SettingsInfoRow("Project", selectedProject)
-                                Text("Appearance controls will be expanded in a later UI pass.", color = IdeMuted, fontSize = 11.sp)
                             }
                         }
                     }
@@ -1462,7 +1490,9 @@ private fun WorkspaceScreen(
     onCloseFile: (String) -> Unit,
     editorController: SoraEditorController,
     editorFontSize: Float,
-    editorWordWrap: Boolean,    onMenu: () -> Unit,
+    editorWordWrap: Boolean,
+    editorTheme: String,
+    onMenu: () -> Unit,
     onExplorer: () -> Unit,
     onFile: (String) -> Unit,
     onAction: (String) -> Unit,    selectedPanel: ToolPanel,
@@ -1603,7 +1633,8 @@ private fun WorkspaceScreen(
                     modifier = Modifier.fillMaxSize(),
                     controller = editorController,
                     fontSize = editorFontSize,
-                    wordWrap = editorWordWrap
+                    wordWrap = editorWordWrap,
+                    themeName = editorTheme
                 )
             }
         }
