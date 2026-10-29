@@ -95,14 +95,18 @@ class EmbeddedTermuxRuntime(
 ) {
     val layout: RuntimeLayout = RuntimeLayout.fromAppFilesDirectory(appFilesDirectory)
 
-    fun installBootstrap(archive: File, expectedSha256: String): BootstrapInstaller.Result {
+    fun installBootstrap(
+        archive: File,
+        expectedSha256: String,
+        validateInstalledPrefix: ((File) -> Boolean)? = null,
+    ): BootstrapInstaller.Result {
         layout.ensurePrivateDirectories()
         val prefix = layout.prefix.canonicalFile
         val privateRoot = layout.rootDirectory.canonicalFile
         if (!prefix.toPath().startsWith(privateRoot.toPath())) {
             throw SecurityException("Bootstrap prefix escapes app-private runtime directory")
         }
-        val result = installer.install(archive, expectedSha256, prefix)
+        val result = installer.install(archive, expectedSha256, prefix, validateInstalledPrefix)
         // Promotion replaces the entire prefix tree, so recreate private runtime
         // directories such as PREFIX/tmp that may not be present in the archive.
         layout.ensurePrivateDirectories()
