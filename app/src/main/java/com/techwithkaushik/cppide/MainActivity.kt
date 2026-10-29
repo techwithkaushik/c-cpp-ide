@@ -350,14 +350,9 @@ private fun IdeUiPrototype() {
                         Column(
                             Modifier.fillMaxWidth()
                                 .clickable {
+                                    // Every Activity Bar destination opens in the same VS Code-style left sidebar.
+                                    showExplorer = activeActivity != label || !showExplorer
                                     activeActivity = label
-                                    when (label) {
-                                        "Explorer" -> showExplorer = !showExplorer
-                                        "Search" -> { searchInProject = true; searchQuery = ""; showSearch = true }
-                                        "Run and Debug" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                                        "Source Control" -> showSourceControl = true
-                                        "Extensions" -> { extensionQuery = ""; showExtensions = true }
-                                    }
                                 }
                                 .background(if (selected) Color(0xFF202B37) else Color.Transparent)
                                 .padding(vertical = 11.dp),
@@ -379,21 +374,75 @@ private fun IdeUiPrototype() {
                 }
                 if (showExplorer) {
                     Column(
-                        Modifier.width(208.dp).fillMaxSize().background(IdeSurface)
+                        Modifier.width(224.dp).fillMaxSize().background(IdeSurface)
                     ) {
-                        FileExplorerSheet(
-                            projectName = selectedProject,
-                            activeFile = activeFile,
-                            files = workspaceFiles.toList(),
-                            onOpenFile = { openFile(it) },
-                            onCreateFile = { file ->
-                                if (file !in workspaceFiles) workspaceFiles.add(file)
-                                if (file !in fileContents) fileContents[file] = sampleCode(file)
-                                openFile(file)
-                            },
-                            onClose = { showExplorer = false },
-                            sidebarMode = true
-                        )
+                        Row(
+                            Modifier.fillMaxWidth().height(42.dp).padding(start = 14.dp, end = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(activeActivity.uppercase(), modifier = Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            IconButton(onClick = { showExplorer = false }, modifier = Modifier.size(32.dp)) {
+                                IdeIcon("close", IdeMuted, 16.dp)
+                            }
+                        }
+                        Divider(color = IdeSurfaceRaised)
+                        when (activeActivity) {
+                            "Explorer" -> FileExplorerSheet(
+                                projectName = selectedProject,
+                                activeFile = activeFile,
+                                files = workspaceFiles.toList(),
+                                onOpenFile = { openFile(it) },
+                                onCreateFile = { file ->
+                                    if (file !in workspaceFiles) workspaceFiles.add(file)
+                                    if (file !in fileContents) fileContents[file] = sampleCode(file)
+                                    openFile(file)
+                                },
+                                onClose = { showExplorer = false },
+                                sidebarMode = true
+                            )
+                            "Search" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    label = { Text("Search in project") },
+                                    leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) }
+                                )
+                                Button(onClick = { searchInProject = true; showSearch = true }, modifier = Modifier.fillMaxWidth()) { Text("Show Results") }
+                                Text("Search across project files", color = IdeMuted, fontSize = 12.sp)
+                            }
+                            "Source Control" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Changes", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                                if (dirtyFiles.isEmpty()) Text("No unsaved changes", color = IdeMuted, fontSize = 12.sp)
+                                else dirtyFiles.forEach { file -> Text("M  $file", color = IdeGreen, fontSize = 12.sp) }
+                                Button(onClick = {
+                                    val pending = dirtyFiles.toList()
+                                    pending.forEach { file ->
+                                        val textToSave = if (file == activeFile) code else fileContents[file].orEmpty()
+                                        runCatching { projectStorage.writeFile(selectedProject, file, textToSave) }
+                                            .onSuccess { dirtyFiles.remove(file) }
+                                    }
+                                }, modifier = Modifier.fillMaxWidth()) { Text("Save All Changes") }
+                            }
+                            "Run and Debug" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Run and Debug", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
+                                Button(onClick = { selectedPanel = ToolPanel.Build; showToolPanel = true }, modifier = Modifier.fillMaxWidth()) { Text("Build") }
+                                OutlinedButton(onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true }, modifier = Modifier.fillMaxWidth()) { Text("Run / Output") }
+                                Text("Build and run integration is not connected yet.", color = IdeMuted, fontSize = 11.sp)
+                            }
+                            "Extensions" -> Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = extensionQuery,
+                                    onValueChange = { extensionQuery = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    label = { Text("Find extensions") },
+                                    leadingIcon = { IdeIcon("extensions", IdeAccent, 18.dp) }
+                                )
+                                Text("Extension installation is not available yet.", color = IdeMuted, fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxSize()) {
@@ -497,8 +546,7 @@ private fun IdeUiPrototype() {
                                     .clickable {
                                         showCommandPalette = false
                                         when (command) {
-                                            "New File" -> { newFileName = ""; newFileDialog = true }                                            "File Explorer" -> showExplorer = !showExplorer
-                                            "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
+                                            "New File" -> { newFileName = ""; newFileDialog = true }                                            "File Explorer" -> showExplorer = !showExplorer                                            "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                                             "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                                             "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                                             "Output", "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
@@ -997,8 +1045,7 @@ private fun IdeUiPrototype() {
                         code = fileContents[entryFile] ?: sampleCode(entryFile)
                         openFile(entryFile)                        newProjectDialog = false
                         newProjectName = ""
-                        newProjectError = null
-                        screen = IdeScreen.Workspace
+                        newProjectError = null                        screen = IdeScreen.Workspace
                     }.onFailure { error ->
                         newProjectError = error.message ?: "Could not create project."
                     }
@@ -1497,8 +1544,7 @@ private fun WorkspaceScreen(
     editorWordWrap: Boolean,    onMenu: () -> Unit,
     onExplorer: () -> Unit,
     onFile: (String) -> Unit,
-    onAction: (String) -> Unit,
-    selectedPanel: ToolPanel,
+    onAction: (String) -> Unit,    selectedPanel: ToolPanel,
     showToolPanel: Boolean,
     fullScreen: Boolean,
     onToggleFullScreen: () -> Unit,
@@ -1997,8 +2043,7 @@ private fun ToolStatusCard(
             }
             Text(description, color = IdeMuted, fontSize = 12.sp)
             Divider(color = IdeSurfaceRaised)
-            Text(detail, color = accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        }
+            Text(detail, color = accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace)        }
     }
 }
 
