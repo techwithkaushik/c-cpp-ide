@@ -21,8 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - name: Checkout selected ref
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify vendored Termux source
+        run: bash scripts/verify-termux-vendor.sh
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -35,13 +38,24 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Run unit tests and assemble debug APK
+      - name: Compile vendored Termux modules
+        run: >-
+          gradle --no-daemon
+          :integrations:termux-upstream:terminal-emulator:assembleDebug
+          :integrations:termux-upstream:terminal-view:assembleDebug
+          :integrations:termux-upstream:termux-am-library:assembleDebug
+          :integrations:termux-upstream:termux-shared:assembleDebug
+
+      - name: Run runtime installer tests
+        run: gradle --no-daemon :integrations:termux-runtime:testDebugUnitTest
+
+      - name: Run app unit tests and assemble debug APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: cpp-ide-debug-apk
+          name: code-studio-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
