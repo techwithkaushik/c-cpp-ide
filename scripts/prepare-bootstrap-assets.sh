@@ -22,9 +22,11 @@ for flavor in arm32 arm64 x86 x64; do
 
   [[ -s "$archive" ]] || fail "Missing bootstrap archive for $abi: $archive. Refusing to build an APK without its matching bootstrap."
   [[ -s "$metadata" ]] || fail "Missing pinned metadata for $abi: $metadata"
+  size="$(stat -c '%s' "$archive")"
+  (( size > 0 && size <= 536870912 )) || fail "$archive exceeds the allowed compressed size (512 MiB)."
 
   python3 - "$abi" "$archive" "$metadata" <<'PY'
-import hashlib, json, pathlib, sys
+import hashlib, json, pathlib, sys, zipfile
 abi, archive, metadata = sys.argv[1:]
 try:
     data = json.loads(pathlib.Path(metadata).read_text(encoding="utf-8"))
@@ -33,15 +35,28 @@ except Exception as exc:
 if data.get("abi") != abi:
     raise SystemExit(f"{metadata}: ABI mismatch: expected {abi}, got {data.get('abi')!r}")
 version = data.get("version")
-if not isinstance(version, str) or not version.strip():
-    raise SystemExit(f"{metadata}: missing non-empty version")
+if not isinstance(version, str) or not version.strip() or len(version) > 64:
+    raise SystemExit(f"{metadata}: missing or invalid version")
 expected = data.get("sha256")
 if not isinstance(expected, str) or len(expected) != 64 or any(c not in "0123456789abcdefABCDEF" for c in expected):
     raise SystemExit(f"{metadata}: sha256 must be 64 hex characters")
-digest = hashlib.sha256(pathlib.Path(archive).read_bytes()).hexdigest()
-if digest.lower() != expected.lower():
-    raise SystemExit(f"{archive}: SHA-256 mismatch (expected {expected}, got {digest})")
-print(f"Validated {abi} bootstrap {version}: sha256={digest}")
+digest = hashlib.sha256()
+with open(archive, "rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+actual = digest.hexdigest()
+if actual.lower() != expected.lower():
+    raise SystemExit(f"{archive}: SHA-256 mismatch (expected {expected}, got {actual})")
+try:
+    with zipfile.ZipFile(archive) as bundle:
+        entries = bundle.infolist()
+        if not entries:
+            raise SystemExit(f"{archive}: bootstrap ZIP is empty")
+        if bundle.testzip() is not None:
+            raise SystemExit(f"{archive}: bootstrap ZIP contains a corrupt entry")
+except zipfile.BadZipFile as exc:
+    raise SystemExit(f"{archive}: not a valid ZIP archive: {exc}")
+print(f"Validated {abi} bootstrap {version}: sha256={actual}")
 PY
 
   destination="$OUTPUT_ROOT/$flavor/bootstrap"
