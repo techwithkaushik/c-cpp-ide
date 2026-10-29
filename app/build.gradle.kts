@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-
 android {
     namespace = "com.techwithkaushik.cppide"
     compileSdk = 36
@@ -17,6 +16,38 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    // Each distributable APK contains only native libraries and bootstrap data for one ABI.
+    flavorDimensions += "bootstrapAbi"
+    productFlavors {
+        create("arm32") {
+            dimension = "bootstrapAbi"
+            ndk { abiFilters += "armeabi-v7a" }
+            buildConfigField("String", "BOOTSTRAP_ABI", "\"armeabi-v7a\"")
+        }
+        create("arm64") {
+            dimension = "bootstrapAbi"
+            ndk { abiFilters += "arm64-v8a" }
+            buildConfigField("String", "BOOTSTRAP_ABI", "\"arm64-v8a\"")
+        }
+        create("x86") {
+            dimension = "bootstrapAbi"
+            ndk { abiFilters += "x86" }
+            buildConfigField("String", "BOOTSTRAP_ABI", "\"x86\"")
+        }
+        create("x64") {
+            dimension = "bootstrapAbi"
+            ndk { abiFilters += "x86_64" }
+            buildConfigField("String", "BOOTSTRAP_ABI", "\"x86_64\"")
+        }
+    }
+
+    sourceSets {
+        getByName("arm32").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/arm32"))
+        getByName("arm64").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/arm64"))
+        getByName("x86").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/x86"))
+        getByName("x64").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/x64"))
     }
 
     // Keep Java and Kotlin output compatible across CI and local builds.
@@ -47,8 +78,10 @@ android {
         }
     }
 
-    buildFeatures { compose = true }
-
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 kotlin {
