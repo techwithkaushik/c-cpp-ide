@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
-
 android {
     namespace = "com.techwithkaushik.cppide.feature.terminal"
     compileSdk = 36
@@ -14,22 +13,14 @@ android {
     }
     buildFeatures { compose = true }
 }
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
-
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:aidl"))
     implementation(project(":integrations:termux-runtime"))
-
-    // Use the upstream Termux terminal view + native PTY emulator, not a Compose mock.
-    // Version is pinned so native/JNI behavior remains reproducible in CI.
-    implementation("com.termux.termux-app:terminal-view:0.118.3")
-    implementation("com.termux.termux-app:termux-shared:0.118.3")
+    implementation(project(":integrations:termux-upstream:terminal-view"))
+    implementation(project(":integrations:termux-upstream:terminal-emulator"))
+    implementation(project(":integrations:termux-upstream:termux-shared"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
