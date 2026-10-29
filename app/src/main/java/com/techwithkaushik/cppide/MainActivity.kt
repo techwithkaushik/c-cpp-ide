@@ -333,7 +333,7 @@ private fun IdeUiPrototype() {
                                     "File Explorer" -> FileExplorerSheet(
                                         projectName = selectedProject, activeFile = activeFile, files = workspaceFiles.toList(),
                                         onOpenFile = { openFile(it); scope.launch { drawerState.close() } },
-                                        onCreateFile = { file -> if (file !in workspaceFiles) workspaceFiles.add(file); if (file !in fileContents) fileContents[file] = sampleCode(file); openFile(file) },
+                                        onCreateFile = { file -> if (file !in workspaceFiles) workspaceFiles.add(file); if (file !in fileContents) fileContents[file] = sampleCode(file); openFile(file); scope.launch { drawerState.close() } },
                                         onClose = { scope.launch { drawerState.close() } }, sidebarMode = true
                                     )
                                     "Search" -> {
@@ -344,9 +344,16 @@ private fun IdeUiPrototype() {
                                         Text(if (dirtyFiles.isEmpty()) "No changes" else "${dirtyFiles.size} changed file(s)", color = IdeMuted, fontSize = 12.sp)
                                         dirtyFiles.forEach { Text("M  $it", color = IdeGreen, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                                         Button(onClick = {
+                                            var saveFailed = false
                                             dirtyFiles.toList().forEach { file ->
                                                 val contents = if (file == activeFile) code else fileContents[file].orEmpty()
-                                                runCatching { projectStorage.writeFile(selectedProject, file, contents) }.onSuccess { dirtyFiles.remove(file) }
+                                                runCatching { projectStorage.writeFile(selectedProject, file, contents) }
+                                                    .onSuccess { dirtyFiles.remove(file) }
+                                                    .onFailure { saveFailed = true }
+                                            }
+                                            if (saveFailed) {
+                                                selectedPanel = ToolPanel.Problems
+                                                showToolPanel = true
                                             }
                                         }, modifier = Modifier.fillMaxWidth()) { Text("Save all") }
                                     }
