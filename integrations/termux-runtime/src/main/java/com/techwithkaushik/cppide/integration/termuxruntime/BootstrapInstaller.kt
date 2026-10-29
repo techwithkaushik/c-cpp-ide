@@ -179,7 +179,7 @@ class BootstrapInstaller(
                     } else {
                         File(rawTarget).toPath().toAbsolutePath().normalize().toFile()
                     }
-                    val finalNormalized = finalPrefix.absoluteFile.normalize()
+                    val finalNormalized = finalPrefix.toPath().toAbsolutePath().normalize().toFile()
                     if (candidate != finalNormalized &&
                         !candidate.path.startsWith(finalNormalized.path + File.separator)
                     ) {
@@ -189,7 +189,7 @@ class BootstrapInstaller(
                 } else {
                     if (rawTarget.contains('\\')) throw IOException("Invalid symlink target")
                     val resolved = File(File(finalPrefix, linkRelative).parentFile, rawTarget).toPath().toAbsolutePath().normalize().toFile()
-                    val finalNormalized = finalPrefix.absoluteFile.normalize()
+                    val finalNormalized = finalPrefix.toPath().toAbsolutePath().normalize().toFile()
                     if (resolved != finalNormalized &&
                         !resolved.path.startsWith(finalNormalized.path + File.separator)
                     ) {
