@@ -156,6 +156,7 @@ private fun IdeUiPrototype() {
     var newFileDialog by rememberSaveable { mutableStateOf(false) }
     var newFileName by rememberSaveable { mutableStateOf("") }
     var pendingCloseFile by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingCloseError by rememberSaveable { mutableStateOf<String?>(null) }
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
@@ -174,7 +175,7 @@ private fun IdeUiPrototype() {
         recentFiles.add(0, file)
     }
     fun closeFile(file: String) {
-        if (dirtyFiles.contains(file)) { pendingCloseFile = file; return }
+        if (dirtyFiles.contains(file)) { pendingCloseError = null; pendingCloseFile = file; return }
         openFiles.remove(file)
         if (openFiles.isEmpty()) openFiles.add("README.md")
         if (activeFile == file) {
@@ -223,19 +224,31 @@ private fun IdeUiPrototype() {
 
     pendingCloseFile?.let { fileToClose ->
         AlertDialog(
-            onDismissRequest = { pendingCloseFile = null },
+            onDismissRequest = { pendingCloseFile = null; pendingCloseError = null },
             containerColor = IdeSurface,
             title = { Text("Unsaved changes", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
-            text = { Text("Save changes to $fileToClose before closing it?", color = IdeMuted) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Save changes to $fileToClose before closing it?", color = IdeMuted)
+                    pendingCloseError?.let { error -> Text(error, color = Color(0xFFFF8A80), fontSize = 12.sp) }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     if (fileToClose == activeFile) fileContents[fileToClose] = code
                     val contents = fileContents[fileToClose].orEmpty()
+                    pendingCloseError = null
                     runCatching { projectStorage.writeFile(selectedProject, fileToClose, contents) }
                         .onSuccess {
                             dirtyFiles.remove(fileToClose)
                             pendingCloseFile = null
+                            pendingCloseError = null
                             closeFile(fileToClose)
+                        }
+                        .onFailure { error ->
+                            pendingCloseError = error.message?.takeIf { it.isNotBlank() }
+                                ?.let { "Could not save file: $it" }
+                                ?: "Could not save file. Check storage access and try again."
                         }
                 }) { Text("Save", color = IdeAccent) }
             },
@@ -244,9 +257,10 @@ private fun IdeUiPrototype() {
                     TextButton(onClick = {
                         dirtyFiles.remove(fileToClose)
                         pendingCloseFile = null
+                        pendingCloseError = null
                         closeFile(fileToClose)
                     }) { Text("Discard", color = IdeMuted) }
-                    TextButton(onClick = { pendingCloseFile = null }) { Text("Cancel", color = IdeAccent) }
+                    TextButton(onClick = { pendingCloseFile = null; pendingCloseError = null }) { Text("Cancel", color = IdeAccent) }
                 }
             }
         )
