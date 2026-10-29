@@ -25,7 +25,7 @@ class CppIdeApplication : Application() {
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             try {
                 val reportFile = writeCrashReport(this, thread, error)
-                scheduleCrashReportActivity(this, reportFile)
+                launchCrashReportImmediately(this, reportFile)
             } catch (_: Throwable) {
                 // Never let crash-reporting failure hide the original exception.
             }
@@ -66,23 +66,25 @@ class CppIdeApplication : Application() {
         return report
     }
 
-    private fun scheduleCrashReportActivity(context: Context, reportFile: File) {
+    /**
+     * Try to open the report while this process still owns the foreground crash context.
+     * AlarmManager activity launches are restricted on modern Android, so an alarm alone
+     * is not a reliable crash UI mechanism. The report is persisted before this is called.
+     */
+    private fun launchCrashReportImmediately(context: Context, reportFile: File) {
         val intent = Intent(context, CrashReportActivity::class.java).apply {
             putExtra(CrashReportActivity.EXTRA_REPORT_PATH, reportFile.absolutePath)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            )
         }
-        val pending = PendingIntent.getActivity(
-            context,
-            7319,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val alarm = context.getSystemService(ALARM_SERVICE) as AlarmManager
-        val triggerAt = System.currentTimeMillis() + 900L
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarm.setAndAllowWhileIdle(AlarmManager.RTC, triggerAt, pending)
-        } else {
-            alarm.set(AlarmManager.RTC, triggerAt, pending)
+        runCatching {
+            context.startActivity(intent)
+            // Give ActivityTaskManager a brief chance to process the launch before the
+            // platform's uncaught-exception handler terminates this process.
+            Thread.sleep(900L)
         }
     }
 }
