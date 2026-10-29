@@ -102,7 +102,11 @@ class EmbeddedTermuxRuntime(
         if (!prefix.toPath().startsWith(privateRoot.toPath())) {
             throw SecurityException("Bootstrap prefix escapes app-private runtime directory")
         }
-        return installer.install(archive, expectedSha256, prefix)
+        val result = installer.install(archive, expectedSha256, prefix)
+        // Promotion replaces the entire prefix tree, so recreate private runtime
+        // directories such as PREFIX/tmp that may not be present in the archive.
+        layout.ensurePrivateDirectories()
+        return result
     }
 
     /** Structural check only; a real executable smoke test still has to run. */
