@@ -22,8 +22,9 @@ class EmbeddedTermuxRuntimeTest {
         assertEquals(File(files, "usr").canonicalPath, layout.prefix.canonicalPath)
         assertEquals(File(layout.prefix, "tmp").canonicalPath, layout.temporaryDirectory.canonicalPath)
         assertTrue(layout.home.isDirectory)
+        assertTrue(layout.prefix.isDirectory) // TMPDIR is a child of the embedded prefix.
         assertTrue(layout.temporaryDirectory.isDirectory)
-        assertFalse(layout.prefix.exists())
+        assertFalse(layout.shell.exists()) // Directory setup must not pretend a bootstrap is installed.
     }
 
     @Test
