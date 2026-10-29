@@ -1,5 +1,7 @@
 package com.techwithkaushik.cppide
 
+import com.techwithkaushik.cppide.feature.terminal.TermuxTerminalPanel
+
 import android.os.Bundle
 import android.app.Activity
 import android.net.Uri
@@ -1935,8 +1937,7 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         }
         when (selected) {
             ToolPanel.Terminal -> {
-                ToolStatusCard("TERMINAL SESSION", "Not connected", "The shell runtime has not been started.", "›  Waiting for runtime integration", IdeAccent)
-                Text("Terminal commands will be available when the managed Linux runtime is active.", color = IdeMuted, fontSize = 11.sp)
+                TermuxTerminalPanel()
             }
             ToolPanel.Build -> {
                 ToolStatusCard("BUILD STATUS", "Waiting for runtime", "Build tools are resolved from the active file and workspace.", "Language toolchain · Not active", IdeAccent)
@@ -1958,7 +1959,9 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
                 }
             }
         }
-        Text("Preview only · runtime/compiler integration is not connected", color = Color(0xFFE5B978), fontSize = 10.sp)
+        if (selected != ToolPanel.Terminal) {
+            Text("Runtime/compiler integration is still being connected", color = Color(0xFFE5B978), fontSize = 10.sp)
+        }
     }
 }
 
