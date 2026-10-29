@@ -6,11 +6,11 @@ on:
       architectures:
         description: "Termux architecture names (comma-separated)"
         required: true
-        default: "aarch64"
+        default: "arm"
         type: choice
         options:
-          - aarch64
           - arm
+          - aarch64
           - i686
           - x86_64
 
@@ -45,6 +45,7 @@ jobs:
           grep -q 'TERMUX_APP__PACKAGE_NAME' termux-packages/scripts/properties.sh
           python3 - <<'PY'
           from pathlib import Path
+          import os
           import re
           p = Path("termux-packages/scripts/properties.sh")
           text = p.read_text()
@@ -54,7 +55,8 @@ jobs:
           old = matches[0].group(0)
           indent = re.match(r'^\s*', old).group(0)
           export = "export " if old.lstrip().startswith("export ") else ""
-          text = text[:matches[0].start()] + f'{indent}{export}TERMUX_APP__PACKAGE_NAME="{__import__("os").environ["CODE_STUDIO_PACKAGE"]}"' + text[matches[0].end():]
+          replacement = f'{indent}{export}TERMUX_APP__PACKAGE_NAME="{os.environ["CODE_STUDIO_PACKAGE"]}"'
+          text = text[:matches[0].start()] + replacement + text[matches[0].end():]
           p.write_text(text)
           print("Configured custom application package identity.")
           PY
@@ -67,6 +69,36 @@ jobs:
           # Force a clean rebuild: compiled paths may embed the package prefix.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ inputs.architectures }}" 2>&1 | tee ../bootstrap-build.log
 
+      - name: Validate archive structure before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="termux-packages/bootstrap-${{ inputs.architectures }}.zip"
+          test -s "$archive"
+          python3 - "$archive" "$CODE_STUDIO_PACKAGE" <<'PY'
+          import sys
+          import zipfile
+
+          archive, package = sys.argv[1:]
+          with zipfile.ZipFile(archive) as zf:
+              names = {name.rstrip("/") for name in zf.namelist()}
+              required = ("bin", "etc", "lib", "share")
+              missing = [path for path in required if not any(
+                  name == path or name.startswith(path + "/") for name in names
+              )]
+              if missing:
+                  raise SystemExit("Bootstrap missing required directories: " + ", ".join(missing))
+              if not any(name in names for name in ("bin/sh", "bin/bash")):
+                  raise SystemExit("Bootstrap archive has no bin/sh or bin/bash")
+              if "SYMLINKS.txt" not in names:
+                  raise SystemExit("Bootstrap archive is missing SYMLINKS.txt")
+              symlinks = zf.read("SYMLINKS.txt").decode("utf-8", errors="strict")
+              stock_prefix = "/data/data/com.termux/files/usr"
+              if stock_prefix in symlinks:
+                  raise SystemExit("Archive still references the stock Termux prefix")
+              print(f"Archive structure validated for {package}: {len(names)} entries")
+          PY
+
       - name: Create artifact manifest and checksums
         shell: bash
         run: |
@@ -75,7 +107,6 @@ jobs:
           arch="${{ inputs.architectures }}"
           test "$(printf '%s' "$arch" | tr ',' '\n' | wc -l)" -eq 1
           archive="termux-packages/bootstrap-$arch.zip"
-          test -s "$archive"
           cp "$archive" "dist/code-studio-bootstrap-$arch.zip"
           sha256sum "dist/code-studio-bootstrap-$arch.zip" > dist/SHA256SUMS
           cat > dist/manifest.json <<EOF
