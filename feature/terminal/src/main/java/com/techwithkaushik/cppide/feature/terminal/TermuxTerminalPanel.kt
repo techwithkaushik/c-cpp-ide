@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -52,9 +56,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val layout = remember(appContext) { RuntimeLayout.fromAppFilesDirectory(appContext.filesDir) }
+    var runtimeRefreshToken by remember(appContext) { mutableIntStateOf(0) }
     val runtimeStatus = produceState(
         initialValue = RuntimeStatus(false, "Checking the embedded runtime…"),
-        key1 = appContext
+        key1 = appContext,
+        key2 = runtimeRefreshToken
     ) {
         value = withContext(Dispatchers.IO) {
             try {
@@ -97,26 +103,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
         } else {
             runtimeStatus.message
         }
-        Box(
+        RuntimeSetupPanel(
+            message = message,
+            onRuntimeReady = { runtimeRefreshToken++ },
             modifier = modifier
-                .fillMaxSize()
-                .background(Color(0xFF0D1117))
-                .padding(18.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("Embedded terminal", color = Color(0xFF8CC8FF), fontSize = 14.sp)
-                Text(
-                    if (runtimeStatus.message.startsWith("Checking")) "Checking runtime" else "Terminal unavailable",
-                    color = Color(0xFFE8EDF5),
-                    fontSize = 13.sp
-                )
-                Text(message, color = Color(0xFF9AA7B5), fontSize = 11.sp)
-            }
-        }
+        )
         return
     }
 
