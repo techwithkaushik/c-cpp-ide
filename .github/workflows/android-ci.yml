@@ -47,6 +47,9 @@ jobs:
           :integrations:termux-upstream:termux-am-library:assembleDebug
           :integrations:termux-upstream:termux-shared:assembleDebug
 
+      - name: Run runtime installer tests
+        run: gradle --no-daemon :integrations:termux-runtime:testDebugUnitTest
+
       - name: Restore development signing key
         id: keystore
         uses: timheuer/base64-to-file@v2.0
