@@ -25,9 +25,9 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:aidl"))
 
-    // Keep this module self-contained until the upstream terminal sources are vendored
-    // from a reviewed, pinned Termux revision. Termux's app modules are not published
-    // as a public terminal-view Maven artifact.
+    // Use the upstream Termux terminal view + native PTY emulator, not a Compose mock.
+    // Version is pinned so native/JNI behavior remains reproducible in CI.
+    implementation("com.termux.termux-app:terminal-view:0.119.0-beta.3")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
