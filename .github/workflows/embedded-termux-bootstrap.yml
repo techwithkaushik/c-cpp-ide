@@ -1,6 +1,11 @@
 name: Build Code Studio Termux Bootstrap
 
 on:
+  # Keep this workflow available from the default branch and run when its definition changes.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/embedded-termux-bootstrap.yml"
   workflow_dispatch:
     inputs:
       architectures:
