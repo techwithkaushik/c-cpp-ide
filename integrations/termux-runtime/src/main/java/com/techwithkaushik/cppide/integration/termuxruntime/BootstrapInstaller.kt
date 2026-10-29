@@ -157,8 +157,10 @@ class BootstrapInstaller(
                     throw IOException("Malformed SYMLINKS.txt line ${index + 1}")
                 }
 
-                val rawTarget = line.substring(0, separator)
-                val rawLink = line.substring(separator + 1)
+                // Termux manifests use spaces around the Unicode arrow delimiter.
+                // Trim both sides before validating or resolving the paths.
+                val rawTarget = line.substring(0, separator).trim()
+                val rawLink = line.substring(separator + 1).trim()
                 val linkRelative = validateArchivePath(rawLink)
                 val linkInStage = File(staging, linkRelative)
                 val targetFile = if (rawTarget.startsWith("/")) {
