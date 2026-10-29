@@ -53,6 +53,27 @@ class BootstrapInstallerTest {
     }
 
     @Test
+    fun remapsUserZeroAliasAndTrimsManifestWhitespace() {
+        val userZeroPrefix = BootstrapInstaller.DEFAULT_BOOTSTRAP_PREFIX
+            .replace("/data/data/", "/data/user/0/")
+        val archive = createArchive(
+            "bin/sh" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+            "SYMLINKS.txt" to "  ${userZeroPrefix}/bin/sh   ←   bin/bash  \n",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        val result = BootstrapInstaller().install(archive, sha256(archive), prefix)
+
+        val bash = File(prefix, "bin/bash")
+        assertTrue(java.nio.file.Files.isSymbolicLink(bash.toPath()))
+        assertEquals("shell", bash.readText())
+        assertEquals(1, result.symlinksCreated)
+    }
+
+    @Test
     fun rejectsStockTermuxPrefixInsteadOfPretendingArchiveIsRelocatable() {
         val archive = createArchive(
             "bin/sh" to "shell",
