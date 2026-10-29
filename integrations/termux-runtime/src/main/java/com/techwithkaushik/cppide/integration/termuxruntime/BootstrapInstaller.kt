@@ -35,6 +35,7 @@ class BootstrapInstaller(
         archive: File,
         expectedSha256: String,
         prefixDirectory: File,
+        validateInstalledPrefix: ((File) -> Boolean)? = null,
     ): Result {
         require(archive.isFile) { "Bootstrap archive does not exist" }
         require(expectedSha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
@@ -134,6 +135,12 @@ class BootstrapInstaller(
                 if (backup.exists()) backup.renameTo(prefixDirectory)
                 throw IOException("Unable to promote staged runtime prefix")
             }
+            // Keep the previous runtime until the caller's executable smoke test passes.
+            // Validation runs only after promotion because Termux binaries may contain
+            // absolute paths compiled for the final app-private prefix.
+            if (validateInstalledPrefix != null && !validateInstalledPrefix(prefixDirectory)) {
+                throw IOException("Installed bootstrap failed runtime validation")
+            }
             promoted = true
             backup.deleteRecursively()
 
@@ -141,7 +148,16 @@ class BootstrapInstaller(
         } finally {
             if (!promoted) {
                 staging.deleteRecursively()
-                if (backup.exists() && !prefixDirectory.exists()) backup.renameTo(prefixDirectory)
+                // A failed post-promotion validation must remove the new tree before
+                // restoring the old one. If no old tree existed, remove the failed tree.
+                if (backup.exists()) {
+                    if (prefixDirectory.exists()) prefixDirectory.deleteRecursively()
+                    if (!backup.renameTo(prefixDirectory)) {
+                        throw IOException("Runtime validation failed and previous runtime could not be restored")
+                    }
+                } else if (prefixDirectory.exists()) {
+                    prefixDirectory.deleteRecursively()
+                }
             }
         }
     }
