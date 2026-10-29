@@ -13,6 +13,8 @@ android {
 }
 dependencies {
     implementation(project(":integrations:termux-upstream:terminal-view"))
+    implementation(project(":integrations:termux-upstream:terminal-emulator"))
+    implementation(project(":integrations:termux-upstream:termux-am-library"))
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.annotation:annotation:1.9.1")
     implementation("androidx.core:core:1.17.0")
@@ -23,6 +25,8 @@ dependencies {
     implementation("io.noties.markwon:linkify:4.6.2")
     implementation("io.noties.markwon:recycler:4.6.2")
     implementation("androidx.window:window:1.4.0")
-    implementation("commons-io:commons-io:2.19.0")
+    implementation("commons-io:commons-io:2.5")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    implementation("com.google.code.findbugs:jsr305:3.0.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
