@@ -24,12 +24,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: code-studio-bootstrap-${{ inputs.architectures }}
+  group: code-studio-bootstrap-${{ inputs.architectures || 'arm' }}
   cancel-in-progress: false
 
 jobs:
   bootstrap:
-    name: Build custom bootstrap (${{ inputs.architectures }})
+    name: Build custom bootstrap (${{ inputs.architectures || 'arm' }})
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
@@ -73,13 +73,13 @@ jobs:
           set -euo pipefail
           cd termux-packages
           # Force a clean rebuild: compiled paths may embed the package prefix.
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ inputs.architectures }}" 2>&1 | tee ../bootstrap-build.log
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ inputs.architectures || 'arm' }}" 2>&1 | tee ../bootstrap-build.log
 
       - name: Validate archive structure before publishing
         shell: bash
         run: |
           set -euo pipefail
-          archive="termux-packages/bootstrap-${{ inputs.architectures }}.zip"
+          archive="termux-packages/bootstrap-${{ inputs.architectures || 'arm' }}.zip"
           test -s "$archive"
           python3 - "$archive" "$CODE_STUDIO_PACKAGE" <<'PY'
           import sys
@@ -110,7 +110,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          arch="${{ inputs.architectures }}"
+          arch="${{ inputs.architectures || 'arm' }}"
           test "$(printf '%s' "$arch" | tr ',' '\n' | wc -l)" -eq 1
           archive="termux-packages/bootstrap-$arch.zip"
           cp "$archive" "dist/code-studio-bootstrap-$arch.zip"
@@ -134,7 +134,7 @@ jobs:
       - name: Upload bootstrap artifact for review
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-bootstrap-${{ inputs.architectures }}
+          name: code-studio-bootstrap-${{ inputs.architectures || 'arm' }}
           path: |
             dist/code-studio-bootstrap-*.zip
             dist/SHA256SUMS
