@@ -1,6 +1,12 @@
 name: Build Code Studio Termux Bootstrap
 
 on:
+  # Build the default ARM artifact when this workflow is first added or changed.
+  # This bootstrap workflow lives on main so workflow_dispatch is available.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/embedded-termux-bootstrap.yml"
   workflow_dispatch:
     inputs:
       architectures:
