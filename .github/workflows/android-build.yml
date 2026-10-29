@@ -43,7 +43,10 @@ jobs:
           :integrations:termux-upstream:termux-am-library:assembleDebug
           :integrations:termux-upstream:termux-shared:assembleDebug
 
-      - name: Run unit tests and assemble debug APK
+      - name: Run runtime installer tests
+        run: gradle --no-daemon :integrations:termux-runtime:testDebugUnitTest
+
+      - name: Run app unit tests and assemble debug APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 
       - name: Upload debug APK
