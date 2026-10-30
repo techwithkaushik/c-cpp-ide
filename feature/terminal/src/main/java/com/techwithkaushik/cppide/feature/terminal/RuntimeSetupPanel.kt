@@ -74,6 +74,11 @@ internal fun RuntimeSetupPanel(
                             val packageId = metadata.optString("applicationId")
                             if (packageId != context.packageName) {
                                 throw IOException("Bootstrap package identity mismatch")
+                            }                            if (!metadata.optBoolean("approvedForDistribution", false)) {
+                                throw IOException("This bootstrap has not passed package-identity audit and device smoke tests")
+                            }
+                            if (metadata.optString("prefix") != "/data/data/" + context.packageName + "/files/usr") {
+                                throw IOException("Bootstrap prefix does not match Code Studio")
                             }
                             val sha256 = metadata.optString("sha256")
                             if (!sha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
