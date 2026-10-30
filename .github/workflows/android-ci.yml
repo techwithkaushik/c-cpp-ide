@@ -150,7 +150,7 @@ jobs:
             # when its source tree is first extracted, so stale trees can silently
             # bypass the pinned 1.6.1 shebang fix and make ensurepip fail on all ABIs.
             find /home/builder/.termux-build -maxdepth 3 -type d \
-              \\( -name 'crossenv-1.6.1' -o -name 'python3.12-crossenv-prefix-*' \\) \
+              \( -name 'crossenv-1.6.1' -o -name 'python3.12-crossenv-prefix-*' \) \
               -prune -exec rm -rf {} +
             ./scripts/build-bootstraps.sh --architectures "${{ matrix.architecture }}"
           ' 2>&1 | tee ../bootstrap-build.log
