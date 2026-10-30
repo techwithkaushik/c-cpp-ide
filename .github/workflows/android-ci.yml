@@ -140,6 +140,11 @@ jobs:
             set -euo pipefail
             cd /home/builder/termux-packages
             . ./scripts/properties.sh
+            # The host-Python helper links a native Linux executable with clang-19.
+            # Minimal Termux builder images may lack the host CRT/development files,
+            # causing configure to report "C compiler cannot create executables".
+            sudo apt-get update
+            sudo apt-get install -y build-essential libc6-dev
             ./scripts/setup-android-sdk.sh
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
