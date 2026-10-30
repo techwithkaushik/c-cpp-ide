@@ -138,8 +138,9 @@ jobs:
           text = text.replace(old_cxx, 'CXX="clang++-21 -fuse-ld=lld"')
           p.write_text(text)
           PY
-          command -v clang-21
-          command -v clang++-21
+          # Do not probe clang-21 on the GitHub runner: this helper runs inside
+          # the Termux builder container, not on the host runner. The container
+          # image supplies LLVM 21; syntax validation is safe on either host.
           bash -n termux-packages/scripts/build/setup/termux_setup_build_python.sh
 
       - name: Restore cached bootstrap for this source and ABI
