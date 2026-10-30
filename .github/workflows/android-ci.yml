@@ -100,21 +100,16 @@ jobs:
             -o termux-packages/scripts/build/setup/python-crossenv-PYTHONPATH.patch
           curl --fail --location --retry 3 "$setup_base/python-crossenv-fix-shebang.patch" \
             -o termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
-          # The pinned build runner does not source this companion helper before
-          # termux_setup_python_pip.sh invokes its function. Load it explicitly.
+          # The upstream helper is a sourced shell fragment and may start with
+          # comments rather than a shebang. Prepend the companion function
+          # definition so it exists before termux_setup_python_pip uses it.
           python3 - <<'PY'
           from pathlib import Path
           p = Path("termux-packages/scripts/build/setup/termux_setup_python_pip.sh")
           text = p.read_text()
-          if not text.startswith("#!"):
-              raise SystemExit("Python pip helper has no shebang")
-          line_end = text.find("\n")
-          if line_end < 0:
-              raise SystemExit("Python pip helper has no first line")
           source_line = '. "$(dirname "${BASH_SOURCE[0]}")/termux_setup_build_python.sh"'
           if source_line not in text:
-              text = text[:line_end + 1] + source_line + "\n" + text[line_end + 1:]
-              p.write_text(text)
+              p.write_text(source_line + "\\n" + text)
           PY
           bash -n termux-packages/scripts/build/setup/termux_setup_python_pip.sh
           bash -n termux-packages/scripts/build/setup/termux_setup_build_python.sh
