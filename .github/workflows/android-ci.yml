@@ -46,6 +46,24 @@ jobs:
           ref: fb44d31f3445d7efd2cee6dada47aa19401c1329
           path: termux-packages
 
+      - name: Refresh checksum for re-generated upstream foot archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Codeberg re-generated the foot 1.23.1 source archive without changing
+          # the pinned package version. CI logs recorded this new SHA-256 from
+          # the downloaded archive; fail closed if the recipe has drifted.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("termux-packages/x11-packages/foot/build.sh")
+          text = p.read_text()
+          old = "TERMUX_PKG_SHA256=02072b8f0aaf26907b6b02293c875539ce52fc59079344e7cf811ab03394cfa3"
+          new = "TERMUX_PKG_SHA256=b3fa774983abb5f95aecca4557d146091d8666bc65fb310d4d3e38327357ade9"
+          if text.count(old) != 1:
+              raise SystemExit("Expected pinned foot 1.23.1 checksum was not found exactly once")
+          p.write_text(text.replace(old, new))
+          PY
+
       - name: Configure Code Studio package identity
         shell: bash
         run: |
@@ -71,7 +89,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v2
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v3
 
       - name: Build bootstrap with matching Android NDK
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
