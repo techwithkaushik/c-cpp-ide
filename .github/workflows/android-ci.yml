@@ -174,7 +174,7 @@ jobs:
                 "the build includes its bzip2 subpackage.")
           PY
 
-      - name: Build all four bootstrap architectures
+      - name: Build ARM32 bootstrap only
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
@@ -203,10 +203,10 @@ jobs:
             if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
               source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
             else
-              source="termux-packages/bootstrap-${upstream_arch}.zip"
+              source="$(find "$GITHUB_WORKSPACE/termux-packages" -type f -name "bootstrap-${upstream_arch}.zip" -print -quit)"
             fi
             destination="$root/$abi"
-            [[ -s "$source" ]] || { echo "::error::Missing generated bootstrap: $source"; exit 1; }
+            [[ -n "$source" && -s "$source" ]] || { echo "::error::Missing generated bootstrap for $abi ($upstream_arch); searched under $GITHUB_WORKSPACE/termux-packages"; find "$GITHUB_WORKSPACE/termux-packages" -maxdepth 4 -type f -name "*.zip" -print || true; exit 1; }
             mkdir -p "$destination"
             cp "$source" "$destination/bootstrap.zip"
             python3 - "$abi" "$destination/bootstrap.zip" "$CODE_STUDIO_PACKAGE" <<'PY'
@@ -242,7 +242,7 @@ jobs:
           if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != "true" ]]; then
             mkdir -p bootstrap-cache
             for arch in arm; do
-              install -m 0644 "termux-packages/bootstrap-${arch}.zip" "bootstrap-cache/bootstrap-${arch}.zip"
+              install -m 0644 "$root/armeabi-v7a/bootstrap.zip" "bootstrap-cache/bootstrap-arm.zip"
             done
           fi
           find "$root" -type f -maxdepth 2 -print
