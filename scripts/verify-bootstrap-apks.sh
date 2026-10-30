@@ -21,7 +21,7 @@ for flavor in arm32 arm64 x86 x64; do
     fail "$apk does not contain lib/$abi/libtermux-bootstrap.so"
   fi
   unzip -p "$apk" assets/bootstrap/bootstrap.json > "$temp/bootstrap.json" || fail "$apk does not contain bootstrap metadata"
-  python3 - "$abi" "$temp/libtermux-bootstrap.so" "$temp/bootstrap.json" <<'PY'
+  python3 - "$abi" "$temp/libtermux-bootstrap.so" "$temp/bootstrap.json" "$BUILD_TYPE" <<'PY'
 import json, pathlib, sys
 expected_abi, library, metadata, build_type = sys.argv[1:]
 binary = pathlib.Path(library).read_bytes()
