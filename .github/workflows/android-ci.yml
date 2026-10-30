@@ -203,10 +203,10 @@ jobs:
             if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
               source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
             else
-              source="$(find "$GITHUB_WORKSPACE/termux-packages" -type f -name "bootstrap-${upstream_arch}.zip" -print -quit)"
+              source="$(find "$GITHUB_WORKSPACE" -type f -name "bootstrap-${upstream_arch}.zip" -print -quit)"
             fi
             destination="$root/$abi"
-            [[ -n "$source" && -s "$source" ]] || { echo "::error::Missing generated bootstrap for $abi ($upstream_arch); searched under $GITHUB_WORKSPACE/termux-packages"; find "$GITHUB_WORKSPACE/termux-packages" -maxdepth 4 -type f -name "*.zip" -print || true; exit 1; }
+            [[ -n "$source" && -s "$source" ]] || { echo "::error::Missing generated bootstrap for $abi ($upstream_arch); searched under $GITHUB_WORKSPACE"; find "$GITHUB_WORKSPACE" -type f -name "bootstrap-*.zip" -print || true; exit 1; }
             mkdir -p "$destination"
             cp "$source" "$destination/bootstrap.zip"
             python3 - "$abi" "$destination/bootstrap.zip" "$CODE_STUDIO_PACKAGE" <<'PY'
