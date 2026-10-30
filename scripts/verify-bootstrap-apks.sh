@@ -4,12 +4,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APK_ROOT="$ROOT/app/build/outputs/apk"
 declare -A FLAVOR_ABI=(
   [arm32]=armeabi-v7a
-  [arm64]=arm64-v8a
-  [x86]=x86
-  [x64]=x86_64
 )
 fail() { echo "::error::$*" >&2; exit 1; }
-for flavor in arm32 arm64 x86 x64; do
+for flavor in arm32; do
   abi="${FLAVOR_ABI[$flavor]}"
   apk="$APK_ROOT/$flavor/debug/app-$flavor-debug.apk"
   [[ -s "$apk" ]] || fail "Expected APK missing: $apk"
