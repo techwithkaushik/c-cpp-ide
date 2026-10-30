@@ -101,7 +101,15 @@ jobs:
           new = "local _CROSSENV_VERSION=1.6.1"
           if text.count(old) != 1:
               raise SystemExit("Expected crossenv 1.4.0 declaration exactly once")
-          p.write_text(text.replace(old, new))
+          text = text.replace(old, new)
+          # GitHub regenerated the v1.6.1 source archive. The build log shows
+          # the archive's current SHA-256; update the pinned upstream checksum
+          # alongside the version, and fail if the expected old pin has drifted.
+          old_sha = "28da6260fafd85b05fa539793c45ef804c700a0bb71172fadef429796d49ac4e"
+          new_sha = "f85bfbfbfea3567427daa56693c28c75e69fb6ae78c508565f7ae54a26fe407d"
+          if text.count(old_sha) != 1:
+              raise SystemExit("Expected crossenv archive checksum was not found exactly once")
+          p.write_text(text.replace(old_sha, new_sha))
           PY
           # Include the upstream crossenv shebang fix from a fixed commit.
           curl --fail --location --retry 3 \
