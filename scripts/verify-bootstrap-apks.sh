@@ -16,35 +16,30 @@ for flavor in arm32 arm64 x86 x64; do
   apk="$APK_ROOT/$flavor/$BUILD_TYPE/app-$flavor-$BUILD_TYPE.apk"
   [[ -s "$apk" ]] || fail "Expected APK missing: $apk"
   temp="$(mktemp -d)"
-  if ! unzip -p "$apk" assets/bootstrap/bootstrap.zip > "$temp/bootstrap.zip"; then
-    rm -rf "$temp"
-    fail "$apk does not contain bundled bootstrap.zip"
+  trap 'rm -rf "$temp"' EXIT
+  if ! unzip -p "$apk" "lib/$abi/libtermux-bootstrap.so" > "$temp/libtermux-bootstrap.so"; then
+    fail "$apk does not contain lib/$abi/libtermux-bootstrap.so"
   fi
-  if ! unzip -p "$apk" assets/bootstrap/bootstrap.json > "$temp/bootstrap.json"; then
-    rm -rf "$temp"
-    fail "$apk does not contain bootstrap.json"
-  fi
-  python3 - "$abi" "$temp/bootstrap.zip" "$temp/bootstrap.json" <<'PY'
-import hashlib, json, pathlib, sys, zipfile
-expected_abi, archive, metadata = sys.argv[1:]
+  unzip -p "$apk" assets/bootstrap/bootstrap.json > "$temp/bootstrap.json" || fail "$apk does not contain bootstrap metadata"
+  python3 - "$abi" "$temp/libtermux-bootstrap.so" "$temp/bootstrap.json" <<'PY'
+import json, pathlib, sys
+expected_abi, library, metadata = sys.argv[1:]
+binary = pathlib.Path(library).read_bytes()
+if not binary.startswith(b"\\x7fELF"):
+    raise SystemExit(f"Embedded bootstrap library is not an ELF binary for {expected_abi}")
 data = json.loads(pathlib.Path(metadata).read_text(encoding="utf-8"))
 if data.get("abi") != expected_abi:
     raise SystemExit(f"APK ABI/bootstrap mismatch: expected {expected_abi}, got {data.get('abi')!r}")
-expected_hash = data.get("sha256", "")
-digest = hashlib.sha256()
-with open(archive, "rb") as stream:
-    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-        digest.update(chunk)
-actual_hash = digest.hexdigest()
-if actual_hash.lower() != expected_hash.lower():
-    raise SystemExit(f"Embedded bootstrap digest mismatch for {expected_abi}")
-try:
-    with zipfile.ZipFile(archive) as bundle:
-        if not bundle.infolist() or bundle.testzip() is not None:
-            raise SystemExit(f"Embedded bootstrap ZIP is empty or corrupt for {expected_abi}")
-except zipfile.BadZipFile as exc:
-    raise SystemExit(f"Embedded bootstrap is not a valid ZIP for {expected_abi}: {exc}")
-print(f"APK contains the verified {expected_abi} bootstrap ({data.get('version')})")
+if not isinstance(data.get("sha256"), str) or len(data["sha256"]) != 64:
+    raise SystemExit(f"APK bootstrap metadata has no SHA-256 for {expected_abi}")
+if len(binary) < 4096:
+    raise SystemExit(f"Native bootstrap library is suspiciously small for {expected_abi}")
+print(f"APK contains native bootstrap library for {expected_abi} ({data.get('version')}, {len(binary)} bytes)")
 PY
   rm -rf "$temp"
+  trap - EXIT
+  # The archive must be embedded in the native library, not duplicated as an APK asset.
+  if unzip -Z1 "$apk" | grep -q '^assets/bootstrap/bootstrap.zip$'; then
+    fail "$apk duplicates bootstrap.zip in assets; expected native embedding only"
+  fi
 done
