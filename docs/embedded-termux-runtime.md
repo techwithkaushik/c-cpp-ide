@@ -13,13 +13,11 @@ Code Studio must run its own app-private Termux-compatible runtime. It must not 
 
 ## Required implementation for Code Studio
 
-### Packaging model: follow AndroidIDE/Termux, not a bootstrap build on every APK build
+### Packaging model: automatic CI build, APK embedding, automatic first-run installation
 
-AndroidIDE follows the Termux packaging model: it consumes a prebuilt bootstrap ZIP, verifies its SHA-256 during the Android build, embeds the ZIP bytes into an ABI-specific native library using an assembly `.incbin`, and ships that library inside the APK. At first launch, the installer loads the native library for the device ABI and extracts the embedded ZIP into the app-private prefix. The bootstrap is not rebuilt as part of each normal APK build.
+AndroidIDE follows the Termux packaging model: Gradle downloads or consumes an ABI-matched bootstrap, verifies its SHA-256, embeds it into `libtermux-bootstrap.so`, and ships it inside the APK. When the runtime setup screen appears, Code Studio automatically verifies and extracts the embedded bootstrap into app-private storage, then runs a shell smoke test. The user does not build, download, select, or import a bootstrap manually.
 
-Code Studio should adopt that same packaging pattern, with one non-negotiable compatibility constraint: the archive must be built for `com.techwithkaushik.cppide` and the matching prefix. We must not embed AndroidIDE's own archive or stock Termux's archive and assume that rewriting `SYMLINKS.txt` fixes compiled-in paths.
-
-The custom package-specific bootstrap must be produced and audited once per supported ABI, then published as immutable versioned artifacts. Normal APK CI should only download the pinned artifacts, verify checksums, embed the matching ABI archive, build the APK, and fail closed if any required archive or checksum is missing. Bootstrap source-building belongs in a separate maintainer/provisioning operation only when intentionally upgrading the bootstrap—not in every APK CI run. Do not create a release checksum from an unverified archive.
+Code Studio cannot directly reuse AndroidIDE's bootstrap because the archive must match `com.techwithkaushik.cppide` and its compiled prefix. The Android CI pipeline therefore builds the four custom bootstraps from a pinned Termux packages commit in parallel, caches each result by source/package/architecture, validates the archive and creates a checksum manifest, then makes the release job wait for all four results. The release job downloads each generated artifact internally, verifies it, embeds only the matching ABI archive, and uploads each APK separately. No manual bootstrap provisioning step is required.
 
 ### Implementation steps
 
@@ -54,7 +52,7 @@ Generate and test bootstrap artifacts for each Android ABI that Code Studio offi
 
 - Native `.incbin` embedding, ABI-specific CMake input paths, JNI byte access, and setup-screen integration are implemented.
 - `scripts/prepare-bootstrap-assets.sh` validates package identity, prefix, ABI, version and SHA-256, then stages the ZIP for native embedding. Release packaging refuses artifacts that do not carry `approvedForDistribution: true`.
-- The bootstrap generation workflow emits `bootstrap.zip` plus `bootstrap.json`, but marks each result unapproved. A maintainer must audit the archive and successfully test shell execution on a device before setting that approval flag.
+- The terminal setup screen automatically installs the embedded bootstrap when shown and exposes a retry only if setup fails. The app validates package identity, ABI, prefix, checksum and then requires the shell smoke test to pass before marking the runtime ready.
 - For local debug/device smoke tests only, `BOOTSTRAP_ALLOW_UNAPPROVED=1` permits staging an unapproved artifact; release CI does not set this override. The debug setup UI permits installation of an unapproved artifact only in a debuggable build.
-- Android CI now has a separate synthetic-fixture job that compiles all four debug APK flavors and verifies their ABI-specific native libraries. These tiny fixture archives are packaging tests only; they are never uploaded as usable runtime APKs. The signed release job continues to require real, approved bootstrap artifacts.
+- Android CI retains a quick synthetic-fixture smoke job for native packaging, but those debug APKs are explicitly test fixtures, not usable runtime builds. The dependent release job builds and embeds real package-specific bootstrap archives automatically.
 - No package-compatible archive has yet been confirmed as approved, and native compilation plus on-device shell/compiler tests remain to be verified by CI and a real device. Do not treat vendored terminal UI modules or a successful APK build as proof of a working Linux runtime.
