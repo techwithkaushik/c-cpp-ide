@@ -87,7 +87,7 @@ jobs:
           :app:testX86DebugUnitTest
           :app:testX64DebugUnitTest
 
-  build-bootstrap:
+ build-bootstrap:
     name: 3 · Build and verify custom bootstrap for all ABIs
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -108,50 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
-          python3 - &1 | tee ../bootstrap-build.log
-
-      - name: Validate archives and generate pinned ABI metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          root="$GITHUB_WORKSPACE/bootstrap-artifacts"
-          mkdir -p "$root"
-          declare -A ARCH_MAP=(
-            [armeabi-v7a]=arm
-            [arm64-v8a]=aarch64
-            [x86]=i686
-            [x86_64]=x86_64
-          )
-          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
-            upstream_arch="${ARCH_MAP[$abi]}"
-            source="termux-packages/bootstrap-${upstream_arch}.zip"
-            destination="$root/$abi"
-            [[ -s "$source" ]] || { echo "::error::Missing generated bootstrap: $source"; exit 1; }
-            mkdir -p "$destination"
-            cp "$source" "$destination/bootstrap.zip"
-            python3 - "$abi" "$destination/bootstrap.zip" "$CODE_STUDIO_PACKAGE" <<'PY'
-          import pathlib, sys, zipfile
-          abi, archive, package = sys.argv[1:]
-          with zipfile.ZipFile(archive) as zf:
-              names = {name.rstrip("/") for name in zf.namelist()}
-              if not names:
-                  raise SystemExit(f"{archive}: empty archive")
-              if zf.testzip() is not None:
-                  raise SystemExit(f"{archive}: corrupt ZIP entry")
-              for required in ("bin", "etc", "lib", "share"):
-                  if not any(name == required or name.startswith(required + "/") for name in names):
-                      raise SystemExit(f"{archive}: missing {required}/")
-              if not any(name in names for name in ("bin/sh", "bin/bash")):
-                  raise SystemExit(f"{archive}: missing shell executable")
-              if "SYMLINKS.txt" not in names:
-                  raise SystemExit(f"{archive}: missing SYMLINKS.txt")
-              symlinks = zf.read("SYMLINKS.txt").decode("utf-8", errors="strict")
-              if "/data/data/com.termux/files/usr" in symlinks:
-                  raise SystemExit(f"{archive}: contains stock Termux prefix")
-              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries")
-          PY
-            sha="$(sha256sum "$destination/bootstrap.zip" | cut -d ' ' -f 1)"
-            cat > "$destination/bootstrap.json" <<EOF
+          python3 -  "$destination/bootstrap.json" <<EOF
           {
             "abi": "$abi",
             "version": "$BOOTSTRAP_VERSION",
