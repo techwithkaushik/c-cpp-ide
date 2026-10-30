@@ -52,13 +52,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Share Actions Java with the Termux builder container
+      - name: Make Actions Java available to the builder container
         shell: bash
         run: |
           set -euo pipefail
           test -x "$JAVA_HOME/bin/java"
-          echo "TERMUX_DOCKER_RUN_EXTRA_ARGS=$TERMUX_DOCKER_RUN_EXTRA_ARGS --volume $JAVA_HOME:/opt/github-actions-java:ro --env JAVA_HOME=/opt/github-actions-java" >> "$GITHUB_ENV"
-          echo "TERMUX_DOCKER_EXEC_EXTRA_ARGS=$TERMUX_DOCKER_EXEC_EXTRA_ARGS --volume $JAVA_HOME:/opt/github-actions-java:ro --env JAVA_HOME=/opt/github-actions-java" >> "$GITHUB_ENV"
+          mkdir -p termux-packages/.ci-java
+          cp -a "$JAVA_HOME/." termux-packages/.ci-java/
+          test -x termux-packages/.ci-java/bin/java
 
       - name: Refresh checksum for re-generated upstream foot archive
         shell: bash
@@ -170,7 +171,7 @@ jobs:
         run: |
           set -euo pipefail
           cd termux-packages
-          ./scripts/run-docker.sh bash -lc '
+          ./scripts/run-docker.sh env TERMUX_JAVA_HOME=/home/builder/termux-packages/.ci-java bash -lc '
             set -euo pipefail
             cd /home/builder/termux-packages
             . ./scripts/properties.sh
@@ -193,7 +194,7 @@ jobs:
               exit 1
             fi
             gcc --version
-            export JAVA_HOME=/opt/github-actions-java
+            test -x "$JAVA_HOME/bin/java"
             export PATH="$JAVA_HOME/bin:$PATH"
             java -version
             ./scripts/setup-android-sdk.sh
