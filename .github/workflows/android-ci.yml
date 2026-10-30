@@ -58,8 +58,10 @@ jobs:
           set -euo pipefail
           test -x "$JAVA_HOME/bin/java"
           mkdir -p termux-packages/.ci-java
-          cp -a "$JAVA_HOME/." termux-packages/.ci-java/
+          cp -aL "$JAVA_HOME/." termux-packages/.ci-java/
           test -x termux-packages/.ci-java/bin/java
+          test ! -L termux-packages/.ci-java/bin/java
+          termux-packages/.ci-java/bin/java -version
 
       - name: Point Termux Java configuration at the shared JDK
         shell: bash
