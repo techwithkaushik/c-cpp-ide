@@ -75,7 +75,8 @@ internal fun RuntimeSetupPanel(
                             val packageId = metadata.optString("applicationId")
                             if (packageId != context.packageName) {
                                 throw IOException("Bootstrap package identity mismatch")
-                            }                            if (!metadata.optBoolean("approvedForDistribution", false) &&
+                            }
+                            if (!metadata.optBoolean("approvedForDistribution", false) &&
                                 (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0
                             ) {
                                 throw IOException("This bootstrap is unapproved; release builds require package-identity audit and device smoke tests")
