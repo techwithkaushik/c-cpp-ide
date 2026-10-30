@@ -86,10 +86,10 @@ jobs:
 
       - name: Restore cached bootstrap for this source and ABI
         id: bootstrap-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v3
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v4
 
       - name: Build bootstrap with matching Android NDK
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
@@ -112,6 +112,9 @@ jobs:
             # the pinned Python 3.12 target package. Install it if the builder
             # image does not provide it.
             if ! command -v python3.12 >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y software-properties-common
+              sudo add-apt-repository -y ppa:deadsnakes/ppa
               sudo apt-get update
               sudo apt-get install -y python3.12
             fi
@@ -143,6 +146,17 @@ jobs:
               if z.testzip() is not None:
                   raise SystemExit("Bootstrap archive contains a corrupt entry")
           PY
+
+      # Save immediately after successful archive validation. The regular
+      # actions/cache post-job save is too late: later metadata/artifact steps
+      # can fail and discard an otherwise expensive, valid bootstrap build.
+      - name: Save validated bootstrap cache
+        if: steps.bootstrap-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v4
+
           mkdir -p dist
           cp "$archive" dist/bootstrap.zip
           sha256="$(sha256sum dist/bootstrap.zip | awk '{print $1}')"
