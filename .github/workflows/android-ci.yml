@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: termux/termux-packages
-          ref: ${{ env.TERMUX_PACKAGES_REF }}
+          ref: 21700256be43a0c8aae38bacecdac87c5ded4cc6
           path: termux-packages
 
       - name: Configure Code Studio package identity
@@ -245,7 +245,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ matrix.architecture }}-v1
+          key: code-studio-bootstrap-21700256be43a0c8aae38bacecdac87c5ded4cc6-com.techwithkaushik.cppide-${{ matrix.architecture }}-v1
 
       - name: Build bootstrap automatically when cache is missing
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
