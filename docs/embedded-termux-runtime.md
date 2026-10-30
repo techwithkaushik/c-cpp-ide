@@ -13,9 +13,20 @@ Code Studio must run its own app-private Termux-compatible runtime. It must not 
 
 ## Required implementation for Code Studio
 
-1. Build and publish a reproducible bootstrap for `com.techwithkaushik.cppide` from the Termux package build system. Include only the base packages required for shell/package management initially; install clang, Python and language tooling as optional packages.
-2. Pin the bootstrap release URL, version and SHA-256 in a dedicated runtime configuration file. Do not download an unpinned archive or trust a checksum fetched from the same untrusted location as the archive.
-3. Add an app-owned bootstrap installer that:
+### Packaging model: follow AndroidIDE/Termux, not a bootstrap build on every APK build
+
+AndroidIDE follows the Termux packaging model: it consumes a prebuilt bootstrap ZIP, verifies its SHA-256 during the Android build, embeds the ZIP bytes into an ABI-specific native library using an assembly `.incbin`, and ships that library inside the APK. At first launch, the installer loads the native library for the device ABI and extracts the embedded ZIP into the app-private prefix. The bootstrap is not rebuilt as part of each normal APK build.
+
+Code Studio should adopt that same packaging pattern, with one non-negotiable compatibility constraint: the archive must be built for `com.techwithkaushik.cppide` and the matching prefix. We must not embed AndroidIDE's own archive or stock Termux's archive and assume that rewriting `SYMLINKS.txt` fixes compiled-in paths.
+
+The custom package-specific bootstrap must be produced and audited once per supported ABI, then published as immutable versioned artifacts. Normal APK CI should only download the pinned artifacts, verify checksums, embed the matching ABI archive, build the APK, and fail closed if any required archive or checksum is missing. Bootstrap source-building belongs in a separate maintainer/provisioning operation only when intentionally upgrading the bootstrap—not in every APK CI run. Do not create a release checksum from an unverified archive.
+
+### Implementation steps
+
+1. Produce and publish a reproducible bootstrap for `com.techwithkaushik.cppide` from the Termux package build system. Include only the base packages required for shell/package management initially; install clang, Python and language tooling as optional packages.
+2. Pin each bootstrap release URL, version, upstream revision, target ABI and SHA-256 in a dedicated runtime configuration file. Do not download an unpinned archive or trust a checksum fetched from the same untrusted location as the archive.
+3. Add the AndroidIDE-style native embedding step: place each verified ZIP into the matching ABI's native build input, use `.incbin` to embed its bytes in a dedicated bootstrap shared library, and package only the matching library in each ABI APK. Ensure native-library extraction is enabled so the installer can access the library from `nativeLibraryDir`.
+4. Add an app-owned bootstrap installer that:
    - uses an app-private prefix under `filesDir`;
    - extracts into a staging directory and validates paths against zip-slip;
    - reads `SYMLINKS.txt` using the upstream format and recreates links safely;
