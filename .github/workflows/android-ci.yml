@@ -122,8 +122,10 @@ jobs:
           done
           grep -q 'local _CROSSENV_VERSION=1.6.1' \
             termux-packages/scripts/build/setup/termux_setup_python_pip.sh
-          # Use the image's native GCC only for host-Python configure; target
-          # packages continue using the configured Termux Clang/NDK toolchain.
+          # The resolute builder image provides LLVM 21. The upstream helper
+          # derives an older clang major from Termux metadata, which is not
+          # installed in this container; use the installed host LLVM explicitly.
+          # Keep this override scoped to the host-Python build only.
           python3 - <<'PY'
           from pathlib import Path
           p = Path("termux-packages/scripts/build/setup/termux_setup_build_python.sh")
@@ -132,9 +134,12 @@ jobs:
           old_cxx = 'CXX="clang++-${TERMUX_HOST_LLVM_MAJOR_VERSION} -fuse-ld=lld"'
           if text.count(old_cc) != 1 or text.count(old_cxx) != 1:
               raise SystemExit("Unexpected upstream host-Python compiler configuration")
-          text = text.replace(old_cc, 'CC="gcc"').replace(old_cxx, 'CXX="g++"')
+          text = text.replace(old_cc, 'CC="clang-21 -fuse-ld=lld"')
+          text = text.replace(old_cxx, 'CXX="clang++-21 -fuse-ld=lld"')
           p.write_text(text)
           PY
+          command -v clang-21
+          command -v clang++-21
           bash -n termux-packages/scripts/build/setup/termux_setup_build_python.sh
 
       - name: Restore cached bootstrap for this source and ABI
