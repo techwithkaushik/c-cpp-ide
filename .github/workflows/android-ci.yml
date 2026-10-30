@@ -16,6 +16,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-embedding-smoke:
+    name: Compile and verify native bootstrap embedding (synthetic fixtures)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create synthetic bootstrap fixtures
+        run: bash scripts/create-bootstrap-fixtures.sh
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Build all ABI debug APKs with synthetic fixtures
+        env:
+          BOOTSTRAP_ALLOW_UNAPPROVED: "1"
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Verify ABI-specific native libraries
+        env:
+          BUILD_TYPE: debug
+        run: bash scripts/verify-bootstrap-apks.sh
+
   release:
     name: Build signed release APK
     runs-on: ubuntu-latest
