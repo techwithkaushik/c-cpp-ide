@@ -160,18 +160,17 @@ jobs:
             set -euo pipefail
             cd /home/builder/termux-packages
             . ./scripts/properties.sh
-            # The pinned builder image can expose gcc wrappers without the
-            # GCC frontend (cc1) installed. Install and verify the complete
-            # native host toolchain inside the container before building Python.
+            # The Termux builder image intentionally holds its customized
+            # build-essential package. Do not request it again: apt would try
+            # to replace the image's GNU coreutils workaround and fail.
+            # Ensure the compiler packages are present without upgrading held
+            # packages, then verify the actual GCC frontend path.
             sudo apt-get update
-            sudo apt-get install -y build-essential gcc g++ libc6-dev
+            sudo apt-get install -y --no-install-recommends --no-upgrade gcc g++ libc6-dev
             command -v gcc
             command -v g++
             test -f /usr/include/stdio.h
-            cc1_path="$(gcc -print-prog-name=cc1)"
-            if [[ "$cc1_path" != /* ]]; then
-              cc1_path="$(command -v gcc | xargs dirname)/$cc1_path"
-            fi
+            cc1_path="$(gcc -print-file-name=cc1)"
             test -x "$cc1_path" || { echo "GCC frontend cc1 missing: $cc1_path" >&2; exit 1; }
             gcc --version
             ./scripts/setup-android-sdk.sh
