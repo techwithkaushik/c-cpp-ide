@@ -84,12 +84,37 @@ jobs:
           p.write_text(content[:matches[0].start()] + replacement + content[matches[0].end():])
           PY
 
+      - name: Update crossenv for Python 3.12 cross-builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper="termux-packages/scripts/build/setup/termux_setup_python_pip.sh"
+          test -f "$helper"
+          # The pinned package snapshot still uses crossenv 1.4.0. Use the
+          # upstream 1.6.1 release, which supports the current Python build flow.
+          python3 - "$helper" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(sys.argv[1])
+          text = p.read_text()
+          old = "local _CROSSENV_VERSION=1.4.0"
+          new = "local _CROSSENV_VERSION=1.6.1"
+          if text.count(old) != 1:
+              raise SystemExit("Expected crossenv 1.4.0 declaration exactly once")
+          p.write_text(text.replace(old, new))
+          PY
+          # Include the upstream crossenv shebang fix from a fixed commit.
+          curl --fail --location --retry 3 \
+            "https://raw.githubusercontent.com/termux/termux-packages/de5945d396/scripts/build/setup/python-crossenv-fix-shebang.patch" \
+            -o termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
+          test -s termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
+
       - name: Restore cached bootstrap for this source and ABI
         id: bootstrap-cache
         uses: actions/cache/restore@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v5
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v6
 
       - name: Build bootstrap with matching Android NDK
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
@@ -174,7 +199,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v5
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v6
 
       - name: Upload generated ABI bootstrap for APK packaging
         uses: actions/upload-artifact@v4
