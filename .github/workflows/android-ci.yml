@@ -46,6 +46,20 @@ jobs:
           ref: fb44d31f3445d7efd2cee6dada47aa19401c1329
           path: termux-packages
 
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Share Actions Java with the Termux builder container
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$JAVA_HOME/bin/java"
+          echo "TERMUX_DOCKER_RUN_EXTRA_ARGS=$TERMUX_DOCKER_RUN_EXTRA_ARGS --volume $JAVA_HOME:/opt/github-actions-java:ro --env JAVA_HOME=/opt/github-actions-java" >> "$GITHUB_ENV"
+          echo "TERMUX_DOCKER_EXEC_EXTRA_ARGS=$TERMUX_DOCKER_EXEC_EXTRA_ARGS --volume $JAVA_HOME:/opt/github-actions-java:ro --env JAVA_HOME=/opt/github-actions-java" >> "$GITHUB_ENV"
+
       - name: Refresh checksum for re-generated upstream foot archive
         shell: bash
         run: |
@@ -179,21 +193,9 @@ jobs:
               exit 1
             fi
             gcc --version
-            gcc -v -x c -fsyntax-only /dev/null
-            # Always derive JAVA_HOME from Java inside this container. The
-            # inherited JAVA_HOME can point at a non-existent Ubuntu OpenJDK
-            # path, while the builder image actually provides Temurin Java.
-            java_cmd="$(command -v java || true)"
-            if [[ -z "$java_cmd" ]]; then
-              echo "No Java executable is available inside the Termux builder container" >&2
-              find /usr/lib/jvm /opt -maxdepth 5 -type f -path '*/bin/java' -print 2>/dev/null || true
-              exit 1
-            fi
-            resolved_java="$(readlink -f "$java_cmd")"
-            export JAVA_HOME="$(dirname "$(dirname "$resolved_java")")"
-            echo "Resolved container JAVA_HOME=$JAVA_HOME (java=$resolved_java)"
-            test -x "$JAVA_HOME/bin/java"
-            "$JAVA_HOME/bin/java" -version
+            export JAVA_HOME=/opt/github-actions-java
+            export PATH="$JAVA_HOME/bin:$PATH"
+            java -version
             ./scripts/setup-android-sdk.sh
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
