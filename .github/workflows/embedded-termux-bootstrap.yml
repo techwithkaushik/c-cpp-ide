@@ -132,6 +132,7 @@ jobs:
             "sha256": "$sha256",
             "upstreamRepository": "https://github.com/termux/termux-packages",
             "upstreamCommit": "$TERMUX_PACKAGES_REF",
+            "approvedForDistribution": false,
             "status": "CI artifact only; not yet approved for app distribution or device execution"
           }
           EOF
