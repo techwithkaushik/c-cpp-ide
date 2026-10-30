@@ -111,10 +111,17 @@ jobs:
               raise SystemExit("Expected crossenv archive checksum was not found exactly once")
           p.write_text(text.replace(old_sha, new_sha))
           PY
-          # Include the upstream crossenv shebang fix from a fixed commit.
-          curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/termux/termux-packages/de5945d396/scripts/build/setup/python-crossenv-fix-shebang.patch" \
+          # Keep both crossenv patches aligned with v1.6.1. The pinned
+          # Termux snapshot carries the old v1.4.0 PYTHONPATH patch, whose
+          # pywrapper hunk no longer matches crossenv v1.6.1 and aborts gpgv.
+          # These patch files are taken from the immutable upstream commit that
+          # introduced the v1.6.1 helper update.
+          patch_base="https://raw.githubusercontent.com/termux/termux-packages/de5945d396bd69eab05877cd4ccf19077e4f3950/scripts/build/setup"
+          curl --fail --location --retry 3 "$patch_base/python-crossenv-PYTHONPATH.patch" \
+            -o termux-packages/scripts/build/setup/python-crossenv-PYTHONPATH.patch
+          curl --fail --location --retry 3 "$patch_base/python-crossenv-fix-shebang.patch" \
             -o termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
+          test -s termux-packages/scripts/build/setup/python-crossenv-PYTHONPATH.patch
           test -s termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
 
       - name: Restore cached bootstrap for this source and ABI
