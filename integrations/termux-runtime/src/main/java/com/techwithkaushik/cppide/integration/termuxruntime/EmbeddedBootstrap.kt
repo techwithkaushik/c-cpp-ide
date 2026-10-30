@@ -7,8 +7,8 @@ import java.security.MessageDigest
 
 /**
  * Accesses the ZIP bytes embedded in this APK's ABI-specific libtermux-bootstrap.so.
- * The archive is generated once by the pinned bootstrap workflow, then checksum
- * verified and embedded during the app build; it is not rebuilt by normal APK CI.
+ * The archive is generated automatically by the dependent CI bootstrap job, then checksum
+ * verified and embedded into the ABI-specific APK.
  */
 object EmbeddedBootstrap {
     init {
