@@ -42,6 +42,10 @@ if len(binary) < 4096:
     raise SystemExit(f"Native bootstrap library is suspiciously small for {expected_abi}")
 print(f"APK contains native bootstrap library for {expected_abi} ({data.get('version')}, {len(binary)} bytes)")
 PY
+  unzip -Z1 "$apk" > "$temp/apk-entries.txt"
+  if grep -Fxq 'assets/bootstrap/bootstrap.zip' "$temp/apk-entries.txt"; then
+    fail "$apk duplicates bootstrap.zip in assets; expected native embedding only"
+  fi
   rm -rf "$temp"
   trap - EXIT
 done
