@@ -36,8 +36,8 @@ jobs:
       TERMUX_PACKAGES_REF: 21700256be43a0c8aae38bacecdac87c5ded4cc6
       CODE_STUDIO_PACKAGE: com.techwithkaushik.cppide
       # Ensure the builder container sees the app identity before its startup cleanup.
-      TERMUX_DOCKER_RUN_EXTRA_ARGS: --env TERMUX_APP__PACKAGE_NAME=com.techwithkaushik.cppide --env TERMUX_APP_PACKAGE=com.techwithkaushik.cppide --env TERMUX__ROOTFS=/data/data/com.techwithkaushik.cppide/files/usr --env TERMUX__PREFIX=/data/data/com.techwithkaushik.cppide/files/usr
-      TERMUX_DOCKER_EXEC_EXTRA_ARGS: --env TERMUX_APP__PACKAGE_NAME=com.techwithkaushik.cppide --env TERMUX_APP_PACKAGE=com.techwithkaushik.cppide --env TERMUX__ROOTFS=/data/data/com.techwithkaushik.cppide/files/usr --env TERMUX__PREFIX=/data/data/com.techwithkaushik.cppide/files/usr
+      TERMUX_DOCKER_RUN_EXTRA_ARGS: --env TERMUX_APP__PACKAGE_NAME=com.techwithkaushik.cppide --env TERMUX_APP_PACKAGE=com.techwithkaushik.cppide --env TERMUX__ROOTFS=/data/data/com.techwithkaushik.cppide/files --env TERMUX__PREFIX=/data/data/com.techwithkaushik.cppide/files/usr
+      TERMUX_DOCKER_EXEC_EXTRA_ARGS: --env TERMUX_APP__PACKAGE_NAME=com.techwithkaushik.cppide --env TERMUX_APP_PACKAGE=com.techwithkaushik.cppide --env TERMUX__ROOTFS=/data/data/com.techwithkaushik.cppide/files --env TERMUX__PREFIX=/data/data/com.techwithkaushik.cppide/files/usr
     steps:
       - name: Checkout pinned Termux packages source
         uses: actions/checkout@v4
