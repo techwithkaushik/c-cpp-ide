@@ -108,14 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
-          python3 - &1 pipe and correctly targeted PIPESTATUS for tracking
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
-            --architectures "arm,aarch64,i686,x86_64" 2>&1 | tee ../bootstrap-build.log
-          
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "::error::Bootstrap accumulation build phase failed!"
-            exit 1
-          fi
+          python3 - &1 | tee ../bootstrap-build.log
 
       - name: Validate archives and generate pinned ABI metadata
         shell: bash
