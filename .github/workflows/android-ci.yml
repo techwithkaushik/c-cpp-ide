@@ -187,6 +187,7 @@ jobs:
           # force-clean path can expand an unset per-architecture cache path to /*.
           # A clean runner already guarantees that no stale package cache is reused.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
+            --prebuild \
             --architectures "arm,aarch64,i686,x86_64" 2>&1 | tee ../bootstrap-build.log
 
       - name: Validate archives and generate pinned ABI metadata
