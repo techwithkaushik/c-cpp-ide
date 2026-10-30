@@ -180,21 +180,18 @@ jobs:
             fi
             gcc --version
             gcc -v -x c -fsyntax-only /dev/null
-            # run-docker.sh can forward the GitHub runner's JAVA_HOME into
-            # the builder container, where that host-only path does not exist.
-            # Resolve Java from inside the container before invoking sdkmanager.
-            if [[ -n "${JAVA_HOME:-}" && ! -x "${JAVA_HOME}/bin/java" ]]; then
-              java_cmd="$(command -v java || true)"
-              if [[ -n "$java_cmd" ]]; then
-                resolved_java="$(readlink -f "$java_cmd")"
-                export JAVA_HOME="$(dirname "$(dirname "$resolved_java")")"
-                echo "Corrected container JAVA_HOME=$JAVA_HOME"
-              else
-                echo "JAVA_HOME is invalid and no Java executable is on PATH" >&2
-                find /usr/lib/jvm -maxdepth 3 -type f -path '*/bin/java' -print 2>/dev/null || true
-                exit 1
-              fi
+            # Always derive JAVA_HOME from Java inside this container. The
+            # inherited JAVA_HOME can point at a non-existent Ubuntu OpenJDK
+            # path, while the builder image actually provides Temurin Java.
+            java_cmd="$(command -v java || true)"
+            if [[ -z "$java_cmd" ]]; then
+              echo "No Java executable is available inside the Termux builder container" >&2
+              find /usr/lib/jvm /opt -maxdepth 5 -type f -path '*/bin/java' -print 2>/dev/null || true
+              exit 1
             fi
+            resolved_java="$(readlink -f "$java_cmd")"
+            export JAVA_HOME="$(dirname "$(dirname "$resolved_java")")"
+            echo "Resolved container JAVA_HOME=$JAVA_HOME (java=$resolved_java)"
             test -x "$JAVA_HOME/bin/java"
             "$JAVA_HOME/bin/java" -version
             ./scripts/setup-android-sdk.sh
