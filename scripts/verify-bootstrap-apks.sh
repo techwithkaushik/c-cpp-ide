@@ -2,6 +2,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APK_ROOT="$ROOT/app/build/outputs/apk"
+BUILD_TYPE="${BUILD_TYPE:-debug}"
+[[ "$BUILD_TYPE" =~ ^(debug|release)$ ]] || { echo "::error::Unsupported BUILD_TYPE: $BUILD_TYPE" >&2; exit 1; }
 declare -A FLAVOR_ABI=(
   [arm32]=armeabi-v7a
   [arm64]=arm64-v8a
@@ -11,7 +13,7 @@ declare -A FLAVOR_ABI=(
 fail() { echo "::error::$*" >&2; exit 1; }
 for flavor in arm32 arm64 x86 x64; do
   abi="${FLAVOR_ABI[$flavor]}"
-  apk="$APK_ROOT/$flavor/debug/app-$flavor-debug.apk"
+  apk="$APK_ROOT/$flavor/$BUILD_TYPE/app-$flavor-$BUILD_TYPE.apk"
   [[ -s "$apk" ]] || fail "Expected APK missing: $apk"
   temp="$(mktemp -d)"
   if ! unzip -p "$apk" assets/bootstrap/bootstrap.zip > "$temp/bootstrap.zip"; then
