@@ -65,7 +65,6 @@ PY
   mkdir -p "$native_destination" "$asset_destination"
   install -m 0644 "$archive" "$native_destination/bootstrap.zip"
   install -m 0644 "$metadata" "$asset_destination/bootstrap.json"
-  continue
 
 
 
