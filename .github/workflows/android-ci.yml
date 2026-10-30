@@ -79,7 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           cd termux-packages
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ matrix.architecture }}" 2>&1 | tee ../bootstrap-build.log
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh --no-build-unneeded-subpackages --architectures "${{ matrix.architecture }}" 2>&1 | tee ../bootstrap-build.log
 
       - name: Validate bootstrap and create metadata
         shell: bash
