@@ -109,7 +109,7 @@ jobs:
           text = p.read_text()
           source_line = '. "$(dirname "${BASH_SOURCE[0]}")/termux_setup_build_python.sh"'
           if source_line not in text:
-              p.write_text(source_line + "\\n" + text)
+              p.write_text(source_line + "\n" + text)
           PY
           bash -n termux-packages/scripts/build/setup/termux_setup_python_pip.sh
           bash -n termux-packages/scripts/build/setup/termux_setup_build_python.sh
