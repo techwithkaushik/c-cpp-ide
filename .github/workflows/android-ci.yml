@@ -108,7 +108,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}-${{ runner.os }}
 
       - name: Checkout pinned Termux packages source
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
