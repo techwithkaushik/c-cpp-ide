@@ -18,7 +18,7 @@ val prepareBootstrapAssets by tasks.registering(Exec::class) {
 }
 
 tasks.configureEach {
-    if (name.startsWith("configureCMake")) dependsOn(prepareBootstrapAssets)
+    if (name.startsWith("configureCMake") || (name.startsWith("merge") && name.contains("Assets"))) dependsOn(prepareBootstrapAssets)
 }
 
 android {
