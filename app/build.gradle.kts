@@ -6,6 +6,21 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+val bootstrapZipPaths = mapOf(
+    "arm32" to layout.buildDirectory.file("generated/bootstrapAssets/arm32/bootstrap/bootstrap.zip").get().asFile.absolutePath,
+    "arm64" to layout.buildDirectory.file("generated/bootstrapAssets/arm64/bootstrap/bootstrap.zip").get().asFile.absolutePath,
+    "x86" to layout.buildDirectory.file("generated/bootstrapAssets/x86/bootstrap/bootstrap.zip").get().asFile.absolutePath,
+    "x64" to layout.buildDirectory.file("generated/bootstrapAssets/x64/bootstrap/bootstrap.zip").get().asFile.absolutePath,
+)
+
+val prepareBootstrapAssets by tasks.registering(Exec::class) {
+    commandLine("bash", rootProject.file("scripts/prepare-bootstrap-assets.sh").absolutePath)
+}
+
+tasks.configureEach {
+    if (name.startsWith("configureCMake")) dependsOn(prepareBootstrapAssets)
+}
+
 android {
     namespace = "com.techwithkaushik.cppide"
     compileSdk = 36
@@ -43,25 +58,25 @@ android {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "armeabi-v7a" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"armeabi-v7a\"")
-            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/arm32/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=" + bootstrapZipPaths.getValue("arm32") } }
         }
         create("arm64") {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "arm64-v8a" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"arm64-v8a\"")
-            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/arm64/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=" + bootstrapZipPaths.getValue("arm64") } }
         }
         create("x86") {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "x86" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"x86\"")
-            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/x86/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=" + bootstrapZipPaths.getValue("x86") } }
         }
         create("x64") {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "x86_64" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"x86_64\"")
-            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/x64/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=" + bootstrapZipPaths.getValue("x64") } }
         }
     }
 
