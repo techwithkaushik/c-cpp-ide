@@ -89,7 +89,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v4
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v5
 
       - name: Build bootstrap with matching Android NDK
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
@@ -120,7 +120,7 @@ jobs:
             fi
             command -v python3.12
             python3.12 --version
-            ./scripts/build-bootstraps.sh --no-build-unneeded-subpackages --architectures "${{ matrix.architecture }}"
+            ./scripts/build-bootstraps.sh --architectures "${{ matrix.architecture }}"
           ' 2>&1 | tee ../bootstrap-build.log
 
       - name: Validate bootstrap and create metadata
@@ -174,7 +174,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v4
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v5
 
       - name: Upload generated ABI bootstrap for APK packaging
         uses: actions/upload-artifact@v4
