@@ -9,11 +9,12 @@ on:
   workflow_dispatch:
     inputs:
       architectures:
-        description: "Termux architecture names (comma-separated)"
+        description: "Build all architectures or one selected Termux architecture"
         required: true
-        default: "arm"
+        default: "all"
         type: choice
         options:
+          - all
           - arm
           - aarch64
           - i686
@@ -23,12 +24,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: code-studio-bootstrap-${{ inputs.architectures || 'arm' }}
+  group: code-studio-bootstrap-${{ inputs.architectures || 'all' }}
   cancel-in-progress: false
 
 jobs:
   bootstrap:
-    name: Build custom bootstrap (${{ inputs.architectures || 'arm' }})
+    name: Build custom bootstrap (${{ matrix.architecture }})
+    if: ${{ inputs.architectures == 'all' || inputs.architectures == '' || inputs.architectures == matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [arm, aarch64, i686, x86_64]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
@@ -72,13 +78,13 @@ jobs:
           set -euo pipefail
           cd termux-packages
           # Force a clean rebuild: compiled paths may embed the package prefix.
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ inputs.architectures || 'arm' }}" 2>&1 | tee ../bootstrap-build.log
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh -f --architectures "${{ matrix.architecture }}" 2>&1 | tee ../bootstrap-build.log
 
       - name: Validate archive structure before publishing
         shell: bash
         run: |
           set -euo pipefail
-          archive="termux-packages/bootstrap-${{ inputs.architectures || 'arm' }}.zip"
+          archive="termux-packages/bootstrap-${{ matrix.architecture }}.zip"
           test -s "$archive"
           python3 - "$archive" "$CODE_STUDIO_PACKAGE" <<'PY'
           import sys
@@ -109,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          arch="${{ inputs.architectures || 'arm' }}"
+          arch="${{ matrix.architecture }}"
           case "$arch" in
             arm) abi="armeabi-v7a" ;;
             aarch64) abi="arm64-v8a" ;;
@@ -143,7 +149,7 @@ jobs:
       - name: Upload bootstrap ZIP for review
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-bootstrap-zip-${{ inputs.architectures || 'arm' }}
+          name: code-studio-bootstrap-zip-${{ matrix.architecture }}
           path: dist/bootstrap.zip
           if-no-files-found: error
           retention-days: 7
@@ -151,7 +157,7 @@ jobs:
       - name: Upload bootstrap metadata JSON
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-bootstrap-metadata-${{ inputs.architectures || 'arm' }}
+          name: code-studio-bootstrap-metadata-${{ matrix.architecture }}
           path: dist/bootstrap.json
           if-no-files-found: error
           retention-days: 7
@@ -159,7 +165,7 @@ jobs:
       - name: Upload bootstrap checksum
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-bootstrap-checksum-${{ inputs.architectures || 'arm' }}
+          name: code-studio-bootstrap-checksum-${{ matrix.architecture }}
           path: dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 7
@@ -167,7 +173,7 @@ jobs:
       - name: Upload bootstrap build log
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-bootstrap-log-${{ inputs.architectures || 'arm' }}
+          name: code-studio-bootstrap-log-${{ matrix.architecture }}
           path: bootstrap-build.log
           if-no-files-found: error
           retention-days: 7
