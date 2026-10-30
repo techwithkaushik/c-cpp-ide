@@ -110,24 +110,33 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           arch="${{ inputs.architectures || 'arm' }}"
-          test "$(printf '%s' "$arch" | tr ',' '\n' | wc -l)" -eq 1
+          case "$arch" in
+            arm) abi="armeabi-v7a" ;;
+            aarch64) abi="arm64-v8a" ;;
+            i686) abi="x86" ;;
+            x86_64) abi="x86_64" ;;
+            *) echo "::error::Unsupported Termux architecture: $arch"; exit 1 ;;
+          esac
           archive="termux-packages/bootstrap-$arch.zip"
-          cp "$archive" "dist/code-studio-bootstrap-$arch.zip"
-          sha256sum "dist/code-studio-bootstrap-$arch.zip" > dist/SHA256SUMS
-          cat > dist/manifest.json <<EOF
+          test -s "$archive"
+          cp "$archive" dist/bootstrap.zip
+          sha256="$(sha256sum dist/bootstrap.zip | awk '{print $1}')"
+          cat > dist/bootstrap.json <<EOF
           {
             "schemaVersion": 1,
             "applicationId": "$CODE_STUDIO_PACKAGE",
+            "prefix": "/data/data/$CODE_STUDIO_PACKAGE/files/usr",
+            "abi": "$abi",
+            "architecture": "$arch",
+            "version": "termux-packages-$TERMUX_PACKAGES_REF",
+            "sha256": "$sha256",
             "upstreamRepository": "https://github.com/termux/termux-packages",
             "upstreamCommit": "$TERMUX_PACKAGES_REF",
-            "architecture": "$arch",
-            "archive": "code-studio-bootstrap-$arch.zip",
-            "sha256File": "SHA256SUMS",
-            "generatedBy": "Build Code Studio Termux Bootstrap workflow",
             "status": "CI artifact only; not yet approved for app distribution or device execution"
           }
           EOF
-          cat dist/manifest.json
+          cat dist/bootstrap.json
+          echo "$sha256  bootstrap.zip" > dist/SHA256SUMS
           cat dist/SHA256SUMS
 
       - name: Upload bootstrap artifact for review
@@ -135,9 +144,9 @@ jobs:
         with:
           name: code-studio-bootstrap-${{ inputs.architectures || 'arm' }}
           path: |
-            dist/code-studio-bootstrap-*.zip
+            dist/bootstrap.zip
             dist/SHA256SUMS
-            dist/manifest.json
+            dist/bootstrap.json
             bootstrap-build.log
           if-no-files-found: error
           retention-days: 7
