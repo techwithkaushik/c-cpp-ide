@@ -7,10 +7,10 @@ plugins {
 }
 
 val bootstrapZipPaths = mapOf(
-    "arm32" to layout.buildDirectory.file("generated/bootstrapAssets/arm32/bootstrap/bootstrap.zip").get().asFile.absolutePath,
-    "arm64" to layout.buildDirectory.file("generated/bootstrapAssets/arm64/bootstrap/bootstrap.zip").get().asFile.absolutePath,
-    "x86" to layout.buildDirectory.file("generated/bootstrapAssets/x86/bootstrap/bootstrap.zip").get().asFile.absolutePath,
-    "x64" to layout.buildDirectory.file("generated/bootstrapAssets/x64/bootstrap/bootstrap.zip").get().asFile.absolutePath,
+    "arm32" to layout.buildDirectory.file("generated/bootstrapNative/arm32/bootstrap.zip").get().asFile.absolutePath,
+    "arm64" to layout.buildDirectory.file("generated/bootstrapNative/arm64/bootstrap.zip").get().asFile.absolutePath,
+    "x86" to layout.buildDirectory.file("generated/bootstrapNative/x86/bootstrap.zip").get().asFile.absolutePath,
+    "x64" to layout.buildDirectory.file("generated/bootstrapNative/x64/bootstrap.zip").get().asFile.absolutePath,
 )
 
 val prepareBootstrapAssets by tasks.registering(Exec::class) {
