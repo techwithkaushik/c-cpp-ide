@@ -122,6 +122,20 @@ jobs:
           done
           grep -q 'local _CROSSENV_VERSION=1.6.1' \
             termux-packages/scripts/build/setup/termux_setup_python_pip.sh
+          # Use the image's native GCC only for host-Python configure; target
+          # packages continue using the configured Termux Clang/NDK toolchain.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("termux-packages/scripts/build/setup/termux_setup_build_python.sh")
+          text = p.read_text()
+          old_cc = 'CC="clang-${TERMUX_HOST_LLVM_MAJOR_VERSION} -fuse-ld=lld"'
+          old_cxx = 'CXX="clang++-${TERMUX_HOST_LLVM_MAJOR_VERSION} -fuse-ld=lld"'
+          if text.count(old_cc) != 1 or text.count(old_cxx) != 1:
+              raise SystemExit("Unexpected upstream host-Python compiler configuration")
+          text = text.replace(old_cc, 'CC="gcc"').replace(old_cxx, 'CXX="g++"')
+          p.write_text(text)
+          PY
+          bash -n termux-packages/scripts/build/setup/termux_setup_build_python.sh
 
       - name: Restore cached bootstrap for this source and ABI
         id: bootstrap-cache
@@ -140,11 +154,12 @@ jobs:
             set -euo pipefail
             cd /home/builder/termux-packages
             . ./scripts/properties.sh
-            # The host-Python helper links a native Linux executable with clang-19.
-            # Minimal Termux builder images may lack the host CRT/development files,
-            # causing configure to report "C compiler cannot create executables".
-            sudo apt-get update
-            sudo apt-get install -y build-essential libc6-dev
+            # The builder image already provides GCC and libc development files.
+            # Keep host Python on the native compiler; clang-19/lld cannot link
+            # the host executable in this pinned package-builder image.
+            command -v gcc
+            command -v g++
+            test -f /usr/include/stdio.h
             ./scripts/setup-android-sdk.sh
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
