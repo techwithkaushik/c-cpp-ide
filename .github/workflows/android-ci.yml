@@ -108,12 +108,12 @@ jobs:
           text = p.read_text()
           if not text.startswith("#!"):
               raise SystemExit("Python pip helper has no shebang")
-          line_end = text.find("\\n")
+          line_end = text.find("\n")
           if line_end < 0:
               raise SystemExit("Python pip helper has no first line")
           source_line = '. "$(dirname "${BASH_SOURCE[0]}")/termux_setup_build_python.sh"'
           if source_line not in text:
-              text = text[:line_end + 1] + source_line + "\\n" + text[line_end + 1:]
+              text = text[:line_end + 1] + source_line + "\n" + text[line_end + 1:]
               p.write_text(text)
           PY
           bash -n termux-packages/scripts/build/setup/termux_setup_python_pip.sh
