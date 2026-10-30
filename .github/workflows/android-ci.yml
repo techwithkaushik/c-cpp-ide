@@ -170,8 +170,17 @@ jobs:
                   "Stop instead of silently building an incomplete bootstrap."
               )
           script.write_text(source.replace(old, new, 1), encoding="utf-8")
-          print("Mapped bootstrap dependency bzip2 to source package libbz2; "
-                "the build includes its bzip2 subpackage.")
+
+          # The mounted checkout is not reliably writable by the container's
+          # builder UID on GitHub-hosted runners. Keep build inputs in the
+          # checkout, but export the finished ZIP to the container's /tmp.
+          archive_move = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" "$TERMUX_PACKAGES_DIRECTORY/"'
+          archive_export = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" "/tmp/bootstrap-${1}.zip"'
+          source = script.read_text(encoding="utf-8")
+          if source.count(archive_move) != 1:
+              raise SystemExit("Expected exactly one upstream bootstrap archive move; refusing unsafe patch.")
+          script.write_text(source.replace(archive_move, archive_export, 1), encoding="utf-8")
+          print("Mapped bzip2 dependency and redirected bootstrap ZIP output to writable container /tmp.")
           PY
 
       - name: Build ARM32 bootstrap only
@@ -185,15 +194,10 @@ jobs:
           # A clean runner already guarantees that no stale package cache is reused.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
             --architectures "arm" 2>&1 | tee ../bootstrap-build.log
-          # The upstream script writes the archive inside its Docker-mounted
-          # checkout. Copy it explicitly from the container as a fallback so
-          # CI does not silently lose the output when mount paths differ.
-          if [[ ! -s bootstrap-arm.zip ]]; then
-            docker cp termux-package-builder:/home/builder/termux-packages/bootstrap-arm.zip \
-              "$GITHUB_WORKSPACE/bootstrap-arm.zip"
-          else
-            install -m 0644 bootstrap-arm.zip "$GITHUB_WORKSPACE/bootstrap-arm.zip"
-          fi
+          # Archive output is redirected to writable container /tmp above;
+          # never depend on the mounted checkout being writable by builder.
+          docker cp termux-package-builder:/tmp/bootstrap-arm.zip \
+            "$GITHUB_WORKSPACE/bootstrap-arm.zip"
           test -s "$GITHUB_WORKSPACE/bootstrap-arm.zip"
 
       - name: Validate archives and generate pinned ABI metadata
