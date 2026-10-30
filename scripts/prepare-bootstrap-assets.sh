@@ -7,14 +7,11 @@ OUTPUT_ROOT="$ROOT/app/build/generated/bootstrapAssets"
 
 declare -A FLAVOR_ABI=(
   [arm32]=armeabi-v7a
-  [arm64]=arm64-v8a
-  [x86]=x86
-  [x64]=x86_64
 )
 
 fail() { echo "::error::$*" >&2; exit 1; }
 
-for flavor in arm32 arm64 x86 x64; do
+for flavor in arm32; do
   abi="${FLAVOR_ABI[$flavor]}"
   source_dir="$ARTIFACT_ROOT/$abi"
   archive="$source_dir/bootstrap.zip"
@@ -65,4 +62,4 @@ PY
   install -m 0644 "$metadata" "$destination/bootstrap.json"
 done
 
-echo "Prepared four ABI-specific bootstrap asset sets."
+echo "Prepared ARM32 (armeabi-v7a) bootstrap assets."
