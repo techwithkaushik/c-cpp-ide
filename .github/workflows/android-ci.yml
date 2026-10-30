@@ -8,6 +8,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      bootstrap_mode:
+        description: "Use cached prebuilt bootstrap archives or rebuild from source"
+        type: choice
+        options:
+          - prebuild
+          - source
+        default: prebuild
+        required: true
 
 permissions:
   contents: read
@@ -96,7 +105,16 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
+      - name: Restore prebuilt bootstrap archives
+        id: bootstrap-cache
+        if: ${{ inputs.bootstrap_mode != 'source' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: bootstrap-cache
+          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+
       - name: Checkout pinned Termux packages source
+        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
         uses: actions/checkout@v4
         with:
           repository: termux/termux-packages
@@ -104,6 +122,7 @@ jobs:
           path: termux-packages
 
       - name: Verify pinned source and configure app package identity
+        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -130,6 +149,7 @@ jobs:
           PY
 
       - name: Adapt pinned upstream bootstrap package names
+        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -158,6 +178,7 @@ jobs:
           PY
 
       - name: Build all four bootstrap architectures
+        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -174,6 +195,9 @@ jobs:
           set -euo pipefail
           root="$GITHUB_WORKSPACE/bootstrap-artifacts"
           mkdir -p "$root"
+          if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
+            echo "Using verified-source prebuilt bootstrap archives from Actions cache."
+          fi
           declare -A ARCH_MAP=(
             [armeabi-v7a]=arm
             [arm64-v8a]=aarch64
@@ -182,7 +206,11 @@ jobs:
           )
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             upstream_arch="${ARCH_MAP[$abi]}"
-            source="termux-packages/bootstrap-${upstream_arch}.zip"
+            if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
+              source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
+            else
+              source="termux-packages/bootstrap-${upstream_arch}.zip"
+            fi
             destination="$root/$abi"
             [[ -s "$source" ]] || { echo "::error::Missing generated bootstrap: $source"; exit 1; }
             mkdir -p "$destination"
@@ -217,7 +245,20 @@ jobs:
           }
           EOF
           done
+          if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != "true" ]]; then
+            mkdir -p bootstrap-cache
+            for arch in arm aarch64 i686 x86_64; do
+              install -m 0644 "termux-packages/bootstrap-${arch}.zip" "bootstrap-cache/bootstrap-${arch}.zip"
+            done
+          fi
           find "$root" -type f -maxdepth 2 -print
+
+      - name: Save prebuilt bootstrap archives for future CI runs
+        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: bootstrap-cache
+          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Upload verified ABI bootstrap artifacts
         uses: actions/upload-artifact@v4
