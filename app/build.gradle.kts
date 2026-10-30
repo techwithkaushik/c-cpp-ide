@@ -16,6 +16,24 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        externalNativeBuild {
+            cmake { cppFlags += "-std=c++20" }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    // The bootstrap archive is embedded in libtermux-bootstrap.so. Extract native
+    // libraries on install so the installer can load it from nativeLibraryDir.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     // Each distributable APK contains only native libraries and bootstrap data for one ABI.
@@ -25,21 +43,25 @@ android {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "armeabi-v7a" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"armeabi-v7a\"")
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/arm32/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
         }
         create("arm64") {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "arm64-v8a" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"arm64-v8a\"")
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/arm64/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
         }
         create("x86") {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "x86" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"x86\"")
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/x86/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
         }
         create("x64") {
             dimension = "bootstrapAbi"
             ndk { abiFilters += "x86_64" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"x86_64\"")
+            externalNativeBuild { cmake { arguments += "-DBOOTSTRAP_ZIP_PATH=${layout.buildDirectory.file(\"generated/bootstrapAssets/x64/bootstrap/bootstrap.zip\").get().asFile.absolutePath}" } }
         }
     }
 
