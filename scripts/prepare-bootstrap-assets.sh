@@ -39,6 +39,8 @@ if data.get("applicationId") != "com.techwithkaushik.cppide":
     raise SystemExit(f"{metadata}: applicationId must be com.techwithkaushik.cppide")
 if data.get("prefix") != "/data/data/com.techwithkaushik.cppide/files/usr":
     raise SystemExit(f"{metadata}: bootstrap prefix does not match Code Studio")
+if data.get("approvedForDistribution") is not True:
+    raise SystemExit(f"{metadata}: bootstrap has not passed package-identity audit and device smoke tests")
 version = data.get("version")
 if not isinstance(version, str) or not version.strip() or len(version) > 64:
     raise SystemExit(f"{metadata}: missing or invalid version")
