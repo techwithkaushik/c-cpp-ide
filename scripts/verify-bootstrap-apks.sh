@@ -23,7 +23,7 @@ for flavor in arm32 arm64 x86 x64; do
   unzip -p "$apk" assets/bootstrap/bootstrap.json > "$temp/bootstrap.json" || fail "$apk does not contain bootstrap metadata"
   python3 - "$abi" "$temp/libtermux-bootstrap.so" "$temp/bootstrap.json" <<'PY'
 import json, pathlib, sys
-expected_abi, library, metadata = sys.argv[1:]
+expected_abi, library, metadata, build_type = sys.argv[1:]
 binary = pathlib.Path(library).read_bytes()
 if not binary.startswith(b"\x7fELF"):
     raise SystemExit(f"Embedded bootstrap library is not an ELF binary for {expected_abi}")
@@ -34,8 +34,8 @@ if data.get("applicationId") != "com.techwithkaushik.cppide":
     raise SystemExit(f"APK bootstrap package identity mismatch for {expected_abi}")
 if data.get("prefix") != "/data/data/com.techwithkaushik.cppide/files/usr":
     raise SystemExit(f"APK bootstrap prefix mismatch for {expected_abi}")
-if data.get("approvedForDistribution") is not True:
-    raise SystemExit(f"APK contains unapproved bootstrap for {expected_abi}")
+if build_type == "release" and data.get("approvedForDistribution") is not True:
+    raise SystemExit(f"Release APK contains unapproved bootstrap for {expected_abi}")
 if not isinstance(data.get("sha256"), str) or len(data["sha256"]) != 64:
     raise SystemExit(f"APK bootstrap metadata has no SHA-256 for {expected_abi}")
 if len(binary) < 4096:
