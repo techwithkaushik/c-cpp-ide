@@ -108,6 +108,15 @@ jobs:
             ./scripts/setup-android-sdk.sh
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
+            # Python 3.12 is required as a HOST interpreter when building
+            # the pinned Python 3.12 target package. Install it if the builder
+            # image does not provide it.
+            if ! command -v python3.12 >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y python3.12
+            fi
+            command -v python3.12
+            python3.12 --version
             ./scripts/build-bootstraps.sh --no-build-unneeded-subpackages --architectures "${{ matrix.architecture }}"
           ' 2>&1 | tee ../bootstrap-build.log
 
