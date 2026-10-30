@@ -84,45 +84,31 @@ jobs:
           p.write_text(content[:matches[0].start()] + replacement + content[matches[0].end():])
           PY
 
-      - name: Update crossenv for Python 3.12 cross-builds
+      - name: Align Python cross-build helpers with upstream Termux
         shell: bash
         run: |
           set -euo pipefail
-          helper="termux-packages/scripts/build/setup/termux_setup_python_pip.sh"
-          test -f "$helper"
-          # The pinned package snapshot still uses crossenv 1.4.0. Use the
-          # upstream 1.6.1 release, which supports the current Python build flow.
-          python3 - "$helper" <<'PY'
-          from pathlib import Path
-          import sys
-          p = Path(sys.argv[1])
-          text = p.read_text()
-          old = "local _CROSSENV_VERSION=1.4.0"
-          new = "local _CROSSENV_VERSION=1.6.1"
-          if text.count(old) != 1:
-              raise SystemExit("Expected crossenv 1.4.0 declaration exactly once")
-          text = text.replace(old, new)
-          # GitHub regenerated the v1.6.1 source archive. The build log shows
-          # the archive's current SHA-256; update the pinned upstream checksum
-          # alongside the version, and fail if the expected old pin has drifted.
-          old_sha = "28da6260fafd85b05fa539793c45ef804c700a0bb71172fadef429796d49ac4e"
-          new_sha = "f85bfbfbfea3567427daa56693c28c75e69fb6ae78c508565f7ae54a26fe407d"
-          if text.count(old_sha) != 1:
-              raise SystemExit("Expected crossenv archive checksum was not found exactly once")
-          p.write_text(text.replace(old_sha, new_sha))
-          PY
-          # Keep both crossenv patches aligned with v1.6.1. The pinned
-          # Termux snapshot carries the old v1.4.0 PYTHONPATH patch, whose
-          # pywrapper hunk no longer matches crossenv v1.6.1 and aborts gpgv.
-          # These patch files are taken from the immutable upstream commit that
-          # introduced the v1.6.1 helper update.
-          patch_base="https://raw.githubusercontent.com/termux/termux-packages/de5945d396bd69eab05877cd4ccf19077e4f3950/scripts/build/setup"
-          curl --fail --location --retry 3 "$patch_base/python-crossenv-PYTHONPATH.patch" \
+          # Use the complete, matching upstream helper pair rather than
+          # editing an older helper in place. crossenv 1.6.1 requires both
+          # patches and the companion host-Python setup logic from this commit.
+          setup_base="https://raw.githubusercontent.com/termux/termux-packages/de5945d396bd69eab05877cd4ccf19077e4f3950/scripts/build/setup"
+          curl --fail --location --retry 3 "$setup_base/termux_setup_python_pip.sh" \
+            -o termux-packages/scripts/build/setup/termux_setup_python_pip.sh
+          curl --fail --location --retry 3 "$setup_base/termux_setup_build_python.sh" \
+            -o termux-packages/scripts/build/setup/termux_setup_build_python.sh
+          curl --fail --location --retry 3 "$setup_base/python-crossenv-PYTHONPATH.patch" \
             -o termux-packages/scripts/build/setup/python-crossenv-PYTHONPATH.patch
-          curl --fail --location --retry 3 "$patch_base/python-crossenv-fix-shebang.patch" \
+          curl --fail --location --retry 3 "$setup_base/python-crossenv-fix-shebang.patch" \
             -o termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
-          test -s termux-packages/scripts/build/setup/python-crossenv-PYTHONPATH.patch
-          test -s termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch
+          for file in \
+            termux-packages/scripts/build/setup/termux_setup_python_pip.sh \
+            termux-packages/scripts/build/setup/termux_setup_build_python.sh \
+            termux-packages/scripts/build/setup/python-crossenv-PYTHONPATH.patch \
+            termux-packages/scripts/build/setup/python-crossenv-fix-shebang.patch; do
+            test -s "$file"
+          done
+          grep -q 'local _CROSSENV_VERSION=1.6.1' \
+            termux-packages/scripts/build/setup/termux_setup_python_pip.sh
 
       - name: Restore cached bootstrap for this source and ABI
         id: bootstrap-cache
