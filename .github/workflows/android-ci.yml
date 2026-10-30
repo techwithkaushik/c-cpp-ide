@@ -122,10 +122,6 @@ jobs:
         run: |
           set -euo pipefail
           cd termux-packages
-          # The pinned infra-improvs source requires NDK r28c. The published
-          # package-builder image may contain an older NDK, so install the exact
-          # SDK/NDK version declared by scripts/properties.sh inside the container
-          # before attempting to compile packages.
           ./scripts/run-docker.sh bash -lc '
             set -euo pipefail
             cd /home/builder/termux-packages
@@ -134,8 +130,7 @@ jobs:
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
             # Python 3.12 is required as a HOST interpreter when building
-            # the pinned Python 3.12 target package. Install it if the builder
-            # image does not provide it.
+            # the pinned Python 3.12 target package. Install it if absent.
             if ! command -v python3.12 >/dev/null 2>&1; then
               sudo apt-get update
               sudo apt-get install -y software-properties-common
@@ -145,13 +140,17 @@ jobs:
             fi
             command -v python3.12
             python3.12 --version
-            # The builder image may retain a crossenv source tree and generated
-            # cross-prefix from an older build. crossenv patches are applied only
-            # when its source tree is first extracted, so stale trees can silently
-            # bypass the pinned 1.6.1 shebang fix and make ensurepip fail on all ABIs.
-            find /home/builder/.termux-build -maxdepth 3 -type d \
-              \( -name 'crossenv-1.6.1' -o -name 'python3.12-crossenv-prefix-*' \) \
-              -prune -exec rm -rf {} +
+            # A fresh builder may not have this directory at all. Only clean
+            # stale crossenv trees when the cache root exists; find on a missing
+            # root exits 1 under set -e and used to abort every ABI build.
+            cache_root=/home/builder/.termux-build
+            if [[ -d "$cache_root" ]]; then
+              find "$cache_root" -maxdepth 3 -type d \
+                \( -name "crossenv-1.6.1" -o -name "python3.12-crossenv-prefix-*" \) \
+                -prune -exec rm -rf {} +
+            else
+              echo "No existing Termux build cache; skipping stale crossenv cleanup."
+            fi
             ./scripts/build-bootstraps.sh --architectures "${{ matrix.architecture }}"
           ' 2>&1 | tee ../bootstrap-build.log
 
@@ -199,8 +198,8 @@ jobs:
           EOF
           cat dist/bootstrap.json
 
-      # Save after the archive has been validated. Unlike cache's implicit
-      # post-job save, this persists the expensive build before later steps run.
+      # Save only after validation. A cache hit skips rebuilding and reuses the
+      # previously validated archive for this exact upstream source and ABI.
       - name: Save validated bootstrap cache
         if: steps.bootstrap-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -357,14 +356,6 @@ jobs:
           retention-days: 14
 
       - name: Upload x86 release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-studio-release-x86
-          path: app/build/outputs/apk/x86/release/app-x86-release.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload x86_64 release APK
         uses: actions/upload-artifact@v4
         with:
           name: code-studio-release-x86_64
