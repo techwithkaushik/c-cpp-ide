@@ -25,7 +25,7 @@ for flavor in arm32 arm64 x86 x64; do
 import json, pathlib, sys
 expected_abi, library, metadata = sys.argv[1:]
 binary = pathlib.Path(library).read_bytes()
-if not binary.startswith(b"\\x7fELF"):
+if not binary.startswith(b"\x7fELF"):
     raise SystemExit(f"Embedded bootstrap library is not an ELF binary for {expected_abi}")
 data = json.loads(pathlib.Path(metadata).read_text(encoding="utf-8"))
 if data.get("abi") != expected_abi:
@@ -39,7 +39,8 @@ PY
   rm -rf "$temp"
   trap - EXIT
   # The archive must be embedded in the native library, not duplicated as an APK asset.
-  if unzip -Z1 "$apk" | grep -q '^assets/bootstrap/bootstrap.zip$'; then
+  unzip -Z1 "$apk" > "$temp/apk-entries.txt"
+  if grep -Fxq 'assets/bootstrap/bootstrap.zip' "$temp/apk-entries.txt"; then
     fail "$apk duplicates bootstrap.zip in assets; expected native embedding only"
   fi
 done
