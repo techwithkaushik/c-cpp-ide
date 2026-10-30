@@ -140,14 +140,34 @@ jobs:
           echo "$sha256  bootstrap.zip" > dist/SHA256SUMS
           cat dist/SHA256SUMS
 
-      - name: Upload bootstrap artifact for review
+      - name: Upload bootstrap ZIP for review
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-bootstrap-${{ inputs.architectures || 'arm' }}
-          path: |
-            dist/bootstrap.zip
-            dist/SHA256SUMS
-            dist/bootstrap.json
-            bootstrap-build.log
+          name: code-studio-bootstrap-zip-${{ inputs.architectures || 'arm' }}
+          path: dist/bootstrap.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload bootstrap metadata JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-bootstrap-metadata-${{ inputs.architectures || 'arm' }}
+          path: dist/bootstrap.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload bootstrap checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-bootstrap-checksum-${{ inputs.architectures || 'arm' }}
+          path: dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload bootstrap build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-bootstrap-log-${{ inputs.architectures || 'arm' }}
+          path: bootstrap-build.log
           if-no-files-found: error
           retention-days: 7
