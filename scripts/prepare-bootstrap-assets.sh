@@ -40,7 +40,10 @@ if data.get("applicationId") != "com.techwithkaushik.cppide":
 if data.get("prefix") != "/data/data/com.techwithkaushik.cppide/files/usr":
     raise SystemExit(f"{metadata}: bootstrap prefix does not match Code Studio")
 if data.get("approvedForDistribution") is not True:
-    raise SystemExit(f"{metadata}: bootstrap has not passed package-identity audit and device smoke tests")
+    import os
+    if os.environ.get("BOOTSTRAP_ALLOW_UNAPPROVED") != "1":
+        raise SystemExit(f"{metadata}: bootstrap has not passed package-identity audit and device smoke tests; set BOOTSTRAP_ALLOW_UNAPPROVED=1 only for local debug/device testing")
+    print(f"WARNING: allowing unapproved {abi} bootstrap for local debug testing only", file=sys.stderr)
 version = data.get("version")
 if not isinstance(version, str) or not version.strip() or len(version) > 64:
     raise SystemExit(f"{metadata}: missing or invalid version")
