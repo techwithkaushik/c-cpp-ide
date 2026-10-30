@@ -147,16 +147,6 @@ jobs:
                   raise SystemExit("Bootstrap archive contains a corrupt entry")
           PY
 
-      # Save immediately after successful archive validation. The regular
-      # actions/cache post-job save is too late: later metadata/artifact steps
-      # can fail and discard an otherwise expensive, valid bootstrap build.
-      - name: Save validated bootstrap cache
-        if: steps.bootstrap-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
-          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v4
-
           mkdir -p dist
           cp "$archive" dist/bootstrap.zip
           sha256="$(sha256sum dist/bootstrap.zip | awk '{print $1}')"
@@ -176,6 +166,15 @@ jobs:
           }
           EOF
           cat dist/bootstrap.json
+
+      # Save after the archive has been validated. Unlike cache's implicit
+      # post-job save, this persists the expensive build before later steps run.
+      - name: Save validated bootstrap cache
+        if: steps.bootstrap-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: termux-packages/bootstrap-${{ matrix.architecture }}.zip
+          key: code-studio-bootstrap-fb44d31f3445d7efd2cee6dada47aa19401c1329-com.techwithkaushik.cppide-${{ matrix.architecture }}-v4
 
       - name: Upload generated ABI bootstrap for APK packaging
         uses: actions/upload-artifact@v4
