@@ -166,19 +166,20 @@ jobs:
             # Ensure the compiler packages are present without upgrading held
             # packages, then verify the actual GCC frontend path.
             sudo apt-get update
-            # Install the versioned Ubuntu compiler and frontend explicitly.
-            # Keep --no-upgrade so the builder's held packages remain untouched.
-            sudo apt-get install -y --no-install-recommends --no-upgrade gcc-13 g++-13 cpp-13 libc6-dev
-            command -v gcc-13
-            command -v g++-13
+            # Use the compiler supplied by the Termux builder image. Its
+            # default GCC is the supported host toolchain; a gcc-13 wrapper
+            # may exist without the GCC 13 frontend being installed.
+            command -v gcc
+            command -v g++
             test -f /usr/include/stdio.h
-            cc1_path="$(gcc-13 -print-file-name=cc1)"
-            if [[ "$cc1_path" == "cc1" || ! -x "$cc1_path" ]]; then
-              echo "GCC 13 frontend cc1 missing: $cc1_path" >&2
+            cc1_path="$(gcc -print-prog-name=cc1)"
+            if [[ ! -x "$cc1_path" ]]; then
+              echo "GCC frontend is not executable: $cc1_path" >&2
               find /usr/lib/gcc -type f -name cc1 -print
               exit 1
             fi
-            gcc-13 --version
+            gcc --version
+            gcc -v -x c -fsyntax-only /dev/null
             ./scripts/setup-android-sdk.sh
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
