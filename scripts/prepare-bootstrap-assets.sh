@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARTIFACT_ROOT="${BOOTSTRAP_ARTIFACTS_DIR:-$ROOT/bootstrap-artifacts}"
-OUTPUT_ROOT="$ROOT/app/build/generated/bootstrapAssets"
+ASSET_OUTPUT_ROOT="$ROOT/app/build/generated/bootstrapAssets"
+NATIVE_OUTPUT_ROOT="$ROOT/app/build/generated/bootstrapNative"
 
 declare -A FLAVOR_ABI=(
   [arm32]=armeabi-v7a
@@ -59,10 +60,15 @@ except zipfile.BadZipFile as exc:
 print(f"Validated {abi} bootstrap {version}: sha256={actual}")
 PY
 
-  destination="$OUTPUT_ROOT/$flavor/bootstrap"
-  mkdir -p "$destination"
-  install -m 0644 "$archive" "$destination/bootstrap.zip"
-  install -m 0644 "$metadata" "$destination/bootstrap.json"
+  native_destination="$NATIVE_OUTPUT_ROOT/$flavor"
+  asset_destination="$ASSET_OUTPUT_ROOT/$flavor/bootstrap"
+  mkdir -p "$native_destination" "$asset_destination"
+  install -m 0644 "$archive" "$native_destination/bootstrap.zip"
+  install -m 0644 "$metadata" "$asset_destination/bootstrap.json"
+  continue
+
+
+
 done
 
-echo "Prepared four ABI-specific bootstrap asset sets."
+echo "Prepared four ABI-specific native bootstrap inputs and metadata assets."
