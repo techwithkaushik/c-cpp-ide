@@ -86,6 +86,7 @@ jobs:
           ./scripts/run-docker.sh bash -lc '
             set -euo pipefail
             cd /home/builder/termux-packages
+            . ./scripts/properties.sh
             ./scripts/setup-android-sdk.sh
             test -d "$NDK"
             grep -q "Pkg.Revision = 28" "$NDK/source.properties"
