@@ -108,65 +108,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-
-          path = Path("termux-packages/scripts/properties.sh")
-          text = path.read_text(encoding="utf-8")
-          matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP__PACKAGE_NAME\s*=.*$', text))
-          if len(matches) != 1:
-              raise SystemExit(
-                  f"Expected exactly one TERMUX_APP__PACKAGE_NAME assignment; found {len(matches)}. "
-                  "Upstream changed; stop and review instead of building an incorrectly prefixed runtime."
-              )
-          old = matches[0].group(0)
-          indent = re.match(r'^\s*', old).group(0)
-          export = "export " if old.lstrip().startswith("export ") else ""
-          replacement = f'{indent}{export}TERMUX_APP__PACKAGE_NAME="{os.environ["CODE_STUDIO_PACKAGE"]}"'
-          path.write_text(text[:matches[0].start()] + replacement + text[matches[0].end():], encoding="utf-8")
-          print(f"Configured custom package identity: {os.environ['CODE_STUDIO_PACKAGE']}")
-          PY
-
-      - name: Adapt pinned upstream bootstrap package names
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          script = Path("termux-packages/scripts/build-bootstraps.sh")
-          source = script.read_text(encoding="utf-8")
-          old = 'PACKAGES+=("bzip2")'
-          new = 'PACKAGES+=("libbz2")'
-          package_dir = Path("termux-packages/packages/libbz2/bzip2.subpackage.sh")
-          if not package_dir.is_file():
-              raise SystemExit(
-                  "Pinned Termux source layout changed: expected "
-                  "packages/libbz2/bzip2.subpackage.sh. Stop and review upstream."
-              )
-          count = source.count(old)
-          if count != 1:
-              raise SystemExit(
-                  f"Expected exactly one {old!r} in build-bootstraps.sh, found {count}. "
-                  "Stop instead of silently building an incomplete bootstrap."
-              )
-          script.write_text(source.replace(old, new, 1), encoding="utf-8")
-          print("Mapped bootstrap dependency bzip2 to source package libbz2; "
-                "the build includes its bzip2 subpackage.")
-          PY
-
-      - name: Build all four bootstrap architectures
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd termux-packages
-          # This is a fresh runner/container, so do not pass -f: the upstream
-          # force-clean path can expand an unset per-architecture cache path to /*.
-          # A clean runner already guarantees that no stale package cache is reused.
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
-            --architectures "arm,aarch64,i686,x86_64" 2>&1 | tee ../bootstrap-build.log
+          python3 - &1 | tee ../bootstrap-build.log
+          
+          # Explicit safety check for pipeline error states
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "::error::Bootstrap accumulation build phase failed!"
+            exit 1
+          fi
 
       - name: Validate archives and generate pinned ABI metadata
         shell: bash
@@ -272,9 +220,9 @@ jobs:
         with:
           name: code-studio-abi-debug-apks
           path: |
-            app/build/outputs/apk/arm32/debug/*.apk
-            app/build/outputs/apk/arm64/debug/*.apk
-            app/build/outputs/apk/x86/debug/*.apk
-            app/build/outputs/apk/x64/debug/*.apk
+            app/build/outputs/apk/arm32/debug/.apk
+            app/build/outputs/apk/arm64/debug/.apk
+            app/build/outputs/apk/x86/debug/.apk
+            app/build/outputs/apk/x64/debug/.apk
           if-no-files-found: error
           retention-days: 14
