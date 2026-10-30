@@ -39,11 +39,11 @@ if data.get("applicationId") != "com.techwithkaushik.cppide":
     raise SystemExit(f"{metadata}: applicationId must be com.techwithkaushik.cppide")
 if data.get("prefix") != "/data/data/com.techwithkaushik.cppide/files/usr":
     raise SystemExit(f"{metadata}: bootstrap prefix does not match Code Studio")
-if data.get("approvedForDistribution") is not True:
+if data.get("validatedByCI") is not True:
     import os
     if os.environ.get("BOOTSTRAP_ALLOW_UNAPPROVED") != "1":
-        raise SystemExit(f"{metadata}: bootstrap has not passed package-identity audit and device smoke tests; set BOOTSTRAP_ALLOW_UNAPPROVED=1 only for local debug/device testing")
-    print(f"WARNING: allowing unapproved {abi} bootstrap for local debug testing only", file=sys.stderr)
+        raise SystemExit(f"{metadata}: bootstrap has not passed the automated source, archive, ABI and checksum validation")
+    print(f"WARNING: allowing bootstrap without CI validation for local debug testing only", file=sys.stderr)
 version = data.get("version")
 if not isinstance(version, str) or not version.strip() or len(version) > 64:
     raise SystemExit(f"{metadata}: missing or invalid version")
