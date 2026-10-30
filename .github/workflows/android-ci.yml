@@ -61,6 +61,22 @@ jobs:
           cp -a "$JAVA_HOME/." termux-packages/.ci-java/
           test -x termux-packages/.ci-java/bin/java
 
+      - name: Point Termux Java configuration at the shared JDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("termux-packages/scripts/properties.sh")
+          text = p.read_text()
+          old = ': "${TERMUX_JAVA_HOME:=/usr/lib/jvm/java-17-openjdk-amd64}"'
+          new = ': "${TERMUX_JAVA_HOME:=/home/builder/termux-packages/.ci-java}"'
+          if text.count(old) != 1:
+              raise SystemExit("Expected upstream default TERMUX_JAVA_HOME assignment exactly once")
+          p.write_text(text.replace(old, new))
+          PY
+          grep -Fq 'TERMUX_JAVA_HOME:=/home/builder/termux-packages/.ci-java' termux-packages/scripts/properties.sh
+
       - name: Refresh checksum for re-generated upstream foot archive
         shell: bash
         run: |
