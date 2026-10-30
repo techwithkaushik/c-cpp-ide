@@ -25,7 +25,7 @@ The custom package-specific bootstrap must be produced and audited once per supp
 
 1. Produce and publish a reproducible bootstrap for `com.techwithkaushik.cppide` from the Termux package build system. Include only the base packages required for shell/package management initially; install clang, Python and language tooling as optional packages.
 2. Pin each bootstrap release URL, version, upstream revision, target ABI and SHA-256 in a dedicated runtime configuration file. Do not download an unpinned archive or trust a checksum fetched from the same untrusted location as the archive.
-3. Add the AndroidIDE-style native embedding step: place each verified ZIP into the matching ABI's native build input, use `.incbin` to embed its bytes in a dedicated bootstrap shared library, and package only the matching library in each ABI APK. Ensure native-library extraction is enabled so the installer can access the library from `nativeLibraryDir`.
+3. **Implemented in the app build:** `app/src/main/cpp/bootstrap_zip.S` embeds the staged ABI-specific ZIP with `.incbin` into `libtermux-bootstrap.so`. Each app flavor passes its own archive path to CMake, `jniLibs.useLegacyPackaging` enables native-library extraction, and `EmbeddedBootstrap` reads the archive bytes through JNI. The ZIP is staged under `app/build/generated/bootstrapNative/`; only `bootstrap.json` is packaged as an asset, avoiding a second copy of the large archive in the APK.
 4. Add an app-owned bootstrap installer that:
    - uses an app-private prefix under `filesDir`;
    - extracts into a staging directory and validates paths against zip-slip;
@@ -52,4 +52,8 @@ Generate and test bootstrap artifacts for each Android ABI that Code Studio offi
 
 ## Status
 
-This document records the verified integration design. It does not claim that the custom bootstrap artifact, native execution path, or device smoke tests already exist. Those are implementation gates, not optional polish.
+- Native `.incbin` embedding, ABI-specific CMake input paths, JNI byte access, and setup-screen integration are implemented.
+- `scripts/prepare-bootstrap-assets.sh` validates package identity, prefix, ABI, version and SHA-256, then stages the ZIP for native embedding. Release packaging refuses artifacts that do not carry `approvedForDistribution: true`.
+- The bootstrap generation workflow emits `bootstrap.zip` plus `bootstrap.json`, but marks each result unapproved. A maintainer must audit the archive and successfully test shell execution on a device before setting that approval flag.
+- For local debug/device smoke tests only, `BOOTSTRAP_ALLOW_UNAPPROVED=1` permits staging an unapproved artifact; release CI does not set this override. The debug setup UI permits installation of an unapproved artifact only in a debuggable build.
+- No package-compatible archive has yet been confirmed as approved, and native compilation plus on-device shell/compiler tests remain to be verified by CI and a real device. Do not treat vendored terminal UI modules or a successful APK build as proof of a working Linux runtime.
