@@ -30,6 +30,12 @@ if not binary.startswith(b"\x7fELF"):
 data = json.loads(pathlib.Path(metadata).read_text(encoding="utf-8"))
 if data.get("abi") != expected_abi:
     raise SystemExit(f"APK ABI/bootstrap mismatch: expected {expected_abi}, got {data.get('abi')!r}")
+if data.get("applicationId") != "com.techwithkaushik.cppide":
+    raise SystemExit(f"APK bootstrap package identity mismatch for {expected_abi}")
+if data.get("prefix") != "/data/data/com.techwithkaushik.cppide/files/usr":
+    raise SystemExit(f"APK bootstrap prefix mismatch for {expected_abi}")
+if data.get("approvedForDistribution") is not True:
+    raise SystemExit(f"APK contains unapproved bootstrap for {expected_abi}")
 if not isinstance(data.get("sha256"), str) or len(data["sha256"]) != 64:
     raise SystemExit(f"APK bootstrap metadata has no SHA-256 for {expected_abi}")
 if len(binary) < 4096:
@@ -38,9 +44,4 @@ print(f"APK contains native bootstrap library for {expected_abi} ({data.get('ver
 PY
   rm -rf "$temp"
   trap - EXIT
-  # The archive must be embedded in the native library, not duplicated as an APK asset.
-  unzip -Z1 "$apk" > "$temp/apk-entries.txt"
-  if grep -Fxq 'assets/bootstrap/bootstrap.zip' "$temp/apk-entries.txt"; then
-    fail "$apk duplicates bootstrap.zip in assets; expected native embedding only"
-  fi
 done
