@@ -34,10 +34,10 @@ The custom package-specific bootstrap must be produced and audited once per supp
    - runs the bootstrap second-stage script if required by the generated archive;
    - atomically promotes staging only after validation;
    - records install state and supports safe retry/repair.
-4. Add an app-owned process launcher that configures `PREFIX`, `HOME`, `TMPDIR`, `PATH`, loader variables and working directory for the Code Studio prefix. Verify the actual shell execution path on Android; ordinary JVM `ProcessBuilder` alone must not be assumed to handle Termux's linker/exec requirements.
-5. Gate the Welcome → Bootstrap → Ready → Projects navigation on real smoke tests. A ready state requires a working shell and successful command exit, not merely a completed download.
-6. Keep projects and source files in app-owned storage; do not change or write to the user's existing Termux installation.
-7. Add tests for interrupted extraction, malformed archive, symlink handling, checksum mismatch, retry, missing ABI artifact and shell smoke-test failure.
+5. Add an app-owned process launcher that configures `PREFIX`, `HOME`, `TMPDIR`, `PATH`, loader variables and working directory for the Code Studio prefix. Verify the actual shell execution path on Android; ordinary JVM `ProcessBuilder` alone must not be assumed to handle Termux's linker/exec requirements.
+6. Gate the Welcome → Bootstrap → Ready → Projects navigation on real smoke tests. A ready state requires a working shell and successful command exit, not merely a completed download.
+7. Keep projects and source files in app-owned storage; do not change or write to the user's existing Termux installation.
+8. Add tests for interrupted extraction, malformed archive, symlink handling, checksum mismatch, retry, missing ABI artifact and shell smoke-test failure.
 
 ## ABI and packaging
 
