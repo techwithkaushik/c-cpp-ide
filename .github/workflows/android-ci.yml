@@ -129,6 +129,34 @@ jobs:
           print(f"Configured custom package identity: {os.environ['CODE_STUDIO_PACKAGE']}")
           PY
 
+      - name: Adapt pinned upstream bootstrap package names
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script = Path("termux-packages/scripts/build-bootstraps.sh")
+          source = script.read_text(encoding="utf-8")
+          old = 'PACKAGES+=("bzip2")'
+          new = 'PACKAGES+=("libbz2")'
+          package_dir = Path("termux-packages/packages/libbz2/bzip2.subpackage.sh")
+          if not package_dir.is_file():
+              raise SystemExit(
+                  "Pinned Termux source layout changed: expected "
+                  "packages/libbz2/bzip2.subpackage.sh. Stop and review upstream."
+              )
+          count = source.count(old)
+          if count != 1:
+              raise SystemExit(
+                  f"Expected exactly one {old!r} in build-bootstraps.sh, found {count}. "
+                  "Stop instead of silently building an incomplete bootstrap."
+              )
+          script.write_text(source.replace(old, new, 1), encoding="utf-8")
+          print("Mapped bootstrap dependency bzip2 to source package libbz2; "
+                "the build includes its bzip2 subpackage.")
+          PY
+
       - name: Build all four bootstrap architectures
         shell: bash
         run: |
