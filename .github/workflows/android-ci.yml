@@ -108,7 +108,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Checkout pinned Termux packages source
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
@@ -185,6 +185,16 @@ jobs:
           # A clean runner already guarantees that no stale package cache is reused.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
             --architectures "arm" 2>&1 | tee ../bootstrap-build.log
+          # The upstream script writes the archive inside its Docker-mounted
+          # checkout. Copy it explicitly from the container as a fallback so
+          # CI does not silently lose the output when mount paths differ.
+          if [[ ! -s bootstrap-arm.zip ]]; then
+            docker cp termux-package-builder:/home/builder/termux-packages/bootstrap-arm.zip \
+              "$GITHUB_WORKSPACE/bootstrap-arm.zip"
+          else
+            install -m 0644 bootstrap-arm.zip "$GITHUB_WORKSPACE/bootstrap-arm.zip"
+          fi
+          test -s "$GITHUB_WORKSPACE/bootstrap-arm.zip"
 
       - name: Validate archives and generate pinned ABI metadata
         shell: bash
@@ -203,7 +213,10 @@ jobs:
             if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
               source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
             else
-              source="$(find "$GITHUB_WORKSPACE" -type f -name "bootstrap-${upstream_arch}.zip" -print -quit)"
+              source="$GITHUB_WORKSPACE/bootstrap-${upstream_arch}.zip"
+            if [[ ! -s "$source" ]]; then
+              source="$(find "$GITHUB_WORKSPACE/termux-packages" -type f -name "bootstrap-${upstream_arch}.zip" -print -quit)"
+            fi
             fi
             destination="$root/$abi"
             [[ -n "$source" && -s "$source" ]] || { echo "::error::Missing generated bootstrap for $abi ($upstream_arch); searched under $GITHUB_WORKSPACE"; find "$GITHUB_WORKSPACE" -type f -name "bootstrap-*.zip" -print || true; exit 1; }
