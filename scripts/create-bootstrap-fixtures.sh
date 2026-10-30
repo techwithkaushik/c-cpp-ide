@@ -6,7 +6,7 @@ PACKAGE="com.techwithkaushik.cppide"
 PREFIX="/data/data/$PACKAGE/files/usr"
 python3 - "$OUT" "$PACKAGE" "$PREFIX" <<'PY'
 import hashlib, json, pathlib, sys, zipfile
-root, package, prefix = map(pathlib.Path, sys.argv[:1]) if False else (sys.argv[1], sys.argv[2], sys.argv[3])
+root, package, prefix = sys.argv[1:]
 out = pathlib.Path(root)
 abis = ("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 for abi in abis:
