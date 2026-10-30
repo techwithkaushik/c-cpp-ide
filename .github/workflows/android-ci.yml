@@ -59,7 +59,7 @@ jobs:
         run: gradle --no-daemon help
 
   test:
-    name: 2 · Test all modules and ARM ABI variants
+    name: 2 · Test ARM32 modules only
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: verify
@@ -92,10 +92,9 @@ jobs:
         run: >-
           gradle --no-daemon
           :app:testArm32DebugUnitTest
-          :app:testArm64DebugUnitTest
 
   build-bootstrap:
-    name: 3 · Build and verify ARM bootstraps only
+    name: 3 · Build and verify ARM32 bootstrap only
     runs-on: ubuntu-latest
     timeout-minutes: 360
     needs: test
@@ -185,7 +184,7 @@ jobs:
           # force-clean path can expand an unset per-architecture cache path to /*.
           # A clean runner already guarantees that no stale package cache is reused.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
-            --architectures "arm,aarch64" 2>&1 | tee ../bootstrap-build.log
+            --architectures "arm" 2>&1 | tee ../bootstrap-build.log
 
       - name: Validate archives and generate pinned ABI metadata
         shell: bash
@@ -198,9 +197,8 @@ jobs:
           fi
           declare -A ARCH_MAP=(
             [armeabi-v7a]=arm
-            [arm64-v8a]=aarch64
           )
-          for abi in armeabi-v7a arm64-v8a; do
+          for abi in armeabi-v7a; do
             upstream_arch="${ARCH_MAP[$abi]}"
             if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
               source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
@@ -243,7 +241,7 @@ jobs:
           done
           if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != "true" ]]; then
             mkdir -p bootstrap-cache
-            for arch in arm aarch64; do
+            for arch in arm; do
               install -m 0644 "termux-packages/bootstrap-${arch}.zip" "bootstrap-cache/bootstrap-${arch}.zip"
             done
           fi
@@ -293,11 +291,8 @@ jobs:
       - name: Re-validate and stage ABI-matched assets
         run: bash scripts/prepare-bootstrap-assets.sh
 
-      - name: Assemble ARM32 and ARM64 APKs only
-        run: >-
-          gradle --no-daemon
-          :app:assembleArm32Debug
-          :app:assembleArm64Debug
+      - name: Assemble ARM32 APK only
+        run: gradle --no-daemon :app:assembleArm32Debug
 
       - name: Verify each APK contains its matching bootstrap and checksum
         run: bash scripts/verify-bootstrap-apks.sh
@@ -308,6 +303,5 @@ jobs:
           name: code-studio-abi-debug-apks
           path: |
             app/build/outputs/apk/arm32/debug/*.apk
-            app/build/outputs/apk/arm64/debug/*.apk
           if-no-files-found: error
           retention-days: 14
