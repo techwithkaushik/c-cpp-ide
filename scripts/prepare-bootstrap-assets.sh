@@ -35,6 +35,10 @@ except Exception as exc:
     raise SystemExit(f"Invalid bootstrap metadata {metadata}: {exc}")
 if data.get("abi") != abi:
     raise SystemExit(f"{metadata}: ABI mismatch: expected {abi}, got {data.get('abi')!r}")
+if data.get("applicationId") != "com.techwithkaushik.cppide":
+    raise SystemExit(f"{metadata}: applicationId must be com.techwithkaushik.cppide")
+if data.get("prefix") != "/data/data/com.techwithkaushik.cppide/files/usr":
+    raise SystemExit(f"{metadata}: bootstrap prefix does not match Code Studio")
 version = data.get("version")
 if not isinstance(version, str) or not version.strip() or len(version) > 64:
     raise SystemExit(f"{metadata}: missing or invalid version")
