@@ -197,6 +197,7 @@ jobs:
 
   release:
     name: Build signed release APK
+    needs: [build-bootstrap]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
