@@ -108,7 +108,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v2-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Checkout pinned Termux packages source
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
@@ -276,6 +276,12 @@ jobs:
           docker cp termux-package-builder:/tmp/bootstrap-arm.zip \
             "$GITHUB_WORKSPACE/bootstrap-arm.zip"
           test -s "$GITHUB_WORKSPACE/bootstrap-arm.zip"
+          size_bytes="$(stat -c '%s' "$GITHUB_WORKSPACE/bootstrap-arm.zip")"
+          echo "Pruned ARM32 bootstrap size: $size_bytes bytes"
+          if (( size_bytes > 52428800 )); then
+            echo "::error::ARM32 bootstrap exceeds 50 MiB; refusing to package an oversized APK."
+            exit 1
+          fi
 
       - name: Validate archives and generate pinned ABI metadata
         shell: bash
@@ -352,7 +358,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v1-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v2-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Upload verified ABI bootstrap artifacts
         uses: actions/upload-artifact@v4
