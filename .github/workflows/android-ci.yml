@@ -194,8 +194,9 @@ jobs:
           \t\t\tlocal mirror
           \t\t\tfor mirror in \
           \t\t\t\t"https://gnupg.org/ftp/gcrypt/${suffix}" \
-          \t\t\t\t"https://mirrors.dotsrc.org/gnupg/${suffix}" \
-          \t\t\t\t"https://mirror.cyberbits.eu/gnupg/${suffix}"; do
+          \t\t\t\t"https://mirrors.dotsrc.org/gcrypt/${suffix}" \
+          \t\t\t\t"https://mirror.cyberbits.eu/gnupg/ftp/gcrypt/${suffix}" \\
+          \t\t\t\t"https://www.mirrorservice.org/sites/ftp.gnupg.org/gcrypt/${suffix}"; do
           \t\t\t\techo "Primary source unavailable; trying mirror: ${mirror}"
           \t\t\t\tif curl --fail --location --connect-timeout 15 --max-time 180 \
           \t\t\t\t\t--output "$TMPFILE" "$mirror"; then
