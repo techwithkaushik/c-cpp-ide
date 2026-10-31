@@ -209,7 +209,7 @@ jobs:
               name, deb_arch = meta.get("Package"), meta.get("Architecture")
               if not name or deb_arch not in (arch, "all"): continue
               packages.setdefault(name, deb); fields.setdefault(name, meta)
-              for provided in re.findall(r"([a-z0-9][a-z0-9+.-]*)(?:\\s*\\([^)]*\\))?", meta.get("Provides", "")):
+              for provided in re.findall(r"([a-z0-9][a-z0-9+.-]*)(?:\s*\([^)]*\))?", meta.get("Provides", "")):
                   provides.setdefault(provided, name)
           def split_top(value, sep=","):
               parts, start, depth = [], 0, 0
@@ -232,7 +232,7 @@ jobs:
                   for group in split_top(meta.get(field, "")):
                       resolved = None
                       for alt in split_top(group, "|"):
-                          alt = re.sub(r"\\[[^]]*\\]|<[^>]*>", "", alt).strip()
+                          alt = re.sub(r"\[[^]]*\]|<[^>]*>", "", alt).strip()
                           match = re.match(r"([a-z0-9][a-z0-9+.-]*)(?::[a-z0-9-]+)?", alt)
                           if not match: continue
                           candidate = match.group(1)
