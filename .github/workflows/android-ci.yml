@@ -192,13 +192,14 @@ jobs:
           fallback_block = '''\t\tif [[ "${error}" != 0 && "$URL" == https://www.gnupg.org/ftp/gcrypt/* ]]; then
           \t\t\tlocal suffix="${URL#https://www.gnupg.org/ftp/gcrypt/}"
           \t\t\tlocal mirror
-          \t\t\tfor mirror in \
-          \t\t\t\t"https://gnupg.org/ftp/gcrypt/${suffix}" \
-          \t\t\t\t"https://mirrors.dotsrc.org/gcrypt/${suffix}" \
-          \t\t\t\t"https://mirror.cyberbits.eu/gnupg/ftp/gcrypt/${suffix}" \\
-          \t\t\t\t"https://www.mirrorservice.org/sites/ftp.gnupg.org/gcrypt/${suffix}"; do
+          \t\t\t# Use real mirrors listed by GnuPG; their root already maps to gcrypt/.
+          \t\t\tfor mirror in \\
+          \t\t\t\t"https://mirrors.dotsrc.org/gcrypt/${suffix}" \\
+          \t\t\t\t"https://www.mirrorservice.org/sites/ftp.gnupg.org/gcrypt/${suffix}" \\
+          \t\t\t\t"https://ftp.heanet.ie/mirrors/ftp.gnupg.org/gcrypt/${suffix}" \\
+          \t\t\t\t"https://ftp.franken.de/pub/crypt/mirror/ftp.gnupg.org/gcrypt/${suffix}"; do
           \t\t\t\techo "Primary source unavailable; trying mirror: ${mirror}"
-          \t\t\t\tif curl --fail --location --connect-timeout 15 --max-time 180 \
+          \t\t\t\tif curl --fail --location --connect-timeout 12 --max-time 90 \\
           \t\t\t\t\t--output "$TMPFILE" "$mirror"; then
           \t\t\t\t\tURL="$mirror"
           \t\t\t\t\terror=0
@@ -207,10 +208,9 @@ jobs:
           \t\t\tdone
           \t\tfi
           \t\tif [[ "${error}" != 0 ]]; then
-          \t\t\t	echo "Failed to download $URL (primary and fallback mirrors)" 1>&2
+          \t\t\t\techo "Failed to download $URL (primary and all GnuPG mirrors)" 1>&2
           \t\t\treturn 1
-          \t\tfi'''
-          if download_source.count(failed_block) != 1:
+          \t\tfi'''          if download_source.count(failed_block) != 1:
               raise SystemExit("Termux downloader failure block changed; refusing unsafe mirror patch.")
           downloader.write_text(download_source.replace(failed_block, fallback_block, 1), encoding="utf-8")
 
