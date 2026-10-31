@@ -210,7 +210,8 @@ jobs:
           \t\tif [[ "${error}" != 0 ]]; then
           \t\t\t\techo "Failed to download $URL (primary and all GnuPG mirrors)" 1>&2
           \t\t\treturn 1
-          \t\tfi'''          if download_source.count(failed_block) != 1:
+          \t\tfi'''
+          if download_source.count(failed_block) != 1:
               raise SystemExit("Termux downloader failure block changed; refusing unsafe mirror patch.")
           downloader.write_text(download_source.replace(failed_block, fallback_block, 1), encoding="utf-8")
 
