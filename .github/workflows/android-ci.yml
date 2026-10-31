@@ -180,7 +180,84 @@ jobs:
           if source.count(archive_move) != 1:
               raise SystemExit("Expected exactly one upstream bootstrap archive move; refusing unsafe patch.")
           script.write_text(source.replace(archive_move, archive_export, 1), encoding="utf-8")
-          print("Mapped bzip2 dependency and redirected bootstrap ZIP output to writable container /tmp.")
+
+          # Upstream extracts every .deb in output/, including unrelated cached
+          # packages. Keep only selected bootstrap packages and runtime dependencies.
+          source = script.read_text(encoding="utf-8")
+          marker = '\t\t# Extract all debs.\n\t\textract_debs "$TERMUX_ARCH" || return $?'
+          filter_block = r'''
+          # Prune unrelated prebuilt packages before extracting the bootstrap.
+          BOOTSTRAP_ROOT_PACKAGES="${PACKAGES[*]}" python3 - "$TERMUX_BUILT_DEBS_DIRECTORY" "$TERMUX_ARCH" <<'PY_BOOTSTRAP_PRUNE'
+          import os, pathlib, re, subprocess, sys
+          out = pathlib.Path(sys.argv[1])
+          arch = sys.argv[2]
+          roots = os.environ["BOOTSTRAP_ROOT_PACKAGES"].split()
+          debs = sorted(out.glob("*.deb"))
+          packages, provides, fields = {}, {}, {}
+          def control(path):
+              raw = subprocess.check_output(["dpkg-deb", "-f", str(path)], text=True, stderr=subprocess.DEVNULL)
+              result, key = {}, None
+              for line in raw.splitlines():
+                  if line[:1].isspace() and key:
+                      result[key] += " " + line.strip()
+                  elif ": " in line:
+                      key, value = line.split(": ", 1); result[key] = value.strip()
+              return result
+          for deb in debs:
+              try: meta = control(deb)
+              except subprocess.CalledProcessError: continue
+              name, deb_arch = meta.get("Package"), meta.get("Architecture")
+              if not name or deb_arch not in (arch, "all"): continue
+              packages.setdefault(name, deb); fields.setdefault(name, meta)
+              for provided in re.findall(r"([a-z0-9][a-z0-9+.-]*)(?:\\s*\\([^)]*\\))?", meta.get("Provides", "")):
+                  provides.setdefault(provided, name)
+          def split_top(value, sep=","):
+              parts, start, depth = [], 0, 0
+              for i, ch in enumerate(value):
+                  if ch == "(": depth += 1
+                  elif ch == ")": depth = max(0, depth - 1)
+                  elif ch == sep and depth == 0:
+                      parts.append(value[start:i].strip()); start = i + 1
+              parts.append(value[start:].strip())
+              return [part for part in parts if part]
+          selected, queue, missing = set(), list(roots), []
+          while queue:
+              name = queue.pop().split(":", 1)[0]
+              if name in selected: continue
+              actual = name if name in packages else provides.get(name)
+              if actual is None:
+                  missing.append(name); continue
+              selected.add(actual); meta = fields[actual]
+              for field in ("Pre-Depends", "Depends"):
+                  for group in split_top(meta.get(field, "")):
+                      resolved = None
+                      for alt in split_top(group, "|"):
+                          alt = re.sub(r"\\[[^]]*\\]|<[^>]*>", "", alt).strip()
+                          match = re.match(r"([a-z0-9][a-z0-9+.-]*)(?::[a-z0-9-]+)?", alt)
+                          if not match: continue
+                          candidate = match.group(1)
+                          candidate = candidate if candidate in packages else provides.get(candidate)
+                          if candidate: resolved = candidate; break
+                      if resolved: queue.append(resolved)
+                      else:
+                          names = [re.match(r"([a-z0-9][a-z0-9+.-]*)", a.strip()) for a in split_top(group, "|")]
+                          names = [m.group(1) for m in names if m]
+                          if names and all(n not in packages and n not in provides for n in names):
+                              print("WARN: no archive for virtual/system dependency:", group)
+          if missing:
+              raise SystemExit("Bootstrap root packages missing from output: " + ", ".join(sorted(set(missing))))
+          keep = {packages[name].resolve() for name in selected}
+          for deb in debs:
+              if deb.resolve() not in keep: deb.unlink()
+          print(f"Kept {len(keep)} runtime package archives out of {len(debs)} total; roots={roots}")
+          PY_BOOTSTRAP_PRUNE
+          '''
+          import textwrap
+          filter_block = textwrap.dedent(filter_block).strip("\n")
+          if source.count(marker) != 1:
+              raise SystemExit("Could not locate unique bootstrap extraction point; refusing to build an oversized/incomplete archive.")
+          script.write_text(source.replace(marker, filter_block + "\n" + marker, 1), encoding="utf-8")
+          print("Mapped bzip2 dependency, redirected ZIP output, and added runtime-dependency pruning.")
           PY
 
       - name: Build ARM32 bootstrap only
@@ -226,6 +303,12 @@ jobs:
             [[ -n "$source" && -s "$source" ]] || { echo "::error::Missing generated bootstrap for $abi ($upstream_arch); searched under $GITHUB_WORKSPACE"; find "$GITHUB_WORKSPACE" -type f -name "bootstrap-*.zip" -print || true; exit 1; }
             mkdir -p "$destination"
             cp "$source" "$destination/bootstrap.zip"
+            size_bytes="$(stat -c '%s' "$destination/bootstrap.zip")"
+            echo "Validated input size for $abi bootstrap: $size_bytes bytes"
+            if (( size_bytes > 52428800 )); then
+              echo "::error::Bootstrap for $abi is larger than 50 MiB."
+              exit 1
+            fi
             python3 - "$abi" "$destination/bootstrap.zip" "$CODE_STUDIO_PACKAGE" <<'PY'
           import pathlib, sys, zipfile
           abi, archive, package = sys.argv[1:]
