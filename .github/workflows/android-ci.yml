@@ -181,6 +181,38 @@ jobs:
               raise SystemExit("Expected exactly one upstream bootstrap archive move; refusing unsafe patch.")
           script.write_text(source.replace(archive_move, archive_export, 1), encoding="utf-8")
 
+          # GnuTLS sources are hosted on gnupg.org, which can time out from GitHub runners.
+          # Add checksum-verified mirror fallback in Termux's downloader, without weakening hashes.
+          downloader = Path("termux-packages/scripts/build/termux_download.sh")
+          download_source = downloader.read_text(encoding="utf-8")
+          failed_block = '''\t\tif [[ "${error}" != 0 ]]; then
+          \t\t\techo "Failed to download $URL" 1>&2
+          \t\t\treturn 1
+          \t\tfi'''
+          fallback_block = '''\t\tif [[ "${error}" != 0 && "$URL" == https://www.gnupg.org/ftp/gcrypt/* ]]; then
+          \t\t\tlocal suffix="${URL#https://www.gnupg.org/ftp/gcrypt/}"
+          \t\t\tlocal mirror
+          \t\t\tfor mirror in \
+          \t\t\t\t"https://gnupg.org/ftp/gcrypt/${suffix}" \
+          \t\t\t\t"https://mirrors.dotsrc.org/gnupg/${suffix}" \
+          \t\t\t\t"https://mirror.cyberbits.eu/gnupg/${suffix}"; do
+          \t\t\t\techo "Primary source unavailable; trying mirror: ${mirror}"
+          \t\t\t\tif curl --fail --location --connect-timeout 15 --max-time 180 \
+          \t\t\t\t\t--output "$TMPFILE" "$mirror"; then
+          \t\t\t\t\tURL="$mirror"
+          \t\t\t\t\terror=0
+          \t\t\t\t\tbreak
+          \t\t\t\tfi
+          \t\t\tdone
+          \t\tfi
+          \t\tif [[ "${error}" != 0 ]]; then
+          \t\t\t	echo "Failed to download $URL (primary and fallback mirrors)" 1>&2
+          \t\t\treturn 1
+          \t\tfi'''
+          if download_source.count(failed_block) != 1:
+              raise SystemExit("Termux downloader failure block changed; refusing unsafe mirror patch.")
+          downloader.write_text(download_source.replace(failed_block, fallback_block, 1), encoding="utf-8")
+
           # Upstream extracts every .deb in output/, including unrelated cached
           # packages. Keep only selected bootstrap packages and runtime dependencies.
           source = script.read_text(encoding="utf-8")
