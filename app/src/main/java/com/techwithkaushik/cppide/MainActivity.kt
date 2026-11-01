@@ -160,7 +160,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             else controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
-    var screen by rememberSaveable { mutableStateOf(IdeScreen.Welcome) }
+    val onboardingPreferences = remember(appContext) { appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, android.content.Context.MODE_PRIVATE) }
+    var screen by rememberSaveable { mutableStateOf(if (onboardingPreferences.getBoolean(IdeDesignTokens.Preference.WELCOME_COMPLETED, false)) IdeScreen.Projects else IdeScreen.Welcome) }
     var selectedProject by rememberSaveable { mutableStateOf("Welcome Workspace") }
     var activeFile by rememberSaveable { mutableStateOf("README.md") }
     var code by rememberSaveable { mutableStateOf("# Welcome Workspace\n\nOpen any file to edit it.\n") }
@@ -213,8 +214,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchInProject by rememberSaveable { mutableStateOf(false) }
     var editorFontSize by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, 0).getFloat(IdeDesignTokens.Preference.EDITOR_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_EDITOR_FONT_SIZE)) }
-    var editorWordWrap by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getBoolean(IdeDesignTokens.Preference.EDITOR_WORD_WRAP, false)) }
-    var editorTheme by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getString(IdeDesignTokens.Preference.EDITOR_THEME, "Dark+ (VS Code)") ?: "Dark+ (VS Code)") }
+    var editorWordWrap by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, 0).getBoolean(IdeDesignTokens.Preference.EDITOR_WORD_WRAP, false)) }
+    var editorTheme by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, 0).getString(IdeDesignTokens.Preference.EDITOR_THEME, "Dark+ (VS Code)") ?: "Dark+ (VS Code)") }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember(projectStorage) {
@@ -236,7 +237,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         } else {
             when (screen) {
                 IdeScreen.Workspace -> screen = IdeScreen.Projects
-                IdeScreen.Projects -> screen = IdeScreen.Welcome
+                IdeScreen.Projects -> if (!onboardingPreferences.getBoolean(IdeDesignTokens.Preference.WELCOME_COMPLETED, false)) screen = IdeScreen.Welcome
                 IdeScreen.Settings -> screen = settingsReturnScreen
                 IdeScreen.Welcome -> Unit
             }
@@ -290,7 +291,10 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     if (screen != IdeScreen.Workspace) {
         when (screen) {
             IdeScreen.Welcome -> WelcomeScreen(
-                onNext = { screen = IdeScreen.Projects }
+                onNext = {
+                    onboardingPreferences.edit().putBoolean(IdeDesignTokens.Preference.WELCOME_COMPLETED, true).apply()
+                    screen = IdeScreen.Projects
+                }
             )
             IdeScreen.Settings -> IdeSettingsScreen(
                 editorFontSize = editorFontSize,
@@ -1030,47 +1034,57 @@ private fun SettingsInfoRow(label: String, value: String) {
 @Composable
 private fun WelcomeScreen(onNext: () -> Unit) {
     Box(
-        Modifier
-            .fillMaxSize()
-            .background(IdeBackground)
-            .padding(horizontal = 28.dp),
+        Modifier.fillMaxSize().background(IdeBackground).padding(horizontal = IdeDesignTokens.Spacing.xl, vertical = IdeDesignTokens.Spacing.xxl),
         contentAlignment = Alignment.Center
     ) {
         Column(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 440.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.lg)
         ) {
             Box(
-                Modifier
-                    .size(84.dp)
-                    .background(IdeSurface, RoundedCornerShape(IdeDesignTokens.Spacing.xl)),
+                Modifier.size(88.dp).background(IdeSurface, RoundedCornerShape(IdeDesignTokens.Shape.large)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "</>",
-                    color = IdeAccent,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                Text("</>", color = IdeAccent, fontSize = 32.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+            Text("Code Studio", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = IdeDesignTokens.Color.TextPrimary)
+            Text(
+                "Your native coding workspace for Android",
+                color = IdeMuted,
+                fontSize = IdeDesignTokens.Typography.body,
+                textAlign = TextAlign.Center
+            )
+            Column(
+                Modifier.fillMaxWidth().background(IdeSurface, RoundedCornerShape(IdeDesignTokens.Shape.large)).padding(IdeDesignTokens.Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
+            ) {
+                WelcomeFeature("C / C++ and Python", "Build your projects in a focused editor")
+                WelcomeFeature("Project workspace", "Manage files, tabs and recent projects")
+                WelcomeFeature("Integrated terminal", "Install a compatible private runtime from Settings")
             }
             Text(
-                "Code Studio",
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFF2F6FC)
+                "One-time setup · You can change preferences and install the runtime later in Settings.",
+                color = IdeMuted,
+                fontSize = IdeDesignTokens.Typography.caption,
+                textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(IdeDesignTokens.Spacing.md))
             Button(
                 onClick = onNext,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp)
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(IdeDesignTokens.Shape.medium)
             ) {
-                Text("Next  →", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Get started  →", fontSize = IdeDesignTokens.Typography.body, fontWeight = FontWeight.SemiBold)
             }
         }
+    }
+}
+
+@Composable
+private fun WelcomeFeature(title: String, description: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.xxs)) {
+        Text(title, color = IdeDesignTokens.Color.TextPrimary, fontSize = IdeDesignTokens.Typography.body, fontWeight = FontWeight.SemiBold)
+        Text(description, color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
     }
 }
 
