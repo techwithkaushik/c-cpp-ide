@@ -1,78 +1,72 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
-import java.io.File
-import java.io.InputStream
+import com.techwithkaushik.cppide.core.jni.NativePtyProcess
 import java.io.OutputStream
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Persistent shell session launched through the Android system linker and app-owned PRoot. */
-class LocalLinuxSession private constructor(private val process: Process) : AutoCloseable {
-    val input: OutputStream = process.outputStream
+/** Persistent Ubuntu shell attached to a real kernel PTY, not plain stdin/stdout pipes. */
+class LocalLinuxSession private constructor(private val pty: NativePtyProcess) : AutoCloseable {
+    val input: OutputStream = object : OutputStream() {
+        override fun write(value: Int) = pty.write(byteArrayOf(value.toByte()))
+        override fun write(bytes: ByteArray, offset: Int, length: Int) {
+            if (offset == 0 && length == bytes.size) pty.write(bytes)
+            else pty.write(bytes.copyOfRange(offset, offset + length))
+        }
+        override fun flush() = Unit
+    }
     private val closed = AtomicBoolean(false)
 
     fun readOutput(onChunk: (String) -> Unit, onExit: (Int) -> Unit) {
-        val stdout = Thread { stream(process.inputStream, onChunk) }.apply { isDaemon = true; start() }
-        val stderr = Thread { stream(process.errorStream, onChunk) }.apply { isDaemon = true; start() }
         Thread({
-            val exit = try { process.waitFor() } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                -1
-            }
-            stdout.join(300)
-            stderr.join(300)
+            val buffer = ByteArray(4096)
+            try {
+                while (true) {
+                    val count = pty.read(buffer)
+                    if (count <= 0) break
+                    onChunk(String(buffer, 0, count, Charsets.UTF_8))
+                }
+            } catch (_: Exception) { }
+            val exit = runCatching { pty.waitForExit() }.getOrDefault(-1)
             onExit(exit)
-        }, "local-linux-exit").apply { isDaemon = true; start() }
+        }, "ubuntu-pty-reader").apply { isDaemon = true; start() }
     }
 
     fun interrupt() {
-        try { input.write(3); input.flush() } catch (_: Exception) { process.destroy() }
+        try { pty.write(byteArrayOf(3)) } catch (_: Exception) { }
     }
+
+    fun resize(columns: Int, rows: Int) = pty.resize(columns, rows)
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        try { input.write("exit\n".toByteArray()); input.flush() } catch (_: Exception) {}
-        if (!process.waitFor(300, TimeUnit.MILLISECONDS)) process.destroy()
-        if (process.isAlive && !process.waitFor(300, TimeUnit.MILLISECONDS)) process.destroyForcibly()
+        try { pty.write("exit\n".toByteArray()) } catch (_: Exception) { }
+        // Closing the PTY wakes the reader and terminates the foreground shell.
+        pty.close()
     }
 
     companion object {
         fun start(paths: LinuxRuntimePaths): LocalLinuxSession {
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed.")
-            if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the matching Android PRoot binary is installed.")
+            if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
             if (!paths.proot.setExecutable(true, true)) throw IllegalStateException("Cannot mark PRoot executable.")
             if (!paths.systemLinker.isFile) throw IllegalStateException("Android system linker is unavailable.")
-            val root = paths.ubuntuRoot.absolutePath
             listOf("root", "tmp").forEach {
-                val dir = File(paths.ubuntuRoot, it)
+                val dir = java.io.File(paths.ubuntuRoot, it)
                 if (!dir.exists() && !dir.mkdirs()) throw IllegalStateException("Cannot create Ubuntu $it directory.")
             }
-            val shell = if (File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
-            val process = ProcessBuilder(
-                paths.systemLinker.absolutePath, paths.proot.absolutePath,
-                "-0", "-r", root, "-w", "/root",
-                "-b", "/dev", "-b", "/proc", "-b", "/sys",
-                shell, "-i"
-            ).directory(paths.base).apply {
-                environment()["HOME"] = "/root"
-                environment()["TMPDIR"] = "/tmp"
-                environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-                environment()["TERM"] = "xterm-256color"
-                environment()["LANG"] = "C.UTF-8"
-                environment()["PROOT_TMP_DIR"] = File(paths.base, "tmp").apply { mkdirs() }.absolutePath
-            }.start()
-            return LocalLinuxSession(process)
-        }
-    }
-
-    private fun stream(source: InputStream, onChunk: (String) -> Unit) {
-        val buffer = ByteArray(4096)
-        try {
-            while (true) {
-                val n = source.read(buffer)
-                if (n < 0) break
-                onChunk(String(buffer, 0, n, Charsets.UTF_8))
+            val shell = if (java.io.File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
+            val temp = java.io.File(paths.base, "tmp").apply {
+                if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.")
             }
-        } catch (_: Exception) {}
+            val pty = NativePtyProcess.launch(
+                linker = paths.systemLinker.absolutePath,
+                proot = paths.proot.absolutePath,
+                rootfs = paths.ubuntuRoot.absolutePath,
+                shell = shell,
+                tempDirectory = temp.absolutePath
+            )
+            pty.resize(100, 30)
+            return LocalLinuxSession(pty)
+        }
     }
 }
