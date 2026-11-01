@@ -65,20 +65,22 @@ class BootstrapInstaller(
             "Runtime prefix path exists and is not a directory"
         }
 
-        val staging = File(parent, ".${prefixDirectory.name}.staging-${UUID.randomUUID()}")
+        val installRoot = prefixDirectory.absoluteFile
         val backup = File(parent, ".${prefixDirectory.name}.backup-${UUID.randomUUID()}")
-        var promoted = false
+        var installedSuccessfully = false
         var previousPrefixMoved = false
-        var newPrefixPromoted = false
 
         try {
-            if (!staging.mkdir()) throw IOException("Unable to create staging directory")
-            // Some ZIPs are accidentally packaged as an app-files snapshot
-            // (home/, projects/, usr/...) instead of a bootstrap prefix
-            // (bin/, etc/, lib/, share/...). Detect that wrapper and install
-            // only its usr/ subtree into the actual prefix.
+            // Extract directly into the final app-private runtime prefix.
+            // Preserve the previous runtime in a sibling backup for rollback.
+            if (installRoot.exists()) {
+                if (!installRoot.renameTo(backup)) throw IOException("Unable to move existing runtime prefix to backup")
+                previousPrefixMoved = true
+            }
+            if (!installRoot.mkdirs()) throw IOException("Unable to create runtime prefix: $installRoot")
             val archivePrefix = detectArchivePrefix(archive)
-            var symlinkManifest = File(staging, "SYMLINKS.txt")
+            var symlinkManifest = File(installRoot, "SYMLINKS.txt")
+
             var entryCount = 0
             var expandedBytes = 0L
             val seen = HashSet<String>()
@@ -98,7 +100,7 @@ class BootstrapInstaller(
                         // A valid bootstrap ZIP may have unrelated app-files
                         // folders alongside the real prefix (for example when
                         // someone zipped the whole files/ directory). Never
-                        // import those folders into the runtime staging tree.
+                        // import those folders into the runtime prefix.
                         if (isNonBootstrapWrapperEntry(normalizedName)) continue
                         normalizedName
                     } else {
@@ -113,13 +115,13 @@ class BootstrapInstaller(
                     val relative = validateArchivePath(selectedName)
                     if (!seen.add(relative)) throw IOException("Duplicate archive entry: $relative")
 
-                    val target = File(staging, relative)
+                    val target = File(installRoot, relative)
                     val canonicalTarget = target.canonicalFile
-                    val canonicalStaging = staging.canonicalFile
+                    val canonicalStaging = installRoot.canonicalFile
                     if (canonicalTarget != canonicalStaging &&
                         !canonicalTarget.path.startsWith(canonicalStaging.path + File.separator)
                     ) {
-                        throw IOException("Archive entry escapes staging directory")
+                        throw IOException("Archive entry escapes runtime prefix")
                     }
 
                     if (entry.isDirectory) {
@@ -151,7 +153,7 @@ class BootstrapInstaller(
             // Prefer a manifest inside usr/ for wrapped archives, otherwise
             // accept the conventional top-level SYMLINKS.txt.
             if (archivePrefix.isNotEmpty()) {
-                val nestedManifest = File(staging, "SYMLINKS.txt")
+                val nestedManifest = File(installRoot, "SYMLINKS.txt")
                 if (!nestedManifest.isFile) {
                     // The top-level manifest was copied above if present.
                     symlinkManifest = nestedManifest
@@ -164,61 +166,34 @@ class BootstrapInstaller(
             // SYMLINKS.txt. This makes it possible to test the archive's actual
             // extracted files independently from the app's symlink handling.
             val symlinkCount = if (processSymlinks && symlinkManifest.isFile) {
-                createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile)
+                createSymlinks(symlinkManifest, installRoot, installRoot)
             } else {
                 0
             }
             symlinkManifest.delete()
 
-            setExecutableBits(staging, prefixDirectory)
-            validateBootstrapLayout(staging, requireShell = processSymlinks)
+            setExecutableBits(installRoot, installRoot)
+            validateBootstrapLayout(installRoot, requireShell = processSymlinks)
             if (processSymlinks && requireSymlinkManifest) {
-                validateTermuxSymlinkLayout(staging, prefixDirectory, symlinkCount)
+                validateTermuxSymlinkLayout(installRoot, installRoot, symlinkCount)
             }
 
-            // Keep the previous prefix until the staged tree is ready. Renames
-            // are within the same parent filesystem, so promotion is atomic per rename.
-            if (prefixDirectory.exists()) {
-                if (!prefixDirectory.renameTo(backup)) {
-                    throw IOException("Unable to move existing runtime prefix aside")
-                }
-                previousPrefixMoved = true
-            }
-            if (!staging.renameTo(prefixDirectory)) {
-                if (backup.exists()) backup.renameTo(prefixDirectory)
-                throw IOException("Unable to promote staged runtime prefix")
-            }
-            newPrefixPromoted = true
-            // Keep the previous runtime until the caller's executable smoke test passes.
-            // Validation runs only after promotion because Termux binaries may contain
-            // absolute paths compiled for the final app-private prefix.
-            if (validateInstalledPrefix != null && !validateInstalledPrefix(prefixDirectory)) {
+            // Test the exact prefix where extraction occurred.
+            if (validateInstalledPrefix != null && !validateInstalledPrefix(installRoot)) {
                 throw IOException("Installed bootstrap failed runtime validation")
             }
-            promoted = true
+            installedSuccessfully = true
             backup.deleteRecursively()
-
-            return Result(prefixDirectory, digest, entryCount, symlinkCount)
+            return Result(installRoot, digest, entryCount, symlinkCount)
         } finally {
-            if (!promoted) {
-                staging.deleteRecursively()
-                // Never delete the current runtime when extraction or staged validation
-                // fails before the old prefix has been moved. Roll back only if promotion
-                // actually replaced the destination.
-                if (previousPrefixMoved && backup.exists()) {
-                    if (newPrefixPromoted && prefixDirectory.exists()) {
-                        prefixDirectory.deleteRecursively()
-                    }
-                    if (!backup.renameTo(prefixDirectory)) {
-                        throw IOException("Runtime validation failed and previous runtime could not be restored")
-                    }
-                } else if (!previousPrefixMoved && newPrefixPromoted && prefixDirectory.exists()) {
-                    // First installation failed its post-promotion smoke test.
-                    prefixDirectory.deleteRecursively()
+            if (!installedSuccessfully) {
+                if (installRoot.exists()) installRoot.deleteRecursively()
+                if (previousPrefixMoved && backup.exists() && !backup.renameTo(installRoot)) {
+                    throw IOException("Runtime validation failed and previous runtime could not be restored")
                 }
+                if (backup.exists()) backup.deleteRecursively()
             }
         }
-    }
 
     /**
      * Returns "usr/" when the ZIP is an app-files snapshot containing
