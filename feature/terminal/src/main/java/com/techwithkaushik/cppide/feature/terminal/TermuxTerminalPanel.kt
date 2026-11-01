@@ -4,8 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Typeface
-import android.os.Build
-import org.json.JSONObject
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.compose.foundation.background
@@ -65,24 +63,21 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
             try {
                 val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
                 if (!runtime.hasBootstrapLayout()) {
-                    val installFailure = installBundledBootstrap(appContext, runtime)
-                    if (installFailure == null) {
-                        RuntimeStatus(true, "")
-                    } else {
-                        RuntimeStatus(ready = false, message = installFailure)
-                    }
+                    RuntimeStatus(
+                        ready = false,
+                        message = "No runtime is installed. Open Settings → Runtime & Bootstrap and select a bootstrap ZIP."
+                    )
                 } else {
                     val smokeTest = BootstrapSmokeTest(runtime).run()
-                    if (smokeTest.success) {
-                        RuntimeStatus(true, "")
-                    } else {
-                        // Repair an incomplete or stale private runtime from the
-                        // checksum-pinned bootstrap shipped inside this ABI APK.
-                        val installFailure = installBundledBootstrap(appContext, runtime)
-                        if (installFailure == null) RuntimeStatus(true, "")
-                        else RuntimeStatus(
+                    if (smokeTest.success) RuntimeStatus(true, "")
+                    else {
+                        val detail = listOfNotNull(
+                            smokeTest.failureReason,
+                            smokeTest.stderr.trim().takeIf { it.isNotBlank() }?.let { "stderr: ${it.take(240)}" }
+                        ).joinToString(" — ")
+                        RuntimeStatus(
                             ready = false,
-                            message = installFailure
+                            message = "Runtime validation failed${if (detail.isBlank()) "." else ": $detail"} Open Settings → Runtime & Bootstrap to reinstall or repair it."
                         )
                     }
                 }
@@ -186,50 +181,6 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
     )
 }
 
-/**
- * Installs the ABI-matched bootstrap bundled in this APK on first terminal use.
- * The manifest digest is checked by BootstrapInstaller before any files are promoted.
- * Returns null on success, otherwise a user-visible setup error.
- */
-private fun installBundledBootstrap(
-    context: Context,
-    runtime: EmbeddedTermuxRuntime
-): String? {
-    val stagedArchive = File(context.cacheDir, "bundled-termux-bootstrap.zip")
-    var smokeResult: BootstrapSmokeTest.Result? = null
-    return try {
-        val metadata = context.assets.open("bootstrap/bootstrap.json")
-            .bufferedReader().use { JSONObject(it.readText()) }
-        val expectedAbi = metadata.optString("abi")
-        val supportedAbis = Build.SUPPORTED_ABIS.toSet()
-        if (expectedAbi.isBlank() || expectedAbi !in supportedAbis) {
-            return "This APK's bootstrap ABI ($expectedAbi) does not match this device (${Build.SUPPORTED_ABIS.joinToString()})."
-        }
-        val sha256 = metadata.optString("sha256")
-        if (!sha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
-            return "The bundled bootstrap manifest has an invalid SHA-256 checksum."
-        }
-        context.assets.open("bootstrap/bootstrap.zip").use { input ->
-            stagedArchive.outputStream().buffered().use { output -> input.copyTo(output) }
-        }
-        runtime.installBootstrap(stagedArchive, sha256) {
-            runtime.layout.ensurePrivateDirectories()
-            smokeResult = BootstrapSmokeTest(runtime).run()
-            smokeResult?.success == true
-        }
-        null
-    } catch (error: Exception) {
-        val smokeFailure = smokeResult?.takeIf { !it.success }?.let { result ->
-            listOfNotNull(
-                result.failureReason,
-                result.stderr.trim().takeIf { it.isNotBlank() }?.let { "stderr: ${it.take(240)}" }
-            ).joinToString(" — ")
-        }
-        smokeFailure ?: "Embedded runtime setup failed: ${error.message ?: error.javaClass.simpleName}. Rebuild/install the APK with its matching bootstrap assets."
-    } finally {
-        stagedArchive.delete()
-    }
-}
 
 private class IdeTermuxSessionClient(
     private val context: Context
