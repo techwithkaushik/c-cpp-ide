@@ -1224,6 +1224,7 @@ private fun ProjectListScreen(
             (selectedFilter == "All" || category(project.language) == selectedFilter)
     }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
@@ -1544,21 +1545,6 @@ private fun WorkspaceScreen(
         },
         bottomBar = {
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
-                if (showToolPanel) {
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 112.dp, max = 176.dp)
-                            .background(Color(0xFF10151C)),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Box(Modifier.weight(1f).fillMaxSize().verticalScroll(rememberScrollState())) {
-                            ToolPanelContent(
-                                selected = selectedPanel,
-                                onSelect = onPanel,
-                                onClose = onCloseToolPanel
-                            )
-                        }
-                    }
-                }
                 Row(
                     Modifier.fillMaxWidth().height(30.dp).horizontalScroll(rememberScrollState())
                         .padding(start = 8.dp, end = 4.dp),
@@ -1640,6 +1626,26 @@ private fun WorkspaceScreen(
                 )
             }
         }
+    }
+    if (showToolPanel) {
+        ModalBottomSheet(
+            onDismissRequest = onCloseToolPanel,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+            containerColor = Color(0xFF10151C),
+            contentWindowInsets = { WindowInsets.navigationBars }
+        ) {
+            Column(
+                Modifier.fillMaxWidth().fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                ToolPanelContent(
+                    selected = selectedPanel,
+                    onSelect = onPanel,
+                    onClose = onCloseToolPanel
+                )
+            }
+        }
+    }
     }
 }
 
@@ -1910,7 +1916,7 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         ToolPanel.Output -> "Output"
     }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 10.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1937,7 +1943,7 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         }
         when (selected) {
             ToolPanel.Terminal -> {
-                TermuxTerminalPanel()
+                TermuxTerminalPanel(Modifier.weight(1f).fillMaxWidth())
             }
             ToolPanel.Build -> {
                 ToolStatusCard("BUILD STATUS", "Waiting for runtime", "Build tools are resolved from the active file and workspace.", "Language toolchain · Not active", IdeAccent)
