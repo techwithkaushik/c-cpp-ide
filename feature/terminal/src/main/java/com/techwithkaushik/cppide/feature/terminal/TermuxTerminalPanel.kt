@@ -167,9 +167,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                 post {
                     requestFocus()
                     if (autoShowKeyboard) {
-                        (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
-                            android.view.inputmethod.InputMethodManager)
-                            ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                        postDelayed({
+                            (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                                android.view.inputmethod.InputMethodManager)
+                                ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                        }, 180L)
                     }
                 }
             }
