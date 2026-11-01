@@ -694,7 +694,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         if (showProjectOverview) {
             ModalBottomSheet(
                 onDismissRequest = { showProjectOverview = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+                // Keep the terminal sheet at a stable expanded height while the
+            // keyboard opens/closes. A partial anchor makes Material3 recalculate
+            // the sheet position on every IME inset change, which looks like a
+            // resize when Android Back hides the keyboard.
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 containerColor = IdeSurface,
                 contentWindowInsets = { WindowInsets.navigationBars }
             ) {
