@@ -161,6 +161,7 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                 setTextSize(terminalFontSize)
                 setTypeface(Typeface.MONOSPACE)
                 setTerminalViewClient(IdeTermuxViewClient(viewContext))
+                terminalClient.attach(this)
                 attachSession(session)
                 isFocusable = true
                 isFocusableInTouchMode = true
@@ -230,9 +231,23 @@ private fun installBundledBootstrap(
 private class IdeTermuxSessionClient(
     private val context: Context
 ) : TerminalSessionClient {
-    override fun onTextChanged(changedSession: TerminalSession) = Unit
-    override fun onTitleChanged(changedSession: TerminalSession) = Unit
-    override fun onSessionFinished(finishedSession: TerminalSession) = Unit
+    @Volatile private var terminalView: TerminalView? = null
+
+    fun attach(view: TerminalView?) {
+        terminalView = view
+    }
+
+    override fun onTextChanged(changedSession: TerminalSession) {
+        terminalView?.post { terminalView?.onScreenUpdated() }
+    }
+
+    override fun onTitleChanged(changedSession: TerminalSession) {
+        terminalView?.post { terminalView?.invalidate() }
+    }
+
+    override fun onSessionFinished(finishedSession: TerminalSession) {
+        terminalView?.post { terminalView?.onScreenUpdated() }
+    }
 
     override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
