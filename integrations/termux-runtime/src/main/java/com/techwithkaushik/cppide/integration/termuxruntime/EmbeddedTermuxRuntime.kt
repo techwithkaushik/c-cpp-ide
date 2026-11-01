@@ -66,7 +66,6 @@ data class RuntimeLayout private constructor(
                 .filter { it.isNotBlank() }).distinct().joinToString(File.pathSeparator))
             put("LANG", inherited["LANG"] ?: "C.UTF-8")
         }
-        }
     }
 
     private fun ensureDirectory(directory: File) {
