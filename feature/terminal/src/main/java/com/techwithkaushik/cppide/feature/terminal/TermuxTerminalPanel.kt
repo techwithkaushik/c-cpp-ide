@@ -68,11 +68,14 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
     val layout = remember(appContext) { RuntimeLayout.fromAppFilesDirectory(appContext.filesDir) }
     var runtimeRefreshToken by remember(appContext) { mutableIntStateOf(0) }
     val runtimeStatus = produceState(
-        initialValue = RuntimeStatus(false, "Checking the embedded runtime…"),
+        initialValue = RuntimeStartupCheckCache.get(layout.prefix.absolutePath)
+            ?: RuntimeStatus(false, "Checking the embedded runtime…"),
         key1 = appContext,
         key2 = runtimeRefreshToken
     ) {
-        value = withContext(Dispatchers.IO) {
+        val prefixKey = layout.prefix.absolutePath
+        if (runtimeRefreshToken > 0) RuntimeStartupCheckCache.invalidate(prefixKey)
+        value = RuntimeStartupCheckCache.get(prefixKey) ?: withContext(Dispatchers.IO) {
             try {
                 val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
                 if (!runtime.hasBootstrapLayout()) {
@@ -81,9 +84,10 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                         message = "No runtime is installed. Open Settings → Runtime & Bootstrap and select a bootstrap ZIP."
                     )
                 } else {
-                    // Repair old imported Termux text paths in-place before
-                    // the smoke test and before launching a login shell. This
-                    // does not reinstall or rebuild the bootstrap.
+                    // This potentially expensive repair scan and executable smoke
+                    // test run once per app process, not every time the bottom
+                    // sheet is opened. A successful result is cached; failed checks
+                    // remain retryable, and the explicit Retry button invalidates it.
                     runtime.repairInstalledRuntimePaths()
                     val smokeTest = BootstrapSmokeTest(runtime).run()
                     if (smokeTest.success) RuntimeStatus(true, "")
@@ -103,6 +107,8 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                     ready = false,
                     message = "Runtime check failed: ${error.message ?: error.javaClass.simpleName}"
                 )
+            }.also { status ->
+                if (status.ready) RuntimeStartupCheckCache.store(prefixKey, status)
             }
         }
     }.value
@@ -268,6 +274,34 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
     }
 }
 
+
+/**
+ * Caches only a successfully verified prefix for the lifetime of this process.
+ * The bottom sheet's composition is recreated when it is dismissed, so keeping
+ * this cache outside the composable avoids rescanning the bootstrap and starting
+ * a smoke-test shell on every open.
+ */
+private object RuntimeStartupCheckCache {
+    @Volatile private var prefixPath: String? = null
+    @Volatile private var successfulStatus: RuntimeStatus? = null
+
+    fun get(prefix: String): RuntimeStatus? =
+        if (prefixPath == prefix) successfulStatus else null
+
+    @Synchronized
+    fun store(prefix: String, status: RuntimeStatus) {
+        prefixPath = prefix
+        successfulStatus = status
+    }
+
+    @Synchronized
+    fun invalidate(prefix: String) {
+        if (prefixPath == prefix) {
+            prefixPath = null
+            successfulStatus = null
+        }
+    }
+}
 
 private data class TerminalTab(
     val id: Int,
