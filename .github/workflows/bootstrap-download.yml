@@ -334,7 +334,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v2-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v3-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Upload verified ABI bootstrap artifacts
         uses: actions/upload-artifact@v4
