@@ -249,9 +249,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             containerColor = IdeSurface,
             title = { Text("Unsaved changes", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                     Text("Save changes to $fileToClose before closing it?", color = IdeMuted)
-                    pendingCloseError?.let { error -> Text(error, color = Color(0xFFFF8A80), fontSize = 12.sp) }
+                    pendingCloseError?.let { error -> Text(error, color = Color(0xFFFF8A80), fontSize = IdeDesignTokens.Typography.caption) }
                 }
             },
             confirmButton = {
@@ -348,11 +348,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                 Text("Code Studio", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
                                 Text(selectedProject, color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, 16.dp) }
+                            IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg) }
                         }
                         Divider(color = IdeSurfaceRaised)
                         Row(Modifier.fillMaxSize()) {
-                            Column(Modifier.width(48.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(Modifier.width(48.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs), horizontalAlignment = Alignment.CenterHorizontally) {
                                 listOf(
                                     Triple("File Explorer", "folder", "Explorer"),
                                     Triple("Search", "search", "Search"),
@@ -368,13 +368,13 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                            if (active) Box(Modifier.align(Alignment.CenterStart).width(2.dp).height(25.dp).background(IdeAccent))
+                                            if (active) Box(Modifier.align(Alignment.CenterStart).width(IdeDesignTokens.Spacing.xxs).height(25.dp).background(IdeAccent))
                                             IdeIcon(icon, if (active) Color(0xFFE8EDF5) else IdeMuted, 20.dp)
                                         }
                                     }
                                 }
                             }
-                            Column(Modifier.weight(1f).fillMaxHeight().background(IdeSurface).padding(horizontal = 10.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.weight(1f).fillMaxHeight().background(IdeSurface).padding(horizontal = 10.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                                 Text(drawerDestination.uppercase(), color = Color(0xFFE8EDF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 Divider(color = IdeSurfaceRaised)
                                 when (drawerDestination) {
@@ -389,7 +389,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                         Button(onClick = { searchInProject = true; showSearch = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Search project") }
                                     }
                                     "Source Control" -> {
-                                        Text(if (dirtyFiles.isEmpty()) "No changes" else "${dirtyFiles.size} changed file(s)", color = IdeMuted, fontSize = 12.sp)
+                                        Text(if (dirtyFiles.isEmpty()) "No changes" else "${dirtyFiles.size} changed file(s)", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                                         dirtyFiles.forEach { Text("M  $it", color = IdeGreen, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                                         Button(onClick = {
                                             var saveFailed = false
@@ -409,7 +409,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                         Button(onClick = { selectedPanel = ToolPanel.Build; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Build") }
                                         OutlinedButton(onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Run / Output") }
                                     }
-                                    "Extensions" -> Text("Extension installation is not available yet.", color = IdeMuted, fontSize = 12.sp)
+                                    "Extensions" -> Text("Extension installation is not available yet.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                                     "Settings" -> Button(onClick = { settingsReturnScreen = screen; screen = IdeScreen.Settings; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Open settings") }
                                 }
                             }
@@ -476,7 +476,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 onDismissRequest = { showCommandPalette = false },
                 containerColor = Color(0xFF1B2633),
                 title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                         Text("Command Palette", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
                         OutlinedTextField(
                             value = commandQuery,
@@ -491,7 +491,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 text = {
                     Column(Modifier.fillMaxWidth().heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
                         if (matches.isEmpty()) {
-                            Text("No matching commands", color = IdeMuted, modifier = Modifier.padding(12.dp))
+                            Text("No matching commands", color = IdeMuted, modifier = Modifier.padding(IdeDesignTokens.Spacing.md))
                         }
                         matches.forEach { command ->
                             Row(
@@ -545,8 +545,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                         else -> "command"
                                     }, IdeAccent, 18.dp
                                 )
-                                Spacer(Modifier.width(12.dp))
-                                Text(command, color = Color(0xFFE8EDF5), fontSize = 14.sp)
+                                Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
+                                Text(command, color = Color(0xFFE8EDF5), fontSize = IdeDesignTokens.Typography.body)
                                 Spacer(Modifier.weight(1f))
                                 Text(
                                     when (command) {
@@ -582,15 +582,15 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search text") }, leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) })
-                        Text(if (searchQuery.isBlank()) "Type to search " + if (searchInProject) "all project files" else "the current file" else "$matchCount match${if (matchCount == 1) "" else "es"} found", color = IdeMuted, fontSize = 12.sp)
+                        Text(if (searchQuery.isBlank()) "Type to search " + if (searchInProject) "all project files" else "the current file" else "$matchCount match${if (matchCount == 1) "" else "es"} found", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                         if (searchInProject && pattern != null) {
-                            if (projectResults.isEmpty()) Text("No matches in project files.", color = IdeMuted, fontSize = 12.sp)
-                            else LazyColumn(modifier = Modifier.heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (projectResults.isEmpty()) Text("No matches in project files.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
+                            else LazyColumn(modifier = Modifier.heightIn(max = 240.dp), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.xs)) {
                                 items(projectResults, key = { it.first }) { (file, count) ->
                                     Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(9.dp)).clickable { openFile(file); showSearch = false }.padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                                         FileTypeIcon(file, 19.dp)
                                         Spacer(Modifier.width(9.dp))
-                                        Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = IdeDesignTokens.Typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text("$count", color = IdeGreen, fontSize = 11.sp)
                                     }
                                 }
@@ -610,20 +610,20 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("WORKING TREE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Local editor changes for this session", color = IdeMuted, fontSize = 12.sp)
+                        Text("Local editor changes for this session", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                         if (dirtyFiles.isEmpty()) {
-                            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(vertical = IdeDesignTokens.Spacing.md), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                                 IdeIcon("git", IdeGreen, 30.dp)
                                 Text("Working tree clean", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
-                                Text("Edit a file to see it listed here.", color = IdeMuted, fontSize = 12.sp)
+                                Text("Edit a file to see it listed here.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                             }
                         } else {
                             dirtyFiles.forEach { file ->
-                                Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(IdeDesignTokens.Spacing.sm)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     FileTypeIcon(file, 18.dp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp)
-                                    Text("M", color = Color(0xFFE5B978), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Spacer(Modifier.width(IdeDesignTokens.Spacing.sm))
+                                    Text(file, Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = IdeDesignTokens.Typography.caption)
+                                    Text("M", color = Color(0xFFE5B978), fontWeight = FontWeight.Bold, fontSize = IdeDesignTokens.Typography.caption)
                                 }
                             }
                             Text("Git repository operations are not connected yet.", color = Color(0xFFE5B978), fontSize = 11.sp)
@@ -661,10 +661,10 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             label = { Text("Search language tools") },
                             leadingIcon = { IdeIcon("search", IdeAccent, 18.dp) }
                         )
-                        Column(Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                             extensions.forEach { (name, description, tags) ->
                                 Row(Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.size(36.dp).background(IdeSurface, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                                    Box(Modifier.size(36.dp).background(IdeSurface, RoundedCornerShape(IdeDesignTokens.Spacing.sm)), contentAlignment = Alignment.Center) {
                                         IdeIcon("extensions", IdeAccent, 20.dp)
                                     }
                                     Spacer(Modifier.width(10.dp))
@@ -676,7 +676,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                     Text("Planned", color = IdeMuted, fontSize = 10.sp)
                                 }
                             }
-                            if (extensions.isEmpty()) Text("No matching extensions.", color = IdeMuted, fontSize = 12.sp)
+                            if (extensions.isEmpty()) Text("No matching extensions.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                         }
                         Text("Extension installation is not connected; this catalog is informational.", color = Color(0xFFE5B978), fontSize = 11.sp)
                     }
@@ -730,7 +730,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             containerColor = IdeSurface,
             title = { Text("Create file", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                     OutlinedTextField(
                         value = newFileName,
                         onValueChange = { newFileName = it },
@@ -785,7 +785,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             text = {
                 Column(
                     Modifier.fillMaxWidth().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
                 ) {
                     OutlinedTextField(
                         value = newProjectName,
@@ -804,7 +804,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text("PROJECT TYPE", color = IdeMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                         listOf(
                             listOf("C17", "C++20", "Python"),
                             listOf("JavaScript", "TypeScript", "Rust"),
@@ -816,21 +816,21 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                     val selected = newProjectLanguage == language
                                     if (selected) {
                                         Button(onClick = { newProjectLanguage = language },
-                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = IdeDesignTokens.Spacing.sm),
                                             modifier = Modifier.weight(1f)) { Text(language, fontSize = 11.sp, maxLines = 1) }
                                     } else {
                                         OutlinedButton(onClick = { newProjectLanguage = language },
-                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = IdeDesignTokens.Spacing.sm),
                                             modifier = Modifier.weight(1f)) { Text(language, fontSize = 11.sp, maxLines = 1) }
                                     }
                                 }
                             }
                         }
                     }
-                    Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(12.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                    Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
+                        Row(Modifier.fillMaxWidth().padding(IdeDesignTokens.Spacing.md), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            IdeIcon("code", IdeGreen, 24.dp)
+                            IdeIcon("code", IdeGreen, IdeDesignTokens.Spacing.xl)
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(entryFileForLanguage(newProjectLanguage), color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                 Text("Starter file · $newProjectLanguage", color = IdeMuted, fontSize = 11.sp)
@@ -898,27 +898,27 @@ private fun ProjectOverviewSheet(
     val primaryFile = entryFileForLanguage(projectLanguage)
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Project Overview", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("PROJECT SUMMARY", color = IdeMuted, fontSize = 10.sp)
             }
-            Text("×", Modifier.clickable(onClick = onClose).padding(6.dp), color = IdeAccent, fontSize = 18.sp)
+            Text("×", Modifier.clickable(onClick = onClose).padding(6.dp), color = IdeAccent, fontSize = IdeDesignTokens.Typography.title)
         }
         Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(14.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth().padding(IdeDesignTokens.Spacing.lg), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                 Text(projectName, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                Text("Projects/$projectName", color = IdeMuted, fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(projectLanguage, color = IdeAccent, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                Text("Projects/$projectName", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
+                Row(horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                    Text(projectLanguage, color = IdeAccent, fontWeight = FontWeight.SemiBold, fontSize = IdeDesignTokens.Typography.caption)
                     Text("• Workspace", color = IdeMuted, fontSize = 11.sp)
                 }
             }
         }
         Text("PROJECT CONTENTS", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
             OverviewMetric("—", "Files", Modifier.weight(1f))
             OverviewMetric(projectLanguage, "Language", Modifier.weight(1f))
         }
@@ -934,9 +934,9 @@ private fun ProjectOverviewSheet(
 @Composable
 private fun OverviewMetric(value: String, label: String, modifier: Modifier = Modifier) {
     Column(
-        modifier.background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(vertical = 13.dp, horizontal = 8.dp),
+        modifier.background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(vertical = 13.dp, horizontal = IdeDesignTokens.Spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.xs)
     ) {
         Text(value, color = IdeAccent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Text(label, color = IdeMuted, fontSize = 10.sp, maxLines = 1)
@@ -947,11 +947,11 @@ private fun OverviewMetric(value: String, label: String, modifier: Modifier = Mo
 private fun OverviewFileRow(name: String, description: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 13.dp),
+            .clickable(onClick = onClick).padding(horizontal = IdeDesignTokens.Spacing.md, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(if (name.endsWith(".h")) "◇" else if (name.endsWith(".cpp")) "C++" else "C",
-            color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(38.dp))
+            color = IdeAccent, fontWeight = FontWeight.Bold, fontSize = IdeDesignTokens.Typography.caption, modifier = Modifier.width(38.dp))
         Column(Modifier.weight(1f)) {
             Text(name, color = Color(0xFFE8EDF5), fontSize = 13.sp)
             Text(description, color = IdeMuted, fontSize = 10.sp)
@@ -978,18 +978,18 @@ private fun RecentFilesSheet(
                 Text("Recent Files", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("${displayFiles.distinct().size} recently opened · this session", color = IdeMuted, fontSize = 11.sp)
             }
-            if (files.isNotEmpty()) Text("Clear", Modifier.clickable(onClick = onClear).padding(8.dp), color = IdeAccent)
-            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeMuted)
+            if (files.isNotEmpty()) Text("Clear", Modifier.clickable(onClick = onClear).padding(IdeDesignTokens.Spacing.sm), color = IdeAccent)
+            Text("Done", Modifier.clickable(onClick = onClose).padding(IdeDesignTokens.Spacing.sm), color = IdeMuted)
         }
         if (files.isEmpty()) {
             Column(
-                Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                Modifier.fillMaxWidth().padding(vertical = IdeDesignTokens.Spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)
             ) {
                 Text("◷", color = IdeAccent, fontSize = 36.sp)
                 Text("No recent files yet", fontWeight = FontWeight.SemiBold)
-                Text("Files you open will appear here.", color = IdeMuted, fontSize = 12.sp)
+                Text("Files you open will appear here.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
                 OutlinedButton(onClick = { onOpenFile(activeFile) }) { Text("Return to current file") }
             }
         } else {
@@ -998,7 +998,7 @@ private fun RecentFilesSheet(
                     Modifier.fillMaxWidth()
                         .background(if (file == activeFile) Color(0xFF173D5C) else IdeSurfaceRaised, RoundedCornerShape(10.dp))
                         .clickable { onOpenFile(file) }
-                        .padding(horizontal = 12.dp, vertical = 13.dp),
+                        .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(if (file.endsWith(".cpp")) "C++" else if (file.endsWith(".h")) "H" else "C",
@@ -1021,9 +1021,9 @@ private fun SettingsInfoRow(label: String, value: String) {
         Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(10.dp)).padding(11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = IdeMuted, fontSize = 12.sp, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(8.dp))
-        Text(value, color = Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(label, color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(IdeDesignTokens.Spacing.sm))
+        Text(value, color = Color(0xFFE8EDF5), fontSize = IdeDesignTokens.Typography.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1043,7 +1043,7 @@ private fun WelcomeScreen(onNext: () -> Unit) {
             Box(
                 Modifier
                     .size(84.dp)
-                    .background(IdeSurface, RoundedCornerShape(24.dp)),
+                    .background(IdeSurface, RoundedCornerShape(IdeDesignTokens.Spacing.xl)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -1060,7 +1060,7 @@ private fun WelcomeScreen(onNext: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFF2F6FC)
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(IdeDesignTokens.Spacing.md))
             Button(
                 onClick = onNext,
                 modifier = Modifier
@@ -1122,11 +1122,11 @@ private fun ProjectListScreen(
         floatingActionButton = {
             Button(
                 onClick = onNew,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(IdeDesignTokens.Spacing.lg),
                 modifier = Modifier.height(52.dp)
             ) {
                 IdeIcon("add", Color.White, 18.dp)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(IdeDesignTokens.Spacing.sm))
                 Text("New project", fontWeight = FontWeight.SemiBold)
             }
         }
@@ -1134,7 +1134,7 @@ private fun ProjectListScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp
+                start = IdeDesignTokens.Spacing.lg, end = IdeDesignTokens.Spacing.lg, top = IdeDesignTokens.Spacing.sm, bottom = 100.dp
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -1147,12 +1147,12 @@ private fun ProjectListScreen(
                 ) {
                     Column(
                         Modifier.fillMaxWidth().padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("YOUR NEXT IDEA\nSTARTS HERE", color = Color(0xFFF2F6FC), fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
-                                Text("Create a project and start coding on your device.", color = Color(0xFFB7C7D9), fontSize = 12.sp, lineHeight = 17.sp)
+                                Text("Create a project and start coding on your device.", color = Color(0xFFB7C7D9), fontSize = IdeDesignTokens.Typography.caption, lineHeight = 17.sp)
                             }
                             Box(
                                 Modifier.size(70.dp).background(Color(0xFF254663), RoundedCornerShape(20.dp)),
@@ -1191,7 +1191,7 @@ private fun ProjectListScreen(
                     leadingIcon = { IdeIcon("search", IdeAccent, 19.dp) },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
-                            Text("×", Modifier.clickable { query = "" }.padding(horizontal = 12.dp), color = IdeMuted, fontSize = 22.sp)
+                            Text("×", Modifier.clickable { query = "" }.padding(horizontal = IdeDesignTokens.Spacing.md), color = IdeMuted, fontSize = 22.sp)
                         }
                     },
                     singleLine = true,
@@ -1207,7 +1207,7 @@ private fun ProjectListScreen(
             item {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)
                 ) {
                     filters.forEach { filter ->
                         val selected = selectedFilter == filter
@@ -1216,13 +1216,13 @@ private fun ProjectListScreen(
                                 onClick = { selectedFilter = filter },
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 7.dp),
                                 shape = RoundedCornerShape(50)
-                            ) { Text(filter, fontSize = 12.sp) }
+                            ) { Text(filter, fontSize = IdeDesignTokens.Typography.caption) }
                         } else {
                             OutlinedButton(
                                 onClick = { selectedFilter = filter },
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 7.dp),
                                 shape = RoundedCornerShape(50)
-                            ) { Text(filter, fontSize = 12.sp, color = IdeMuted) }
+                            ) { Text(filter, fontSize = IdeDesignTokens.Typography.caption, color = IdeMuted) }
                         }
                     }
                 }
@@ -1254,7 +1254,7 @@ private fun ProjectListScreen(
                     ) {
                         Column(
                             Modifier.fillMaxWidth().padding(15.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
@@ -1276,26 +1276,26 @@ private fun ProjectListScreen(
                                             else -> "M↓"
                                         },
                                         color = accent,
-                                        fontSize = if (project.language == "C++20") 12.sp else 16.sp,
+                                        fontSize = if (project.language == "C++20") IdeDesignTokens.Typography.caption else 16.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.xs)) {
                                     Text(project.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFFF2F6FC), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(project.language, color = accent, fontSize = 12.sp)
+                                    Text(project.language, color = accent, fontSize = IdeDesignTokens.Typography.caption)
                                 }
                                 Box(
                                     Modifier.size(34.dp).background(IdeSurfaceRaised, CircleShape),
                                     contentAlignment = Alignment.Center
-                                ) { Text("›", color = Color(0xFFE8EDF5), fontSize = 24.sp) }
+                                ) { Text("›", color = Color(0xFFE8EDF5), fontSize = IdeDesignTokens.Typography.headline) }
                             }
                             Row(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Color(0xFF121D28)).padding(horizontal = 10.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 IdeIcon("folder", IdeMuted, 15.dp)
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(IdeDesignTokens.Spacing.sm))
                                 Text(project.path, Modifier.weight(1f), color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1335,7 +1335,7 @@ private fun WorkspaceMetricCard(
             Box(Modifier.size(36.dp).background(accent.copy(alpha = 0.13f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
                 IdeIcon(icon, accent, 19.dp)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.xxs)) {
                 Text(value, color = Color(0xFFF2F6FC), fontSize = 19.sp, fontWeight = FontWeight.Bold)
                 Text(label, color = IdeMuted, fontSize = 11.sp)
             }
@@ -1345,7 +1345,7 @@ private fun WorkspaceMetricCard(
 
 @Composable
 private fun EmptyProjects(onNew: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)) {
         Text("▤", color = IdeAccent, fontSize = 42.sp)
         Text("No projects found", fontWeight = FontWeight.SemiBold)
         Text("Create a project to start coding.", color = IdeMuted)
@@ -1398,9 +1398,9 @@ private fun WorkspaceScreen(
                     IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) { IdeIcon("menu", IdeAccent, 20.dp) }
                 },
                 actions = {
-                    IconButton(onClick = { onAction("Undo") }, modifier = Modifier.size(32.dp)) { IdeIcon("undo", IdeAccent, 17.dp) }
-                    IconButton(onClick = { onAction("Redo") }, modifier = Modifier.size(32.dp)) { IdeIcon("redo", IdeAccent, 17.dp) }
-                    IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(32.dp)) { IdeIcon("save", IdeAccent, 16.dp) }
+                    IconButton(onClick = { onAction("Undo") }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) { IdeIcon("undo", IdeAccent, 17.dp) }
+                    IconButton(onClick = { onAction("Redo") }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) { IdeIcon("redo", IdeAccent, 17.dp) }
+                    IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) { IdeIcon("save", IdeAccent, IdeDesignTokens.Spacing.lg) }
                     var showOverflow by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
@@ -1422,7 +1422,7 @@ private fun WorkspaceScreen(
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
                 Row(
                     Modifier.fillMaxWidth().height(30.dp).horizontalScroll(rememberScrollState())
-                        .padding(start = 8.dp, end = 4.dp),
+                        .padding(start = IdeDesignTokens.Spacing.sm, end = IdeDesignTokens.Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     listOf(
@@ -1440,8 +1440,8 @@ private fun WorkspaceScreen(
                                 IdeIcon(icon, if (selected) IdeAccent else IdeMuted, 15.dp)
                                 Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                             }
-                            Spacer(Modifier.height(4.dp))
-                            Box(Modifier.width(24.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
+                            Spacer(Modifier.height(IdeDesignTokens.Spacing.xs))
+                            Box(Modifier.width(IdeDesignTokens.Spacing.xl).height(IdeDesignTokens.Spacing.xxs).background(if (selected) IdeAccent else Color.Transparent))
                         }
                     }
                     Spacer(Modifier.weight(1f))
@@ -1454,7 +1454,7 @@ private fun WorkspaceScreen(
                     Text(if (fullScreen) "⛶" else "⌘", Modifier.clickable(onClick = onToggleFullScreen), color = Color.White, fontSize = 11.sp)
                     Spacer(Modifier.width(6.dp))
                     Text("main", color = Color.White, fontSize = 10.sp)
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
                     Text("✓ UI Prototype", color = Color.White, fontSize = 10.sp)
                     Spacer(Modifier.weight(1f))
                     Text(if (activeFile.endsWith(".cpp")) "C++  •  UTF-8  •  Ln 1, Col 1" else if (activeFile.endsWith(".c")) "C  •  UTF-8  •  Ln 1, Col 1" else "UTF-8  •  Ln 1, Col 1", color = Color.White, fontSize = 10.sp)
@@ -1484,7 +1484,7 @@ private fun WorkspaceScreen(
                 Text(
                     "＋",
                     Modifier.clickable { onFile(if (activeFile == "README.md") ".gitignore" else "README.md") }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = IdeDesignTokens.Spacing.sm),
                     color = IdeAccent, fontSize = 20.sp
                 )
             }
@@ -1560,32 +1560,32 @@ private fun FileExplorerSheet(
     Column(
         Modifier.fillMaxWidth()
             .padding(horizontal = if (sidebarMode) 10.dp else 18.dp)
-            .padding(bottom = if (sidebarMode) 8.dp else 28.dp)
+            .padding(bottom = if (sidebarMode) IdeDesignTokens.Spacing.sm else 28.dp)
             .then(if (sidebarMode) Modifier.verticalScroll(rememberScrollState()) else Modifier),
-        verticalArrangement = Arrangement.spacedBy(if (sidebarMode) 6.dp else 8.dp)
+        verticalArrangement = Arrangement.spacedBy(if (sidebarMode) 6.dp else IdeDesignTokens.Spacing.sm)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("EXPLORER", fontSize = 12.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
+                Text("EXPLORER", fontSize = IdeDesignTokens.Typography.caption, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
                 Text(projectName.uppercase(), color = IdeMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            IconButton(onClick = { query = "" }, modifier = Modifier.size(32.dp)) {
-                IdeIcon("refresh", IdeMuted, 16.dp)
+            IconButton(onClick = { query = "" }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
+                IdeIcon("refresh", IdeMuted, IdeDesignTokens.Spacing.lg)
             }
-            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                IdeIcon("close", IdeMuted, 16.dp)
+            IconButton(onClick = onClose, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
+                IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg)
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
             OutlinedButton(onClick = { newEntryName = ""; fileDialog = true }, modifier = Modifier.weight(1f)) {
-                IdeIcon("add", IdeAccent, 16.dp)
+                IdeIcon("add", IdeAccent, IdeDesignTokens.Spacing.lg)
                 Spacer(Modifier.width(6.dp))
-                Text("New file", fontSize = 12.sp)
+                Text("New file", fontSize = IdeDesignTokens.Typography.caption)
             }
             OutlinedButton(onClick = { newEntryName = ""; folderDialog = true }, modifier = Modifier.weight(1f)) {
-                IdeIcon("folder", IdeAccent, 16.dp)
+                IdeIcon("folder", IdeAccent, IdeDesignTokens.Spacing.lg)
                 Spacer(Modifier.width(6.dp))
-                Text("New folder", fontSize = 12.sp)
+                Text("New folder", fontSize = IdeDesignTokens.Typography.caption)
             }
         }
         OutlinedTextField(
@@ -1598,13 +1598,13 @@ private fun FileExplorerSheet(
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { IdeIcon("close", IdeMuted, 15.dp) } }
         )
         Row(
-            Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(4.dp)).padding(horizontal = 9.dp, vertical = 9.dp),
+            Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(IdeDesignTokens.Spacing.xs)).padding(horizontal = 9.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IdeIcon("chevronDown", IdeMuted, 14.dp, Modifier.padding(end = 4.dp))
-            IdeIcon("folder", Color(0xFFE4BE79), 18.dp, Modifier.padding(end = 8.dp))
+            IdeIcon("chevronDown", IdeMuted, 14.dp, Modifier.padding(end = IdeDesignTokens.Spacing.xs))
+            IdeIcon("folder", Color(0xFFE4BE79), 18.dp, Modifier.padding(end = IdeDesignTokens.Spacing.sm))
             Column(Modifier.weight(1f)) {
-                Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
+                Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = IdeDesignTokens.Typography.caption)
                 Text("${visibleFiles.size} files", color = IdeMuted, fontSize = 10.sp)
             }
             Text("⋯", color = IdeMuted, fontSize = 19.sp)
@@ -1624,7 +1624,7 @@ private fun FileExplorerSheet(
                 containerColor = IdeSurface,
                 title = { Text(if (creatingFolder) "New folder" else "New file", color = Color(0xFFE8EDF5)) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                         OutlinedTextField(
                             value = newEntryName,
                             onValueChange = { newEntryName = it },
@@ -1669,7 +1669,7 @@ private fun FileExplorerSheet(
         if (visibleFiles.isEmpty()) {
             Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("No matching files", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
-                Text("Try a different file name.", color = IdeMuted, fontSize = 12.sp)
+                Text("Try a different file name.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
             }
         }
         Divider(color = IdeSurfaceRaised)
@@ -1710,7 +1710,7 @@ private fun FileTypeIcon(
         else -> "·" to Color(0xFF9AA8BA)
     }
     Box(
-        modifier = modifier.size(iconSize).background(color.copy(alpha = 0.13f), RoundedCornerShape(4.dp)),
+        modifier = modifier.size(iconSize).background(color.copy(alpha = 0.13f), RoundedCornerShape(IdeDesignTokens.Spacing.xs)),
         contentAlignment = Alignment.Center
     ) {
         Text(label, color = color, fontSize = if (label.length > 2) 7.sp else if (label.length == 2) 9.sp else 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -1730,7 +1730,7 @@ private fun ExplorerFileRow(
             .padding(start = indent)
             .background(if (selected) Color(0xFF1D3047) else Color.Transparent, RoundedCornerShape(9.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+            .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         FileTypeIcon(name, 20.dp, Modifier.width(30.dp))
@@ -1754,16 +1754,16 @@ private fun FileTab(name: String, selected: Boolean, dirty: Boolean, onClick: ()
              .widthIn(min = 64.dp, max = 160.dp)
             .clickable(onClick = onClick)
             .background(if (selected) IdeSurface else Color.Transparent)
-            .padding(horizontal = 8.dp, vertical = 5.dp)
+            .padding(horizontal = IdeDesignTokens.Spacing.sm, vertical = 5.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            FileTypeIcon(name, 16.dp)
-            Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            FileTypeIcon(name, IdeDesignTokens.Spacing.lg)
+            Text(name, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = IdeDesignTokens.Typography.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (dirty) Text("●", color = Color(0xFFE5B978), fontSize = 9.sp)
-            IdeIcon("close", IdeMuted, 13.dp, Modifier.clickable(onClick = onClose).padding(start = 4.dp))
+            IdeIcon("close", IdeMuted, 13.dp, Modifier.clickable(onClick = onClose).padding(start = IdeDesignTokens.Spacing.xs))
         }
-        Spacer(Modifier.height(4.dp))
-        Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) IdeAccent else Color.Transparent))
+        Spacer(Modifier.height(IdeDesignTokens.Spacing.xs))
+        Box(Modifier.fillMaxWidth().height(IdeDesignTokens.Spacing.xxs).background(if (selected) IdeAccent else Color.Transparent))
     }
 }
 
@@ -1779,7 +1779,7 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
     ) {
         IdeIcon(icon, if (selected) IdeAccent else IdeMuted, 18.dp)
         Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-        Box(Modifier.width(18.dp).height(2.dp).background(if (selected) IdeAccent else Color.Transparent, RoundedCornerShape(1.dp)))
+        Box(Modifier.width(18.dp).height(IdeDesignTokens.Spacing.xxs).background(if (selected) IdeAccent else Color.Transparent, RoundedCornerShape(1.dp)))
     }
 }
 
@@ -1797,10 +1797,10 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(title.uppercase(), fontSize = IdeDesignTokens.Typography.caption, fontWeight = FontWeight.Bold)
                 Text("PANEL", color = IdeMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
-            Text("Done", Modifier.clickable(onClick = onClose).padding(8.dp), color = IdeAccent)
+            Text("Done", Modifier.clickable(onClick = onClose).padding(IdeDesignTokens.Spacing.sm), color = IdeAccent)
         }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -1813,8 +1813,8 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
                     ToolPanel.Problems -> "Problems"
                     ToolPanel.Output -> "Output"
                 }
-                if (panel == selected) Button(onClick = { onSelect(panel) }) { Text(label, fontSize = 12.sp) }
-                else OutlinedButton(onClick = { onSelect(panel) }) { Text(label, fontSize = 12.sp) }
+                if (panel == selected) Button(onClick = { onSelect(panel) }) { Text(label, fontSize = IdeDesignTokens.Typography.caption) }
+                else OutlinedButton(onClick = { onSelect(panel) }) { Text(label, fontSize = IdeDesignTokens.Typography.caption) }
             }
         }
         when (selected) {
@@ -1835,9 +1835,9 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
             ToolPanel.Output -> {
                 ToolStatusCard("PROGRAM OUTPUT", "No output yet", "Run output will appear here after execution support is connected.", "Execution target: Linux environment", IdeAccent)
                 Box(
-                    Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF0B0F14), RoundedCornerShape(10.dp)).padding(12.dp)
+                    Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF0B0F14), RoundedCornerShape(10.dp)).padding(IdeDesignTokens.Spacing.md)
                 ) {
-                    Text("Waiting for program execution…", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    Text("Waiting for program execution…", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = IdeDesignTokens.Typography.caption)
                 }
             }
         }
@@ -1864,11 +1864,11 @@ private fun ToolStatusCard(
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(eyebrow, color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                 Box(Modifier.size(9.dp).background(accent, RoundedCornerShape(50)))
                 Text(status, color = Color(0xFFE8EDF5), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
-            Text(description, color = IdeMuted, fontSize = 12.sp)
+            Text(description, color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
             Divider(color = IdeSurfaceRaised)
             Text(detail, color = accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace)        }
     }
@@ -1885,7 +1885,7 @@ private fun PanelInfoRow(number: String, title: String, status: String) {
             Text(number, color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = Color(0xFFE8EDF5), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(title, color = Color(0xFFE8EDF5), fontSize = IdeDesignTokens.Typography.caption, fontWeight = FontWeight.Medium)
             Text(status, color = IdeMuted, fontSize = 10.sp)
         }
     }
