@@ -80,8 +80,8 @@ internal fun IdeSettingsScreen(
                 Text("Settings", color = SettingsText, fontSize = 20.sp)
                 Text("Configure the entire coding environment", color = SettingsMuted, fontSize = 11.sp)
             }
-            TextButton(onClick = { prefs.edit().clear().apply(); onBack() }) {
-                Text("Reset", color = SettingsMuted)
+            TextButton(onClick = { category = "Overview" }) {
+                Text("Overview", color = SettingsMuted)
             }
         }
         Row(
