@@ -62,6 +62,10 @@ jobs:
           gradle-version: ${{ env.GRADLE_VERSION }}
 
       - name: Test Linux runtime and SSH integration
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: gradle --no-daemon --build-cache :integrations:linux-runtime:testDebugUnitTest
 
       - name: Build arm32 release APK with Gradle signing
@@ -95,7 +99,7 @@ jobs:
             size_bytes="$(stat -c '%s' "$apk")"
             echo "Verified Gradle-signed $abi APK: $apk ($(( (size_bytes + 1023) / 1024 )) KiB)"
             if unzip -Z1 "$apk" | grep -E '(^|/)(bootstrap|bootstrap\.zip)(/|$)' >/dev/null; then
-              echo "::error::Bootstrap payload unexpectedly found inside $apk"
+              echo "::error::Linux runtime payload unexpectedly found inside $apk"
               exit 1
             fi
           done
