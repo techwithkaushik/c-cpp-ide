@@ -194,6 +194,7 @@ class BootstrapInstaller(
                 if (backup.exists()) backup.deleteRecursively()
             }
         }
+    }
 
     /**
      * Returns "usr/" when the ZIP is an app-files snapshot containing
