@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,9 +43,6 @@ fun RuntimeSetupPanel(
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     var selectedArchive by remember { mutableStateOf<Uri?>(null) }
-    var selectedManifest by remember { mutableStateOf<Uri?>(null) }
-    var selectedAbi by remember { mutableStateOf<String?>(null) }
-    var sha256 by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var checkingInstalledRuntime by remember { mutableStateOf(false) }
     var status by remember(message) { mutableStateOf(message) }
@@ -90,51 +86,10 @@ fun RuntimeSetupPanel(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
             selectedArchive = uri
-            if (uri != null) status = "Bootstrap ZIP selected. Now select bootstrap.json from the same ABI artifact."
+            if (uri != null) status = "Bootstrap ZIP selected. Ready to install with Termux-style symlink setup."
         }
     )
 
-    val manifestPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            selectedManifest = uri
-            selectedAbi = null
-            if (uri == null) return@rememberLauncherForActivityResult
-            scope.launch {
-                val parsed = try {
-                    withContext(Dispatchers.IO) {
-                        val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                            ?: throw IOException("Android could not open bootstrap.json")
-                        val json = JSONObject(raw)
-                        val abi = json.optString("abi")
-                        val digest = json.optString("sha256").lowercase()
-                        val version = json.optString("version", "unknown")
-                        if (abi.isBlank() || !digest.matches(Regex("^[a-f0-9]{64}$"))) {
-                            throw IOException("bootstrap.json must contain a valid abi and 64-character sha256")
-                        }
-                        if (abi !in supportedAbis) {
-                            throw IOException(
-                                "This bootstrap is for $abi, but this device supports: ${supportedAbis.joinToString()}. Download the matching ABI artifact."
-                            )
-                        }
-                        Triple(abi, digest, version)
-                    }
-                } catch (error: Exception) {
-                    selectedManifest = null
-                    selectedAbi = null
-                    sha256 = ""
-                    status = "Manifest error: ${error.message ?: error.javaClass.simpleName}"
-                    null
-                }
-                if (parsed != null) {
-                    val (abi, digest, version) = parsed
-                    selectedAbi = abi
-                    sha256 = digest
-                    status = "Manifest verified: ABI $abi, version $version. Make sure the ZIP is from the same artifact."
-                }
-            }
-        }
-    )
 
     Column(
         modifier = modifier.fillMaxWidth().background(Color(0xFF0D1117), RoundedCornerShape(16.dp)).padding(16.dp),
@@ -142,7 +97,7 @@ fun RuntimeSetupPanel(
     ) {
         Text("Main terminal setup", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Text(
-            "Install the app-private Linux environment used by the main terminal. In GitHub Actions, download the artifact matching this device (for example, bootstrap-arm64-v8a), extract it, then select both files from that same artifact. Your existing Termux installation is not touched.",
+            "Install the app-private Termux-compatible environment. Select the bootstrap ZIP built for this app and device ABI. Installation extracts files, replays SYMLINKS.txt, restores executable permissions, and tests the shell. Your existing Termux installation is not touched.",
             color = Color(0xFFE8EDF5),
             fontSize = 12.sp
         )
@@ -161,35 +116,11 @@ fun RuntimeSetupPanel(
             fontSize = 11.sp
         )
         Button(
-            enabled = !busy && !checkingInstalledRuntime,
-            onClick = { manifestPicker.launch(arrayOf("application/json", "text/plain", "*/*")) }
-        ) {
-            Text(if (selectedManifest == null) "2 · Select bootstrap.json" else "Change bootstrap manifest")
-        }
-        Text(
-            selectedAbi?.let { "Selected ABI: $it" } ?: "The manifest supplies the trusted SHA-256 and ABI.",
-            color = if (selectedAbi != null) Color(0xFF7DDBB0) else Color(0xFF9AA7B5),
-            fontSize = 11.sp
-        )
-        OutlinedTextField(
-            value = sha256,
-            onValueChange = { sha256 = it.filterNot(Char::isWhitespace).lowercase() },
-            enabled = !busy,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("SHA-256 checksum") },
-            supportingText = { Text("Auto-filled from bootstrap.json; only edit if you have independently verified the published digest.") },
-            singleLine = true
-        )
-        Button(
-            enabled = !busy && !checkingInstalledRuntime &&
-                selectedArchive != null && selectedManifest != null &&
-                selectedAbi != null && selectedAbi in supportedAbis &&
-                sha256.matches(Regex("^[a-f0-9]{64}$")),
+            enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
             onClick = {
                 val uri = selectedArchive ?: return@Button
-                val digest = sha256
                 busy = true
-                status = "Verifying archive checksum, installing bootstrap, and testing the shell…"
+                status = "Installing bootstrap, applying SYMLINKS.txt, and testing the shell…"
                 scope.launch {
                     val result = withContext(Dispatchers.IO) {
                         val stagedArchive = File(context.cacheDir, "selected-code-studio-bootstrap.zip")
@@ -212,12 +143,12 @@ fun RuntimeSetupPanel(
                             val runtime = EmbeddedTermuxRuntime(context.filesDir)
                             var smoke: BootstrapSmokeTest.Result? = null
                             try {
-                                val installed = runtime.installBootstrap(stagedArchive, digest) {
+                                val installed = runtime.installBootstrap(stagedArchive, null) {
                                     runtime.layout.ensurePrivateDirectories()
                                     smoke = BootstrapSmokeTest(runtime).run()
                                     smoke?.success == true
                                 }
-                                "Bootstrap installed and verified (${installed.sha256.take(12)}…). Shell execution passed."
+                                "Bootstrap installed and verified. Created ${installed.symlinksCreated} symlinks; shell execution passed."
                             } catch (error: Exception) {
                                 val failedSmoke = smoke
                                 val reason = failedSmoke?.failureReason
