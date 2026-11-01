@@ -35,7 +35,7 @@ The terminal panel supports:
 - First-connection SSH SHA-256 fingerprint confirmation. Trusted fingerprints are saved app-privately; a changed host key is rejected.
 - Password or private-key authentication. First-use host keys require explicit SHA-256 fingerprint confirmation; a changed key is rejected. Private-key bytes and passwords are not persisted; a Keystore-backed credential vault remains future work.
 
-The terminal view currently presents text output and line-oriented input with Ctrl-C support; a full VT/xterm rendering layer, resize propagation for all terminal sizes, editor/build-to-remote-workspace integration and a full VT/xterm rendering layer are not yet complete. Do not treat this as feature parity with a desktop terminal emulator.
+The terminal view has a bounded VT-style parser for common cursor/erase sequences, text output, line-oriented input, and Ctrl-C support. Full color/alternate-screen rendering, resize propagation, and editor/build-to-remote-workspace integration are not yet complete; this is not yet feature parity with a desktop terminal emulator.
 
 ## Module layout
 
