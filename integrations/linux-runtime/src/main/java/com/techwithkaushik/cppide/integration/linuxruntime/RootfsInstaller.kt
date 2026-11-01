@@ -83,6 +83,14 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             if (!File(stage, "bin/sh").exists() && !File(stage, "usr/bin/sh").exists()) {
                 throw IOException("Ubuntu rootfs does not contain /bin/sh or /usr/bin/sh.")
             }
+            // Ubuntu Base may ship a systemd-resolved stub symlink that cannot
+            // work in this rootless environment. Replace only a missing/broken
+            // resolver with explicit public DNS so apt can resolve package hosts.
+            val resolver = File(stage, "etc/resolv.conf")
+            if (Files.isSymbolicLink(resolver.toPath()) || !resolver.isFile || resolver.length() == 0L) {
+                if (Files.isSymbolicLink(resolver.toPath())) Files.delete(resolver.toPath())
+                resolver.writeText("nameserver 1.1.1.1\\nnameserver 8.8.8.8\\noptions timeout:2 attempts:2\\n")
+            }
             val old = File(paths.staging, "ubuntu-previous")
             if (old.exists()) old.deleteRecursively()
             if (paths.ubuntuRoot.exists() && !paths.ubuntuRoot.renameTo(old)) throw IOException("Cannot back up current Ubuntu rootfs.")
