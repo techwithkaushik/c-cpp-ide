@@ -44,7 +44,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v3-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v4-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Checkout pinned Termux packages source
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
@@ -307,9 +307,30 @@ jobs:
               if "SYMLINKS.txt" not in names:
                   raise SystemExit(f"{archive}: missing SYMLINKS.txt")
               symlinks = zf.read("SYMLINKS.txt").decode("utf-8", errors="strict")
-              if "/data/data/com.termux/files/usr" in symlinks:
-                  raise SystemExit(f"{archive}: contains stock Termux prefix")
-              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries")
+              stock_prefixes = (
+                  b"/data/data/com.termux/files/usr",
+                  b"/data/user/0/com.termux/files/usr",
+              )
+              if any(prefix.decode() in symlinks for prefix in stock_prefixes):
+                  raise SystemExit(f"{archive}: SYMLINKS.txt contains the stock Termux prefix")
+              # Symlink remapping alone is insufficient: termux-exec and other
+              # ELF files may embed the package-specific prefix. Reject a
+              # bootstrap compiled for com.termux instead of shipping a runtime
+              # that silently launches commands from another app's data path.
+              checked = 0
+              for info in zf.infolist():
+                  name = info.filename.rstrip("/")
+                  if info.is_dir() or not name.startswith(("bin/", "lib/", "libexec/", "etc/")):
+                      continue
+                  data = zf.read(info)
+                  checked += 1
+                  if any(prefix in data for prefix in stock_prefixes):
+                      raise SystemExit(f"{archive}: {name} embeds the stock Termux prefix")
+              if not any(b"/data/data/" + package.encode() + b"/files/usr" in zf.read(info)
+                         for info in zf.infolist()
+                         if not info.is_dir() and info.filename.startswith(("bin/", "lib/", "libexec/", "etc/"))):
+                  raise SystemExit(f"{archive}: runtime ELF/config files do not contain the expected app prefix {package}")
+              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries; scanned {checked} runtime files")
           PY
             sha="$(sha256sum "$destination/bootstrap.zip" | cut -d ' ' -f 1)"
             cat > "$destination/bootstrap.json" <<EOF
@@ -334,7 +355,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v3-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v4-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Upload armeabi-v7a bootstrap
         uses: actions/upload-artifact@v4
