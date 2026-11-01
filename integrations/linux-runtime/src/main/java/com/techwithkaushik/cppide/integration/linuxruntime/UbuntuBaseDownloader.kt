@@ -17,23 +17,28 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
         val fileName = "ubuntu-base-24.04.5-base-$arch.tar.gz"
         val baseUrl = "https://cdimage.ubuntu.com/ubuntu-base/releases/noble/release/"
         val sumsFile = File(paths.base, "SHA256SUMS")
-        download(URL(baseUrl + "SHA256SUMS"), sumsFile, MAX_SUMS_BYTES, null)
-        val expected = sumsFile.useLines { lines ->
-            lines.mapNotNull { line ->
-                val parts = line.trim().split(Regex("\\s+"), limit = 2)
-                if (parts.size == 2 && parts[1].trimStart('*') == fileName) parts[0] else null
-            }.firstOrNull()
-        } ?: throw IllegalStateException("Ubuntu SHA256SUMS does not list $fileName.")
-        if (!expected.matches(Regex("[a-fA-F0-9]{64}"))) throw IllegalStateException("Ubuntu SHA256SUMS contains an invalid digest.")
         val archive = File(paths.base, fileName)
-        download(URL(baseUrl + fileName), archive, MAX_ROOTFS_ARCHIVE_BYTES, onProgress)
-        val actual = sha256(archive)
-        if (!actual.equals(expected, ignoreCase = true)) {
+        try {
+            download(URL(baseUrl + "SHA256SUMS"), sumsFile, MAX_SUMS_BYTES, null)
+            val expected = sumsFile.useLines { lines ->
+                lines.mapNotNull { line ->
+                    val parts = line.trim().split(Regex("\\s+"), limit = 2)
+                    if (parts.size == 2 && parts[1].trimStart('*') == fileName) parts[0] else null
+                }.firstOrNull()
+            } ?: throw IllegalStateException("Ubuntu SHA256SUMS does not list $fileName.")
+            if (!expected.matches(Regex("[a-fA-F0-9]{64}"))) throw IllegalStateException("Ubuntu SHA256SUMS contains an invalid digest.")
+            download(URL(baseUrl + fileName), archive, MAX_ROOTFS_ARCHIVE_BYTES, onProgress)
+            val actual = sha256(archive)
+            if (!actual.equals(expected, ignoreCase = true)) throw SecurityException("Ubuntu rootfs checksum verification failed.")
+            val byteCount = archive.length()
+            val installed = RootfsInstaller(paths).install(archive, expected)
+            return Result(installed, actual, byteCount)
+        } finally {
+            // The extracted rootfs is the installed runtime; keeping the compressed
+            // archive would waste hundreds of MiB in the app-private data directory.
             archive.delete()
-            throw SecurityException("Ubuntu rootfs checksum verification failed.")
+            sumsFile.delete()
         }
-        val installed = RootfsInstaller(paths).install(archive, expected)
-        return Result(installed, actual, archive.length())
     }
 
     private fun download(url: URL, destination: File, maxBytes: Long, progress: ((Long, Long) -> Unit)?) {
