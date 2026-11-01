@@ -458,7 +458,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     selectedPanel = selectedPanel, showToolPanel = showToolPanel, fullScreen = fullScreen,
                     onToggleFullScreen = { fullScreen = !fullScreen },
                     onCloseToolPanel = { showToolPanel = false },
-                    onPanel = { selectedPanel = it; showToolPanel = true }
+                    onPanel = { selectedPanel = it; showToolPanel = true },
+                    onOpenSettings = { settingsReturnScreen = screen; screen = IdeScreen.Settings; showToolPanel = false }
                 )
             }
         }
@@ -1374,7 +1375,8 @@ private fun WorkspaceScreen(
     fullScreen: Boolean,
     onToggleFullScreen: () -> Unit,
     onCloseToolPanel: () -> Unit,
-    onPanel: (ToolPanel) -> Unit
+    onPanel: (ToolPanel) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -1514,11 +1516,7 @@ private fun WorkspaceScreen(
                     selected = selectedPanel,
                     onSelect = onPanel,
                     onClose = onCloseToolPanel,
-                    onOpenSettings = {
-                        settingsReturnScreen = screen
-                        screen = IdeScreen.Settings
-                        onCloseToolPanel()
-                    }
+                    onOpenSettings = onOpenSettings
                 )
             }
         }
