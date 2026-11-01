@@ -18,7 +18,6 @@ android {
         versionName = "0.1.0"
     }
 
-    // Each distributable APK contains only native libraries and bootstrap data for one ABI.
     flavorDimensions += "bootstrapAbi"
     productFlavors {
         create("arm32") {
@@ -41,13 +40,6 @@ android {
             ndk { abiFilters += "x86_64" }
             buildConfigField("String", "BOOTSTRAP_ABI", "\"x86_64\"")
         }
-    }
-
-    sourceSets {
-        getByName("arm32").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/arm32"))
-        getByName("arm64").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/arm64"))
-        getByName("x86").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/x86"))
-        getByName("x64").assets.srcDir(layout.buildDirectory.dir("generated/bootstrapAssets/x64"))
     }
 
     // Keep Java and Kotlin output compatible across CI and local builds.
