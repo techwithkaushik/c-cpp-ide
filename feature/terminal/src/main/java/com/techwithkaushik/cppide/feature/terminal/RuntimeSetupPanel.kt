@@ -29,7 +29,6 @@ import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntim
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 
@@ -55,7 +54,7 @@ fun RuntimeSetupPanel(
                     try {
                         val runtime = EmbeddedTermuxRuntime(context.filesDir)
                         if (!runtime.hasBootstrapLayout()) {
-                            "No complete bootstrap is installed. Select the matching bootstrap.zip and bootstrap.json files below."
+                            "No complete bootstrap is installed. Select the matching bootstrap.zip below."
                         } else {
                             val smoke = BootstrapSmokeTest(runtime).run()
                             if (smoke.success) {
@@ -89,15 +88,11 @@ fun RuntimeSetupPanel(
     )
 
 
-    val installBootstrap: (Boolean) -> Unit = { withSymlinks ->
+    val installBootstrap: () -> Unit = {
         val uri = selectedArchive
         if (uri != null && !busy && !checkingInstalledRuntime) {
             busy = true
-            status = if (withSymlinks) {
-                "Installing bootstrap, processing SYMLINKS.txt, and testing the shell…"
-            } else {
-                "Installing bootstrap WITHOUT processing SYMLINKS.txt, then testing the shell…"
-            }
+            status = "Installing bootstrap and creating Termux symlinks…"
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     val stagedArchive = File(context.cacheDir, "selected-code-studio-bootstrap.zip")
@@ -123,21 +118,19 @@ fun RuntimeSetupPanel(
                             val installed = runtime.installBootstrap(
                                 archive = stagedArchive,
                                 expectedSha256 = null,
-                                processSymlinks = withSymlinks,
+                                processSymlinks = true,
                             ) {
                                 runtime.layout.ensurePrivateDirectories()
                                 smoke = BootstrapSmokeTest(runtime).run()
                                 smoke?.success == true
                             }
-                            val mode = if (withSymlinks) "with symlinks" else "without symlinks"
-                            "Bootstrap installed $mode and verified. Created ${installed.symlinksCreated} symlinks; shell execution passed."
+                            "Bootstrap installed and verified. Created ${installed.symlinksCreated} symlinks; shell execution passed."
                         } catch (error: Exception) {
                             val failedSmoke = smoke
                             val reason = failedSmoke?.failureReason
                             if (reason != null) {
                                 val stderr = failedSmoke.stderr.trim().takeIf { it.isNotBlank() }
-                                val mode = if (withSymlinks) "with symlinks" else "without symlinks"
-                                "Setup failed ($mode): $reason" +
+                                "Setup failed: $reason" +
                                     (stderr?.let { " — stderr: ${it.take(400)}" } ?: "") +
                                     ". The previous runtime, if any, was restored."
                             } else {
@@ -163,7 +156,7 @@ fun RuntimeSetupPanel(
     ) {
         Text("Main terminal setup", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Text(
-            "Select the bootstrap ZIP built for this app and device ABI, then choose a test mode. WITH symlinks processes SYMLINKS.txt; WITHOUT symlinks skips it completely so shell behavior can be compared. Both modes test shell execution and restore the previous runtime if the test fails. Your existing Termux installation is not touched.",
+            "Select the bootstrap ZIP built for this app and device ABI. The installer creates the symlinks and tests the shell. If the test fails, the previous runtime is restored.",
             color = Color(0xFFE8EDF5),
             fontSize = 12.sp
         )
@@ -188,15 +181,9 @@ fun RuntimeSetupPanel(
         )
         Button(
             enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
-            onClick = { installBootstrap(true) }
+            onClick = { installBootstrap() }
         ) {
             Text(if (busy) "Setting up terminal…" else "2 · Install bootstrap WITH symlinks")
-        }
-        Button(
-            enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
-            onClick = { installBootstrap(false) }
-        ) {
-            Text(if (busy) "Setting up terminal…" else "3 · Install bootstrap WITHOUT symlinks")
         }
         if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text(
