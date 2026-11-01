@@ -113,7 +113,7 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
         }
         Column(
             modifier = modifier.fillMaxSize().background(IdeDesignTokens.Color.Background).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
         ) {
             Text("Terminal runtime unavailable", color = IdeDesignTokens.Color.TextPrimary)
             Text(message, color = IdeDesignTokens.Color.TextSecondary)
