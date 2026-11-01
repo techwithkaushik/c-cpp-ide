@@ -362,6 +362,8 @@ private object TerminalSessionRegistry {
 
         if (tabs.isEmpty()) {
             selectedTabId = 0
+            // Allow a fresh initial shell the next time the user opens Terminal.
+            initialSessionCreated = false
             onLastSessionExited?.invoke()
             return
         }
@@ -405,6 +407,7 @@ private object TerminalSessionRegistry {
         removed.session.finishIfRunning()
         if (tabs.isEmpty()) {
             selectedTabId = 0
+            initialSessionCreated = false
             onLastSessionExited?.invoke()
         } else if (selectedTabId == id) {
             // Closing a selected tab follows shell-exit behavior: select the
