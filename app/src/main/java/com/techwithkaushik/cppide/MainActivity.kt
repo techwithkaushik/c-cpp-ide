@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide
 
 import com.techwithkaushik.cppide.feature.terminal.TermuxTerminalPanel
+import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 
 import android.os.Bundle
 import android.app.Activity
@@ -95,12 +96,12 @@ import java.io.File
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
-private val IdeBackground = Color(0xFF101820)
-private val IdeSurface = Color(0xFF192733)
-private val IdeSurfaceRaised = Color(0xFF243D52)
-private val IdeAccent = Color(0xFF659AD2)
-private val IdeMuted = Color(0xFF9AA8BA)
-private val IdeGreen = Color(0xFF7DDBB0)
+private val IdeBackground = IdeDesignTokens.Color.Background
+private val IdeSurface = IdeDesignTokens.Color.Surface
+private val IdeSurfaceRaised = IdeDesignTokens.Color.SurfaceRaised
+private val IdeAccent = IdeDesignTokens.Color.Accent
+private val IdeMuted = IdeDesignTokens.Color.TextSecondary
+private val IdeGreen = IdeDesignTokens.Color.Green
 
 private enum class IdeScreen { Welcome, Projects, Workspace, Settings }
 private enum class ToolPanel { Terminal, Build, Problems, Output }
@@ -111,19 +112,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val settings = getSharedPreferences("ide_settings", MODE_PRIVATE)
+            val settings = getSharedPreferences(IdeDesignTokens.Preference.FILE, MODE_PRIVATE)
             var uiFontScale by rememberSaveable {
-                mutableStateOf(settings.getFloat("ui_font_scale", 1.0f).coerceIn(0.85f, 1.25f))
+                mutableStateOf(settings.getFloat(IdeDesignTokens.Preference.UI_FONT_SCALE, IdeDesignTokens.Metrics.DEFAULT_UI_FONT_SCALE).coerceIn(IdeDesignTokens.Metrics.MIN_UI_FONT_SCALE, IdeDesignTokens.Metrics.MAX_UI_FONT_SCALE))
             }
             val systemDensity = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(systemDensity.density, uiFontScale)) {
                 MaterialTheme(
                     colorScheme = androidx.compose.material3.darkColorScheme(
                         primary = IdeAccent,
-                        onPrimary = Color(0xFF071426),
+                        onPrimary = IdeDesignTokens.Color.OnPrimary,
                         background = IdeBackground,
                         surface = IdeSurface,
-                        onSurface = Color(0xFFE8EDF5),
+                        onSurface = IdeDesignTokens.Color.TextPrimary,
                         onSurfaceVariant = IdeMuted,
                         secondary = IdeGreen
                     )
@@ -133,7 +134,7 @@ class MainActivity : ComponentActivity() {
                             uiFontScale = uiFontScale,
                             onUiFontScaleChange = {
                                 uiFontScale = it.coerceIn(0.85f, 1.25f)
-                                settings.edit().putFloat("ui_font_scale", uiFontScale).apply()
+                                settings.edit().putFloat(IdeDesignTokens.Preference.UI_FONT_SCALE, uiFontScale).apply()
                             }
                         )
                     }
@@ -211,9 +212,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var commandQuery by rememberSaveable { mutableStateOf("") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchInProject by rememberSaveable { mutableStateOf(false) }
-    var editorFontSize by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getFloat("editor_font_size", 14f)) }
-    var editorWordWrap by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getBoolean("editor_word_wrap", false)) }
-    var editorTheme by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getString("editor_theme", "Dark+ (VS Code)") ?: "Dark+ (VS Code)") }
+    var editorFontSize by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, 0).getFloat(IdeDesignTokens.Preference.EDITOR_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_EDITOR_FONT_SIZE)) }
+    var editorWordWrap by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getBoolean(IdeDesignTokens.Preference.EDITOR_WORD_WRAP, false)) }
+    var editorTheme by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getString(IdeDesignTokens.Preference.EDITOR_THEME, "Dark+ (VS Code)") ?: "Dark+ (VS Code)") }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember(projectStorage) {
