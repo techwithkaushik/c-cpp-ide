@@ -47,6 +47,16 @@ object IdeDesignTokens {
         val headline = 24.sp
     }
 
+    object Preference {
+        const val FILE = "ide_settings"
+        const val EDITOR_FONT_SIZE = "editor_font_size"
+        const val EDITOR_WORD_WRAP = "editor_word_wrap"
+        const val EDITOR_THEME = "editor_theme"
+        const val TERMINAL_FONT_SIZE = "terminal_font_size"
+        const val TERMINAL_AUTO_KEYBOARD = "terminal_auto_keyboard"
+        const val UI_FONT_SCALE = "ui_font_scale"
+    }
+
     object Metrics {
         const val DEFAULT_EDITOR_FONT_SIZE = 14f
         const val MIN_EDITOR_FONT_SIZE = 10f
