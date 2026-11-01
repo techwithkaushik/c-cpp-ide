@@ -16,7 +16,7 @@ class BootstrapInstallerTest {
     private val temp = TemporaryFolder().apply { create() }
 
     @Test
-    fun installsVerifiedArchiveIntoStagingPrefix() {
+    fun installsBootstrapArchiveDirectlyIntoPrefix() {
         val archive = createArchive(
             "bin/bash" to "shell",
             "etc/profile" to "profile",
@@ -30,7 +30,6 @@ class BootstrapInstallerTest {
         assertEquals("shell", File(prefix, "bin/bash").readText())
         assertEquals(4, result.filesExtracted)
         assertTrue(result.sha256.matches(Regex("^[a-f0-9]{64}$")))
-        assertFalse(File(temp.root, "runtime/.usr.staging").exists())
     }
 
     @Test
@@ -55,7 +54,7 @@ class BootstrapInstallerTest {
     }
 
     @Test
-    fun preservesPreviousRuntimeWhenStagedArchiveIsInvalid() {
+    fun preservesPreviousRuntimeWhenArchiveIsInvalid() {
         val prefix = File(temp.root, "runtime/usr")
         assertTrue(prefix.mkdirs())
         File(prefix, "existing-runtime.txt").writeText("known-good")
@@ -71,7 +70,7 @@ class BootstrapInstallerTest {
 
         assertEquals("known-good", File(prefix, "existing-runtime.txt").readText())
         assertFalse(File(prefix, "bin/sh").exists())
-        assertTrue(temp.root.walkTopDown().none { it.name.startsWith(".usr.staging-") })
+        assertTrue(temp.root.walkTopDown().none { it.name.startsWith(".usr.backup-") })
     }
 
     @Test
@@ -205,7 +204,7 @@ class BootstrapInstallerTest {
     }
 
     @Test
-    fun rejectsTooManyArchiveEntriesAndCleansStagingDirectory() {
+    fun rejectsTooManyArchiveEntriesAndCleansRuntimePrefix() {
         val archive = createArchive(
             "bin/sh" to "shell",
             "etc/profile" to "profile",
