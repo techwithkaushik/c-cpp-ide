@@ -93,13 +93,19 @@ class BootstrapInstaller(
                     // When the archive is an app-files snapshot, ignore sibling
                     // folders such as home/ and projects/; they are not part of
                     // PREFIX and must never be nested inside files/usr.
+                    val normalizedName = rawName.trimStart('/')
                     val selectedName = if (archivePrefix.isEmpty()) {
-                        rawName
+                        // A valid bootstrap ZIP may have unrelated app-files
+                        // folders alongside the real prefix (for example when
+                        // someone zipped the whole files/ directory). Never
+                        // import those folders into the runtime staging tree.
+                        if (isNonBootstrapWrapperEntry(normalizedName)) continue
+                        normalizedName
                     } else {
                         when {
-                            rawName == "SYMLINKS.txt" -> rawName
-                            rawName == archivePrefix.removeSuffix("/") -> continue
-                            rawName.startsWith(archivePrefix) -> rawName.removePrefix(archivePrefix)
+                            normalizedName == "SYMLINKS.txt" -> normalizedName
+                            normalizedName == archivePrefix.removeSuffix("/") -> continue
+                            normalizedName.startsWith(archivePrefix) -> normalizedName.removePrefix(archivePrefix)
                             else -> continue
                         }
                     }
@@ -219,6 +225,21 @@ class BootstrapInstaller(
      * usr/bin, usr/etc, usr/lib and usr/share; returns "" for a normal
      * bootstrap ZIP whose entries start directly with bin/, etc/, lib/.
      */
+    /**
+     * Exclude app-private files-directory content accidentally included next to
+     * the bootstrap root. These are not valid entries inside the Termux prefix.
+     */
+    private fun isNonBootstrapWrapperEntry(name: String): Boolean {
+        val first = name.substringBefore('/')
+        return first == "home" ||
+            first == "projects" ||
+            first == "usr" ||
+            first.startsWith(".usr.staging-") ||
+            first.startsWith(".usr.backup-") ||
+            first.startsWith(".usr.tmp-") ||
+            first.startsWith(".usr.staging")
+    }
+
     private fun detectArchivePrefix(archive: File): String {
         val names = HashSet<String>()
         ZipFile(archive).use { zip ->
