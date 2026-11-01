@@ -25,4 +25,18 @@ class SshHostTest {
         val host = SshHost(host = "example.com", username = "developer", password = "pw", expectedSha256Fingerprint = "MD5:bad")
         assertThrows(IllegalArgumentException::class.java) { host.validate() }
     }
+    @Test fun acceptsIpv4AndIpv6Literals() {
+        SshHost(host = "192.0.2.10", username = "developer", password = "pw").validate()
+        SshHost(host = "2001:db8::1", username = "developer", password = "pw").validate()
+    }
+
+    @Test fun rejectsHostStringsThatCouldBeMalformed() {
+        assertThrows(IllegalArgumentException::class.java) {
+            SshHost(host = "bad host", username = "developer", password = "pw").validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            SshHost(host = ":::;", username = "developer", password = "pw").validate()
+        }
+    }
+
 }
