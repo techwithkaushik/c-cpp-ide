@@ -81,6 +81,10 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                         message = "No runtime is installed. Open Settings → Runtime & Bootstrap and select a bootstrap ZIP."
                     )
                 } else {
+                    // Repair old imported Termux text paths in-place before
+                    // the smoke test and before launching a login shell. This
+                    // does not reinstall or rebuild the bootstrap.
+                    runtime.repairInstalledRuntimePaths()
                     val smokeTest = BootstrapSmokeTest(runtime).run()
                     if (smokeTest.success) RuntimeStatus(true, "")
                     else {
