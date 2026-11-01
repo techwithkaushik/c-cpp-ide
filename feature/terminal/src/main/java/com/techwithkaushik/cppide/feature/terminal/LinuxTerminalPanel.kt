@@ -58,6 +58,7 @@ private data class LinuxTerminalTab(
     val id: Int,
     val title: String,
     val output: MutableState<String>,
+    val screen: TerminalScreen,
     val send: (String) -> Unit,
     val interrupt: () -> Unit,
     val session: AutoCloseable,
@@ -73,10 +74,13 @@ private object LinuxTerminalSessions {
     fun select(id: Int) { if (tabs.any { it.id == id }) selectedId = id }
 
     fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, initialOutput: String = ""): LinuxTerminalTab {
+        val screen = TerminalScreen()
+        screen.append(initialOutput)
         val tab = LinuxTerminalTab(
             id = nextId++,
             title = title,
-            output = mutableStateOf(initialOutput),
+            output = mutableStateOf(screen.render()),
+            screen = screen,
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
             interrupt = interrupt,
             session = session
@@ -88,8 +92,8 @@ private object LinuxTerminalSessions {
 
     fun append(tab: LinuxTerminalTab, text: String) {
         if (tabs.none { it.id == tab.id }) return
-        val combined = tab.output.value + stripTerminalControls(text)
-        tab.output.value = if (combined.length > MAX_SCROLLBACK) combined.takeLast(MAX_SCROLLBACK) else combined
+        tab.screen.append(text)
+        tab.output.value = tab.screen.render()
     }
 
     fun finish(tab: LinuxTerminalTab) {
@@ -109,9 +113,6 @@ private object LinuxTerminalSessions {
         tabs.firstOrNull { it.id == id }?.let(::finish)
     }
 
-    private fun stripTerminalControls(value: String): String =
-        value.replace(Regex("\u001B\\[[0-?]*[ -/]*[@-~]"), "")
-            .replace(Regex("\u001B\\][^\u0007]*(?:\u0007|\u001B\\\\)"), "")
 }
 
 @Composable
@@ -335,4 +336,3 @@ fun LinuxTerminalPanel(
     }
 }
 
-private const val MAX_SCROLLBACK = 300_000
