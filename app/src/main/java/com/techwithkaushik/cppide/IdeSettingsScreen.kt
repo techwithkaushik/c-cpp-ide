@@ -123,7 +123,7 @@ internal fun IdeSettingsScreen(
                     "Runtime & Bootstrap" -> {
                         SettingsHeading("▣  RUNTIME & BOOTSTRAP", "Set up the main terminal with the bootstrap that matches this device.")
                         RuntimeSetupPanel(
-                            message = "Choose the bootstrap.zip and bootstrap.json files from the same ABI artifact.",
+                            message = "Choose the bootstrap ZIP for this app and device ABI. Files extract directly into the app-private usr/ prefix.",
                             onRuntimeReady = onRuntimeReady,
                             modifier = Modifier.fillMaxWidth()
                         )
