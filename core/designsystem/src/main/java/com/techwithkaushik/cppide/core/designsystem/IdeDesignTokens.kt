@@ -59,6 +59,7 @@ object IdeDesignTokens {
         const val TERMINAL_FONT_SIZE = "terminal_font_size"
         const val TERMINAL_AUTO_KEYBOARD = "terminal_auto_keyboard"
         const val UI_FONT_SCALE = "ui_font_scale"
+        const val WELCOME_COMPLETED = "welcome_completed"
     }
 
     object Metrics {
