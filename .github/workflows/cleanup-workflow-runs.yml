@@ -1,0 +1,118 @@
+name: Cleanup old workflow runs
+
+on:
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: "Delete completed runs older than this many days (latest kept runs are protected)"
+        required: true
+        type: number
+        default: 30
+      keep_last:
+        description: "Always keep this many newest completed runs across all workflows"
+        required: true
+        type: number
+        default: 20
+      dry_run:
+        description: "Preview only; do not delete anything"
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    - cron: "20 3 * * 0"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cleanup-workflow-runs
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Prune old completed workflow runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RETENTION_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_days || 30 }}
+      KEEP_LAST: ${{ github.event_name == 'workflow_dispatch' && inputs.keep_last || 20 }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    steps:
+      - name: Validate cleanup settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || { echo "::error::retention_days must be a non-negative integer"; exit 1; }
+          [[ "$KEEP_LAST" =~ ^[0-9]+$ ]] || { echo "::error::keep_last must be a non-negative integer"; exit 1; }
+          if (( RETENTION_DAYS < 1 )); then
+            echo "::error::retention_days must be at least 1"
+            exit 1
+          fi
+          if (( KEEP_LAST < 1 )); then
+            echo "::error::keep_last must be at least 1 to protect recent history"
+            exit 1
+          fi
+          echo "Retention: $RETENTION_DAYS days"
+          echo "Keep newest completed runs: $KEEP_LAST"
+          echo "Dry run: $DRY_RUN"
+
+      - name: Find eligible old runs
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff_epoch="$(date -u -d "$RETENTION_DAYS days ago" +%s)"
+          all_runs="$(gh api --paginate \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" \
+            | jq -s '[.[] | .workflow_runs[]]')"
+
+          # Only completed runs are candidates. Queued and in-progress runs are
+          # never touched. Protect the newest KEEP_LAST completed runs globally,
+          # even when they are older than the retention cutoff.
+          candidate_ids="$(jq -r \
+            --argjson keep "$KEEP_LAST" \
+            --argjson cutoff "$cutoff_epoch" \
+            '[.[] | select(.status == "completed")]
+             | sort_by(.created_at) | reverse
+             | to_entries
+             | map(select(.key >= $keep)
+                   | select((.value.created_at | fromdateiso8601) < $cutoff)
+                   | .value.id)
+             | .[]' <<< "$all_runs")"
+
+          total_completed="$(jq '[.[] | select(.status == "completed")] | length' <<< "$all_runs")"
+          delete_count=0
+          if [[ -n "$candidate_ids" ]]; then
+            delete_count="$(printf '%s\n' "$candidate_ids" | wc -l | tr -d ' ')"
+          fi
+          echo "Completed runs found: $total_completed"
+          echo "Eligible old runs: $delete_count"
+          echo "delete_count=$delete_count" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Workflow run cleanup"
+            echo "- Completed runs found: $total_completed"
+            echo "- Retention: $RETENTION_DAYS days"
+            echo "- Newest completed runs protected: $KEEP_LAST"
+            echo "- Eligible old runs: $delete_count"
+            echo "- Dry run: $DRY_RUN"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -z "$candidate_ids" ]]; then
+            echo "No old runs match the cleanup policy."
+            exit 0
+          fi
+
+          while IFS= read -r run_id; do
+            [[ -n "$run_id" ]] || continue
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "DRY RUN: would delete workflow run $run_id"
+            else
+              echo "Deleting workflow run $run_id"
+              gh api --method DELETE \
+                -H 'Accept: application/vnd.github+json' \
+                "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id"
+            fi
+          done <<< "$candidate_ids"
