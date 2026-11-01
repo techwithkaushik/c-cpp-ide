@@ -12,6 +12,9 @@ object IdeDesignTokens {
     object Color {
         val Background = androidx.compose.ui.graphics.Color(0xFF101820)
         val Surface = androidx.compose.ui.graphics.Color(0xFF192733)
+        val SurfaceRaised = androidx.compose.ui.graphics.Color(0xFF243D52)
+        val OnPrimary = androidx.compose.ui.graphics.Color(0xFF071426)
+        val TerminalBackground = androidx.compose.ui.graphics.Color(0xFF0D1117)
         val Accent = androidx.compose.ui.graphics.Color(0xFF659AD2)
         val AccentLight = androidx.compose.ui.graphics.Color(0xFF83B7FF)
         val AccentDark = androidx.compose.ui.graphics.Color(0xFF00599C)
@@ -20,6 +23,7 @@ object IdeDesignTokens {
         val TextSecondary = androidx.compose.ui.graphics.Color(0xFF9AA8BA)
         val Error = androidx.compose.ui.graphics.Color(0xFFFF6B6B)
         val Success = androidx.compose.ui.graphics.Color(0xFF66C98A)
+        val Green = androidx.compose.ui.graphics.Color(0xFF7DDBB0)
         val Divider = androidx.compose.ui.graphics.Color(0xFF334454)
     }
 
@@ -67,6 +71,5 @@ object IdeDesignTokens {
         const val DEFAULT_UI_FONT_SCALE = 1.0f
         const val MIN_UI_FONT_SCALE = 0.85f
         const val MAX_UI_FONT_SCALE = 1.25f
-        const val SETTINGS_PREFERENCE_FILE = "ide_settings"
     }
 }
