@@ -66,7 +66,13 @@ android {
 
     buildTypes {
         getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
+            // CI can build an unsigned artifact when signing secrets are not configured.
+            // Production signing is enabled only when a keystore path is supplied.
+            signingConfig = if (System.getenv("SIGN_KEY_STORE").isNullOrBlank()) {
+                null
+            } else {
+                signingConfigs.getByName("release")
+            }
             // Keep the distributed APK small; the bootstrap is installed separately by the user.
             isMinifyEnabled = true
             isShrinkResources = true
