@@ -17,14 +17,14 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:aidl"))
-    implementation(project(":integrations:termux-runtime"))
-    implementation(project(":integrations:termux-upstream:terminal-view"))
-    implementation(project(":integrations:termux-upstream:terminal-emulator"))
-    implementation(project(":integrations:termux-upstream:termux-shared"))
+    implementation(project(":integrations:linux-runtime"))
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.commons.compress)
+    implementation(libs.xz)
+    implementation(libs.jsch)
 }
