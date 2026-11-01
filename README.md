@@ -33,9 +33,9 @@ The terminal panel supports:
 - **Connect SSH** — opens a remote SSH shell directly from the terminal panel without first opening a local shell.
 - Multiple live tabs that remain in the app process when the bottom panel is hidden and reopened.
 - First-connection SSH SHA-256 fingerprint confirmation. Trusted fingerprints are saved app-privately; a changed host key is rejected.
-- Password authentication in the current UI. Private-key import and Keystore-backed secret management remain future work.
+- Password or private-key authentication. First-use host keys require explicit SHA-256 fingerprint confirmation; a changed key is rejected. Private-key bytes and passwords are not persisted; a Keystore-backed credential vault remains future work.
 
-The terminal view currently presents text output and line-oriented input with Ctrl-C support; a full VT/xterm rendering layer, resize propagation for all terminal sizes, SSH private-key UI, and editor/build-to-remote-workspace integration are not yet complete. Do not treat this as feature parity with a desktop terminal emulator.
+The terminal view currently presents text output and line-oriented input with Ctrl-C support; a full VT/xterm rendering layer, resize propagation for all terminal sizes, editor/build-to-remote-workspace integration and a full VT/xterm rendering layer are not yet complete. Do not treat this as feature parity with a desktop terminal emulator.
 
 ## Module layout
 
