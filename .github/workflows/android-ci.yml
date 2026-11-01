@@ -61,6 +61,9 @@ jobs:
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
 
+      - name: Test Linux runtime and SSH integration
+        run: gradle --no-daemon --build-cache :integrations:linux-runtime:testDebugUnitTest
+
       - name: Build arm32 release APK with Gradle signing
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
@@ -68,7 +71,7 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: gradle --no-daemon --build-cache :app:assembleArm32Release
 
-      - name: Verify APK signatures and ensure bootstrap is external
+      - name: Verify APK signature and ensure Linux runtime is app-private
         shell: bash
         run: |
           set -euo pipefail
@@ -96,7 +99,7 @@ jobs:
               exit 1
             fi
           done
-          echo "Signed arm32 APK verified; bootstrap files are not embedded."
+          echo "Signed arm32 APK verified; Ubuntu rootfs remains a separately installed app-private runtime."
 
       - name: Upload arm32 APK
         uses: actions/upload-artifact@v4
