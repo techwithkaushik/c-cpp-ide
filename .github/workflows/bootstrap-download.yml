@@ -48,7 +48,7 @@ jobs:
             echo "::error::Stock Termux package identifier remains in properties.sh"
             exit 1
           fi
-          grep -n 'TERMUX_APP__PACKAGE_NAME\|TERMUX_APP__DATA_DIR\|TERMUX__PREFIX\|TERMUX_PREFIX=' "$properties" | head -30
+          grep -n 'TERMUX_APP__PACKAGE_NAME\|TERMUX_APP__DATA_DIR\|TERMUX__PREFIX\|TERMUX_PREFIX=' "$properties" | sed -n '1,30p'
 
       - name: Generate all four ABI bootstraps
         working-directory: termux-packages
