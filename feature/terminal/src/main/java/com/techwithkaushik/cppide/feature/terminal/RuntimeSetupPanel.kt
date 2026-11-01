@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.feature.terminal
 
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,8 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.techwithkaushik.cppide.integration.termuxruntime.BootstrapSmokeTest
-import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.linuxruntime.ProotInstaller
+import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,114 +42,53 @@ fun RuntimeSetupPanel(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
+    val paths = remember(context) { LinuxRuntimePaths(context.filesDir) }
     val scope = rememberCoroutineScope()
-    var selectedArchive by remember { mutableStateOf<Uri?>(null) }
+    var rootfsUri by remember { mutableStateOf<Uri?>(null) }
+    var prootUri by remember { mutableStateOf<Uri?>(null) }
+    var rootfsSha by remember { mutableStateOf("") }
+    var prootSha by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var checkingInstalledRuntime by remember { mutableStateOf(false) }
     var status by remember(message) { mutableStateOf(message) }
 
-    val verifyInstalledRuntime: () -> Unit = {
-        if (!busy && !checkingInstalledRuntime) {
-            checkingInstalledRuntime = true
-            status = "Checking the installed runtime and executing a fixed shell smoke test…"
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    try {
-                        val runtime = EmbeddedTermuxRuntime(context.filesDir)
-                        if (!runtime.hasBootstrapLayout()) {
-                            "No complete bootstrap is installed. Select the matching bootstrap.zip below."
-                        } else {
-                            val smoke = BootstrapSmokeTest(runtime).run()
-                            if (smoke.success) {
-                                "Runtime verified. Shell execution passed."
-                            } else {
-                                val detail = listOfNotNull(
-                                    smoke.failureReason,
-                                    smoke.stderr.trim().takeIf { it.isNotBlank() }?.let { "stderr: ${it.take(400)}" }
-                                ).joinToString(" — ")
-                                "Runtime verification failed: $detail. Select the matching bootstrap files below to repair it."
-                            }
-                        }
-                    } catch (error: Exception) {
-                        "Runtime check failed: ${error.message ?: error.javaClass.simpleName}"
-                    }
+    fun displayName(uri: Uri): String = runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull() ?: (uri.lastPathSegment ?: "selected-file")
+
+    suspend fun copySelected(uri: Uri, label: String): File = withContext(Dispatchers.IO) {
+        val name = displayName(uri).replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val file = File(context.cacheDir, "$label-${System.currentTimeMillis()}-$name")
+        val input = context.contentResolver.openInputStream(uri) ?: throw IOException("Android could not open selected file.")
+        input.use { source ->
+            file.outputStream().buffered().use { target ->
+                val buffer = ByteArray(64 * 1024)
+                var total = 0L
+                while (true) {
+                    val n = source.read(buffer)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_IMPORT_BYTES) throw IOException("Selected file exceeds the 4 GiB import limit.")
+                    target.write(buffer, 0, n)
                 }
-                status = result
-                checkingInstalledRuntime = false
             }
         }
+        file
     }
 
-    LaunchedEffect(context) { verifyInstalledRuntime() }
+    val rootfsPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { rootfsUri = it }
+    val prootPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { prootUri = it }
 
-    val archivePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            selectedArchive = uri
-            if (uri != null) status = "Bootstrap ZIP selected. The installer will detect IDE or stock Termux prefix and configure symlinks."
-        }
-    )
-
-
-    val installBootstrap: () -> Unit = {
-        val uri = selectedArchive
-        if (uri != null && !busy && !checkingInstalledRuntime) {
-            busy = true
-            status = "Installing bootstrap and creating Termux symlinks…"
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    val stagedArchive = File(context.cacheDir, "selected-code-studio-bootstrap.zip")
-                    try {
-                        val input = context.contentResolver.openInputStream(uri)
-                            ?: throw IOException("Android could not open the selected archive")
-                        input.use { source ->
-                            stagedArchive.outputStream().buffered().use { target ->
-                                val buffer = ByteArray(8192)
-                                var total = 0L
-                                while (true) {
-                                    val count = source.read(buffer)
-                                    if (count < 0) break
-                                    total += count
-                                    if (total > MAX_ARCHIVE_BYTES) throw IOException("Bootstrap ZIP exceeds the 512 MiB import limit")
-                                    target.write(buffer, 0, count)
-                                }
-                            }
-                        }
-                        val runtime = EmbeddedTermuxRuntime(context.filesDir)
-                        var smoke: BootstrapSmokeTest.Result? = null
-                        try {
-                            val installed = runtime.installBootstrap(
-                                archive = stagedArchive,
-                                expectedSha256 = null,
-                                processSymlinks = true,
-                            ) {
-                                runtime.layout.ensurePrivateDirectories()
-                                smoke = BootstrapSmokeTest(runtime).run()
-                                smoke?.success == true
-                            }
-                            "Bootstrap installed and verified. Created ${installed.symlinksCreated} symlinks; shell execution passed."
-                        } catch (error: Exception) {
-                            val failedSmoke = smoke
-                            val reason = failedSmoke?.failureReason
-                            if (reason != null) {
-                                val stderr = failedSmoke.stderr.trim().takeIf { it.isNotBlank() }
-                                "Setup failed: $reason" +
-                                    (stderr?.let { " — stderr: ${it.take(400)}" } ?: "") +
-                                    ". The previous runtime, if any, was restored."
-                            } else {
-                                throw error
-                            }
-                        }
-                    } catch (error: Exception) {
-                        "Setup failed: ${error.message ?: error.javaClass.simpleName}"
-                    } finally {
-                        stagedArchive.delete()
-                    }
-                }
-                status = result
-                busy = false
-                if (result.startsWith("Bootstrap installed")) onRuntimeReady()
-            }
+    LaunchedEffect(context) {
+        status = if (paths.ready()) {
+            "Ubuntu rootfs and PRoot are present. Runtime verification is performed when a local shell starts."
+        } else {
+            "Ubuntu setup is incomplete. Import an Ubuntu rootfs archive and a SHA-256-verified Android PRoot release archive."
         }
     }
 
@@ -154,47 +96,90 @@ fun RuntimeSetupPanel(
         modifier = modifier.fillMaxWidth().background(Color(0xFF0D1117), RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Main terminal setup", color = Color(0xFF8CC8FF), fontSize = 18.sp)
+        Text("Ubuntu Linux runtime", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Text(
-            "Select either the IDE-specific bootstrap or a stock Termux bootstrap ZIP for this device ABI. Stock Termux symlinks are remapped into this app's private prefix; the shell is tested before the install is accepted. If the test fails, the previous runtime is restored.",
-            color = Color(0xFFE8EDF5),
-            fontSize = 12.sp
+            "This branch does not use Termux or its app-private prefix. Rootfs and PRoot are stored under this app's files/linux-runtime directory. Import an Ubuntu .tar, .tar.gz or .tar.xz rootfs and a PRoot Android .tar.gz archive. The PRoot archive must be verified with its SHA-256 before installation.",
+            color = Color(0xFFE8EDF5), fontSize = 12.sp
         )
-        Button(enabled = !busy && !checkingInstalledRuntime, onClick = verifyInstalledRuntime) {
-            Text(if (checkingInstalledRuntime) "Checking runtime…" else "Check terminal runtime")
+        Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
+            Text(if (rootfsUri == null) "1 · Select Ubuntu rootfs archive" else "Change Ubuntu rootfs")
         }
-        Button(
-            enabled = !busy && !checkingInstalledRuntime,
-            onClick = { archivePicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
-        ) {
-            Text(if (selectedArchive == null) "1 · Select bootstrap.zip" else "Change bootstrap ZIP")
+        Text(rootfsUri?.let(::displayName) ?: "No Ubuntu rootfs selected", color = Color(0xFF9AA7B5), fontSize = 11.sp)
+        OutlinedTextField(
+            value = rootfsSha,
+            onValueChange = { rootfsSha = it.trim() },
+            label = { Text("Rootfs SHA-256 (optional for local import)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(enabled = !busy && rootfsUri != null, onClick = {
+            val uri = rootfsUri ?: return@Button
+            busy = true
+            status = "Validating and installing Ubuntu rootfs…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    var staged: File? = null
+                    try {
+                        staged = copySelected(uri, "ubuntu-rootfs")
+                        val name = displayName(uri).lowercase()
+                        val namedArchive = File(staged.parentFile, "rootfs-" + when {
+                            name.endsWith(".tar.xz") -> "import.tar.xz"
+                            name.endsWith(".tar.gz") || name.endsWith(".tgz") -> "import.tar.gz"
+                            else -> "import.tar"
+                        })
+                        staged.copyTo(namedArchive, overwrite = true)
+                        RootfsInstaller(paths).install(namedArchive, rootfsSha.ifBlank { null })
+                        namedArchive.delete()
+                        "Ubuntu rootfs installed and validated. Install PRoot next to enable local shell execution."
+                    } catch (e: Exception) {
+                        "Ubuntu installation failed: ${e.message ?: e.javaClass.simpleName}"
+                    } finally { staged?.delete() }
+                }
+                status = result
+                busy = false
+            }
+        }) { Text("Install Ubuntu rootfs") }
+
+        Button(enabled = !busy, onClick = { prootPicker.launch(arrayOf("application/gzip", "application/octet-stream", "*/*")) }) {
+            Text(if (prootUri == null) "2 · Select Android PRoot .tar.gz" else "Change PRoot archive")
         }
-        Text(
-            selectedArchive?.lastPathSegment?.substringAfterLast('/') ?: "No bootstrap ZIP selected",
-            color = Color(0xFF9AA7B5),
-            fontSize = 11.sp
+        Text(prootUri?.let(::displayName) ?: "No PRoot archive selected", color = Color(0xFF9AA7B5), fontSize = 11.sp)
+        OutlinedTextField(
+            value = prootSha,
+            onValueChange = { prootSha = it.trim() },
+            label = { Text("Required PRoot archive SHA-256") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
         )
-        Text(
-            "Install location: ${File(context.filesDir, "usr").absolutePath}",
-            color = Color(0xFF9AA7B5),
-            fontSize = 11.sp
-        )
-        Button(
-            enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
-            onClick = { installBootstrap() }
-        ) {
-            Text(if (busy) "Setting up terminal…" else "2 · Install bootstrap WITH symlinks")
-        }
-        if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
-        Text(
-            status,
-            color = if (
-                status.startsWith("Bootstrap installed") ||
-                status.startsWith("Runtime verified")
-            ) Color(0xFF7DDBB0) else Color(0xFF9AA7B5),
-            fontSize = 12.sp
-        )
+        Button(enabled = !busy && prootUri != null && prootSha.matches(Regex("[a-fA-F0-9]{64}")), onClick = {
+            val uri = prootUri ?: return@Button
+            busy = true
+            status = "Verifying and installing PRoot…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    var staged: File? = null
+                    try {
+                        staged = copySelected(uri, "proot")
+                        val namedArchive = File(staged.parentFile, "proot-import.tar.gz")
+                        staged.copyTo(namedArchive, overwrite = true)
+                        ProotInstaller(paths).install(namedArchive, prootSha)
+                        namedArchive.delete()
+                        if (!paths.ready()) throw IOException("PRoot installed, but Ubuntu rootfs is still missing or invalid.")
+                        "Ubuntu runtime files are installed. Local shell launch will be tested when Terminal opens."
+                    } catch (e: Exception) {
+                        "PRoot installation failed: ${e.message ?: e.javaClass.simpleName}"
+                    } finally { staged?.delete() }
+                }
+                status = result
+                busy = false
+                if (paths.ready()) onRuntimeReady()
+            }
+        }) { Text("Verify and install PRoot") }
+
+        if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
+        Text("Install location: ${paths.base.absolutePath}", color = Color(0xFF9AA7B5), fontSize = 11.sp)
+        Text(status, color = if (paths.ready()) Color(0xFF7DDBB0) else Color(0xFF9AA7B5), fontSize = 12.sp)
     }
 }
 
-private const val MAX_ARCHIVE_BYTES = 512L * 1024 * 1024
+private const val MAX_IMPORT_BYTES = 4L * 1024 * 1024 * 1024
