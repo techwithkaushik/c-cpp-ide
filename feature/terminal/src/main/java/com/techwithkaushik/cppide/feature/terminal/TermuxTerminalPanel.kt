@@ -29,6 +29,7 @@ import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.integration.termuxruntime.BootstrapSmokeTest
 import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
 import com.techwithkaushik.cppide.integration.termuxruntime.RuntimeLayout
+import com.techwithkaushik.cppide.integration.termuxruntime.AndroidRuntimeLauncher
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
@@ -135,11 +136,15 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
             extraPathEntries = listOf(File(layout.prefix, "bin"))
         ).map { (key, value) -> "$key=$value" }.toTypedArray()
     }
+    val linker = remember { AndroidRuntimeLauncher.systemLinker }
+    val sessionArguments = remember(shell, shellArguments) {
+        arrayOf(shell.absolutePath, *shellArguments)
+    }
     val session = remember(shell, home, environment.contentHashCode()) {
         TerminalSession(
-            shell.absolutePath,
+            linker.absolutePath,
             home.absolutePath,
-            shellArguments,
+            sessionArguments,
             environment,
             2_000,
             terminalClient
