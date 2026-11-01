@@ -191,13 +191,28 @@ fun RuntimeSetupPanel(
                         staged.copyTo(namedArchive, overwrite = true)
                         RootfsInstaller(paths).install(namedArchive, rootfsSha.ifBlank { null })
                         namedArchive.delete()
-                        "Ubuntu rootfs installed and validated. Install PRoot next to enable local shell execution."
+                        if (paths.hasProot()) {
+                            val smoke = LinuxRuntimeSmokeTest(paths).run()
+                            if (!smoke.success) throw IOException("Ubuntu shell smoke test failed: ${smoke.error ?: smoke.output}")
+                            "Ubuntu rootfs installed and shell smoke test passed."
+                        } else {
+                            "Ubuntu rootfs installed and validated. Install PRoot next to enable local shell execution."
+                        }
                     } catch (e: Exception) {
                         "Ubuntu installation failed: ${e.message ?: e.javaClass.simpleName}"
                     } finally { staged?.delete() }
                 }
                 status = result
                 busy = false
+                if (paths.ready()) {
+                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
+                    if (smoke.success) {
+                        status = "Ubuntu shell smoke test passed."
+                        onRuntimeReady()
+                    } else {
+                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                    }
+                }
             }
         }) { Text("Install Ubuntu rootfs") }
 
