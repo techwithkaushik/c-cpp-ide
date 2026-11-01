@@ -26,4 +26,22 @@ class TerminalScreenTest {
         assertTrue(screen.render().contains("XY"))
         assertFalse(screen.render().contains("hello"))
     }
+    @Test fun handlesEscapeSequencesSplitAcrossOutputChunks() {
+        val screen = TerminalScreen()
+        screen.append("old text")
+        screen.append("\u001B[")
+        screen.append("2K\u001B[1;1Hnew")
+        assertTrue(screen.render().contains("new"))
+        assertFalse(screen.render().contains("old text"))
+        assertFalse(screen.render().contains("\u001B"))
+    }
+
+    @Test fun carriageReturnRewritesCurrentLine() {
+        val screen = TerminalScreen()
+        screen.append("downloading 100%")
+        screen.append("\rready")
+        assertTrue(screen.render().contains("ready"))
+        assertFalse(screen.render().contains("downloading"))
+    }
+
 }
