@@ -83,7 +83,7 @@ fun RuntimeSetupPanel(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
             selectedArchive = uri
-            if (uri != null) status = "Bootstrap ZIP selected. Ready to install with Termux-style symlink setup."
+            if (uri != null) status = "Bootstrap ZIP selected. The installer will detect IDE or stock Termux prefix and configure symlinks."
         }
     )
 
@@ -156,7 +156,7 @@ fun RuntimeSetupPanel(
     ) {
         Text("Main terminal setup", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Text(
-            "Select the bootstrap ZIP built for this app and device ABI. The installer creates the symlinks and tests the shell. If the test fails, the previous runtime is restored.",
+            "Select either the IDE-specific bootstrap or a stock Termux bootstrap ZIP for this device ABI. Stock Termux symlinks are remapped into this app's private prefix; the shell is tested before the install is accepted. If the test fails, the previous runtime is restored.",
             color = Color(0xFFE8EDF5),
             fontSize = 12.sp
         )
