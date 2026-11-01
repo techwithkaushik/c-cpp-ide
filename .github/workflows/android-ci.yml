@@ -76,7 +76,13 @@ jobs:
           set -euo pipefail
           apk="$(find app/build/outputs/apk/arm32/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
           test -n "$apk" && test -s "$apk"
-          apksigner verify --verbose "$apk"
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner -print 2>/dev/null | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
+            echo "::error::Could not find Android SDK build-tools apksigner under $sdk_root/build-tools"
+            exit 1
+          fi
+          "$apksigner" verify --verbose "$apk"
           size_bytes="$(stat -c '%s' "$apk")"
           echo "Signed ARM32 release APK: $apk"
           echo "APK size: $(( (size_bytes + 1023) / 1024 )) KiB ($size_bytes bytes)"
