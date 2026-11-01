@@ -188,7 +188,7 @@ fun RuntimeSetupPanel(
             Text("Verify and install")
         }
         if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
-        Text(status, color = if (status.startsWith("Bootstrap verified")) Color(0xFF7DDBB0) else Color(0xFF9AA7B5), fontSize = 12.sp)
+        Text(status, color = if (status.startsWith("Bootstrap verified") || status.startsWith("Runtime verified")) Color(0xFF7DDBB0) else Color(0xFF9AA7B5), fontSize = 12.sp)
     }
 }
 
