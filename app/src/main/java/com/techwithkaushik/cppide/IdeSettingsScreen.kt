@@ -55,6 +55,8 @@ internal fun IdeSettingsScreen(
     editorTheme: String,
     onEditorThemeChange: (String) -> Unit,
     projectName: String,
+    uiFontScale: Float,
+    onUiFontScaleChange: (Float) -> Unit,
     onBack: () -> Unit,
     onRuntimeReady: () -> Unit
 ) {
@@ -63,10 +65,6 @@ internal fun IdeSettingsScreen(
     var category by rememberSaveable { mutableStateOf("Overview") }
     var terminalFontSize by remember { mutableStateOf(prefs.getInt("terminal_font_size", 13).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean("terminal_auto_keyboard", true)) }
-    var cursorBlink by remember { mutableStateOf(prefs.getBoolean("terminal_cursor_blink", true)) }
-    var showLineNumbers by remember { mutableStateOf(prefs.getBoolean("editor_line_numbers", true)) }
-    var smoothScroll by remember { mutableStateOf(prefs.getBoolean("editor_smooth_scroll", true)) }
-    var haptics by remember { mutableStateOf(prefs.getBoolean("ui_haptics", false)) }
     val categories = listOf("Overview", "UI", "Editor", "Terminal", "Runtime & Bootstrap", "Languages", "Build & Run", "Keyboard", "About")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -121,9 +119,8 @@ internal fun IdeSettingsScreen(
                     "UI" -> {
                         SettingsHeading("USER INTERFACE", "Interface and workspace preferences.")
                         SettingsCard("Layout", "Workspace", "VS Code-style drawer, editor tabs, file explorer and draggable bottom tool panel")
-                        SettingsSwitch("Haptic feedback", "Use vibration for supported UI actions", haptics) {
-                            haptics = it; prefs.edit().putBoolean("ui_haptics", it).apply()
-                        }
+                        SettingsCard("Interface text scale", "Current scale", "${(uiFontScale * 100).toInt()}%")
+                        Slider(value = uiFontScale, onValueChange = onUiFontScaleChange, valueRange = 0.85f..1.25f, steps = 7)
                         SettingsCard("Navigation", "Settings page", "This is a dedicated full-screen page. Use Back to return to the previous screen.")
                         SettingsCard("Color scheme", "Current app shell", "Dark IDE palette")
                     }
@@ -133,12 +130,6 @@ internal fun IdeSettingsScreen(
                         Slider(value = editorFontSize, onValueChange = { onEditorFontSizeChange(it); prefs.edit().putFloat("editor_font_size", it).apply() }, valueRange = 10f..24f)
                         SettingsSwitch("Word wrap", "Wrap long lines in the editor", editorWordWrap) {
                             onEditorWordWrapChange(it); prefs.edit().putBoolean("editor_word_wrap", it).apply()
-                        }
-                        SettingsSwitch("Line numbers", "Show line numbers where supported by the editor", showLineNumbers) {
-                            showLineNumbers = it; prefs.edit().putBoolean("editor_line_numbers", it).apply()
-                        }
-                        SettingsSwitch("Smooth scrolling", "Prefer smoother editor navigation", smoothScroll) {
-                            smoothScroll = it; prefs.edit().putBoolean("editor_smooth_scroll", it).apply()
                         }
                         SettingsHeading("EDITOR COLOR THEME", "Choose an editor palette.")
                         listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
@@ -157,9 +148,6 @@ internal fun IdeSettingsScreen(
                         }, valueRange = 10f..22f, steps = 11)
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean("terminal_auto_keyboard", it).apply()
-                        }
-                        SettingsSwitch("Cursor blink", "Enable terminal cursor blinking", cursorBlink) {
-                            cursorBlink = it; prefs.edit().putBoolean("terminal_cursor_blink", it).apply()
                         }
                         SettingsCard("Input", "Shell session", "Interactive PTY with command input and terminal output")
                         SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
