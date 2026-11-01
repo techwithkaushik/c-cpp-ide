@@ -71,9 +71,9 @@ internal fun IdeSettingsScreen(
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
         Row(
-            Modifier.fillMaxWidth().background(SettingsCard).padding(horizontal = 16.dp, vertical = 13.dp),
+            Modifier.fillMaxWidth().background(SettingsCard).padding(horizontal = IdeDesignTokens.Spacing.lg, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
         ) {
             TextButton(onClick = onBack) { Text("‹ Back", color = SettingsAccent) }
             Column(Modifier.weight(1f)) {
@@ -85,7 +85,7 @@ internal fun IdeSettingsScreen(
             }
         }
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = IdeDesignTokens.Spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             categories.forEach { item ->
@@ -96,8 +96,8 @@ internal fun IdeSettingsScreen(
         Divider(color = IdeDesignTokens.Color.Divider)
         if (category == "Runtime & Bootstrap") {
             Column(Modifier.fillMaxSize().padding(10.dp)) {
-                Text("RUNTIME & BOOTSTRAP", color = SettingsAccent, fontSize = 12.sp)
-                Text("Import or replace the app-specific bootstrap. The existing Termux app is not modified.", color = SettingsMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+                Text("RUNTIME & BOOTSTRAP", color = SettingsAccent, fontSize = IdeDesignTokens.Typography.caption)
+                Text("Import or replace the app-specific bootstrap. The existing Termux app is not modified.", color = SettingsMuted, fontSize = IdeDesignTokens.Typography.caption, modifier = Modifier.padding(vertical = IdeDesignTokens.Spacing.sm))
                 RuntimeSetupPanel(
                     message = "Select the bootstrap ZIP for this IDE and enter its published SHA-256 checksum.",
                     onRuntimeReady = onRuntimeReady,
@@ -107,7 +107,7 @@ internal fun IdeSettingsScreen(
         } else {
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
             ) {
                 when (category) {
                     "Overview" -> {
@@ -192,16 +192,16 @@ internal fun IdeSettingsScreen(
 private fun SettingsHeading(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(title, color = SettingsAccent, fontSize = 11.sp)
-        Text(subtitle, color = SettingsMuted, fontSize = 12.sp)
+        Text(subtitle, color = SettingsMuted, fontSize = IdeDesignTokens.Typography.caption)
     }
 }
 
 @Composable
 private fun SettingsCard(title: String, eyebrow: String, detail: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(12.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
         Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(eyebrow.uppercase(), color = SettingsAccent, fontSize = 9.sp)
-            Text(title, color = SettingsText, fontSize = 14.sp)
+            Text(title, color = SettingsText, fontSize = IdeDesignTokens.Typography.body)
             Text(detail, color = SettingsMuted, fontSize = 11.sp)
         }
     }
@@ -209,9 +209,9 @@ private fun SettingsCard(title: String, eyebrow: String, detail: String) {
 
 @Composable
 private fun SettingsSwitch(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(12.dp)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
+        Row(Modifier.fillMaxWidth().padding(IdeDesignTokens.Spacing.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.xs)) {
                 Text(title, color = SettingsText, fontSize = 13.sp)
                 Text(description, color = SettingsMuted, fontSize = 11.sp)
             }
@@ -224,10 +224,10 @@ private fun SettingsSwitch(title: String, description: String, checked: Boolean,
 private fun SettingsChoice(title: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(if (selected) Color(0xFF243D52) else SettingsCard, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp),
+            .clickable(onClick = onClick).padding(horizontal = 13.dp, vertical = IdeDesignTokens.Spacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(12.dp).background(if (selected) SettingsAccent else SettingsMuted, RoundedCornerShape(50)))
+        Box(Modifier.size(IdeDesignTokens.Spacing.md).background(if (selected) SettingsAccent else SettingsMuted, RoundedCornerShape(50)))
         Text(title, color = SettingsText, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(start = 10.dp))
         if (selected) Text("✓", color = SettingsAccent)
     }
