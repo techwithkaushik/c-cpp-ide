@@ -2,21 +2,10 @@ name: Code Studio CI
 
 on:
   push:
-    branches:
-      - "**"
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      bootstrap_mode:
-        description: "Use cached prebuilt bootstrap archives or rebuild from source"
-        type: choice
-        options:
-          - prebuild
-          - source
-        default: prebuild
-        required: true
 
 permissions:
   contents: read
@@ -28,15 +17,12 @@ concurrency:
 env:
   JAVA_VERSION: "17"
   GRADLE_VERSION: "8.13"
-  TERMUX_PACKAGES_REF: "21700256be43a0c8aae38bacecdac87c5ded4cc6"
-  CODE_STUDIO_PACKAGE: "com.techwithkaushik.cppide"
-  BOOTSTRAP_VERSION: "0.1.0-ci.${{ github.run_number }}"
 
 jobs:
-  verify:
-    name: 1 · Verify source and Gradle configuration
+  verify-test-build:
+    name: Verify, test and build ARM32 APK
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -50,386 +36,39 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Set up Gradle
+      - name: Set up Gradle with dependency and build cache
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Validate Gradle project configuration
-        run: gradle --no-daemon help
-
-  test:
-    name: 2 · Test ARM32 modules only
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    needs: verify
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-
-      - name: Compile vendored Termux modules and run integration tests
+      - name: Run ARM32 unit tests and build optimized release APK
         run: >-
-          gradle --no-daemon
-          :integrations:termux-upstream:terminal-emulator:assembleDebug
-          :integrations:termux-upstream:terminal-view:assembleDebug
-          :integrations:termux-upstream:termux-am-library:assembleDebug
-          :integrations:termux-upstream:termux-shared:assembleDebug
+          gradle --no-daemon --build-cache --parallel
           :integrations:toolchain:testDebugUnitTest
           :integrations:termux-runtime:testDebugUnitTest
-
-      - name: Run app unit tests for every supported ABI
-        run: >-
-          gradle --no-daemon
           :app:testArm32DebugUnitTest
+          :app:assembleArm32Release
 
-  build-bootstrap:
-    name: 3 · Build and verify ARM32 bootstrap only
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    needs: test
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-
-      - name: Restore prebuilt bootstrap archives
-        id: bootstrap-cache
-        if: ${{ inputs.bootstrap_mode != 'source' }}
-        uses: actions/cache/restore@v4
-        with:
-          path: bootstrap-cache
-          key: bootstrap-prebuilt-v2-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
-
-      - name: Checkout pinned Termux packages source
-        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
-        uses: actions/checkout@v4
-        with:
-          repository: termux/termux-packages
-          ref: ${{ env.TERMUX_PACKAGES_REF }}
-          path: termux-packages
-
-      - name: Verify pinned source and configure app package identity
-        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
+      - name: Report APK size and verify no bootstrap is bundled
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C termux-packages rev-parse HEAD)" = "$TERMUX_PACKAGES_REF"
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-
-          path = Path("termux-packages/scripts/properties.sh")
-          text = path.read_text(encoding="utf-8")
-          matches = list(re.finditer(r'(?m)^\s*(?:export\s+)?TERMUX_APP__PACKAGE_NAME\s*=.*$', text))
-          if len(matches) != 1:
-              raise SystemExit(
-                  f"Expected exactly one TERMUX_APP__PACKAGE_NAME assignment; found {len(matches)}. "
-                  "Upstream changed; stop and review instead of building an incorrectly prefixed runtime."
-              )
-          old = matches[0].group(0)
-          indent = re.match(r'^\s*', old).group(0)
-          export = "export " if old.lstrip().startswith("export ") else ""
-          replacement = f'{indent}{export}TERMUX_APP__PACKAGE_NAME="{os.environ["CODE_STUDIO_PACKAGE"]}"'
-          path.write_text(text[:matches[0].start()] + replacement + text[matches[0].end():], encoding="utf-8")
-          print(f"Configured custom package identity: {os.environ['CODE_STUDIO_PACKAGE']}")
-          PY
-
-      - name: Adapt pinned upstream bootstrap package names
-        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          script = Path("termux-packages/scripts/build-bootstraps.sh")
-          source = script.read_text(encoding="utf-8")
-          old = 'PACKAGES+=("bzip2")'
-          new = 'PACKAGES+=("libbz2")'
-          package_dir = Path("termux-packages/packages/libbz2/bzip2.subpackage.sh")
-          if not package_dir.is_file():
-              raise SystemExit(
-                  "Pinned Termux source layout changed: expected "
-                  "packages/libbz2/bzip2.subpackage.sh. Stop and review upstream."
-              )
-          count = source.count(old)
-          if count != 1:
-              raise SystemExit(
-                  f"Expected exactly one {old!r} in build-bootstraps.sh, found {count}. "
-                  "Stop instead of silently building an incomplete bootstrap."
-              )
-          script.write_text(source.replace(old, new, 1), encoding="utf-8")
-
-          # The mounted checkout is not reliably writable by the container's
-          # builder UID on GitHub-hosted runners. Keep build inputs in the
-          # checkout, but export the finished ZIP to the container's /tmp.
-          archive_move = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" "$TERMUX_PACKAGES_DIRECTORY/"'
-          archive_export = 'mv -f "${BOOTSTRAP_TMPDIR}/bootstrap-${1}.zip" "/tmp/bootstrap-${1}.zip"'
-          source = script.read_text(encoding="utf-8")
-          if source.count(archive_move) != 1:
-              raise SystemExit("Expected exactly one upstream bootstrap archive move; refusing unsafe patch.")
-          script.write_text(source.replace(archive_move, archive_export, 1), encoding="utf-8")
-
-          # GnuTLS sources are hosted on gnupg.org, which can time out from GitHub runners.
-          # Add checksum-verified mirror fallback in Termux's downloader, without weakening hashes.
-          downloader = Path("termux-packages/scripts/build/termux_download.sh")
-          download_source = downloader.read_text(encoding="utf-8")
-          failed_block = '''\t\tif [[ "${error}" != 0 ]]; then
-          \t\t\techo "Failed to download $URL" 1>&2
-          \t\t\treturn 1
-          \t\tfi'''
-          fallback_block = '''\t\tif [[ "${error}" != 0 && "$URL" == https://www.gnupg.org/ftp/gcrypt/* ]]; then
-          \t\t\tlocal suffix="${URL#https://www.gnupg.org/ftp/gcrypt/}"
-          \t\t\tlocal mirror
-          \t\t\t# Use real mirrors listed by GnuPG; their root already maps to gcrypt/.
-          \t\t\tfor mirror in \\
-          \t\t\t\t"https://mirrors.dotsrc.org/gcrypt/${suffix}" \\
-          \t\t\t\t"https://www.mirrorservice.org/sites/ftp.gnupg.org/gcrypt/${suffix}" \\
-          \t\t\t\t"https://ftp.heanet.ie/mirrors/ftp.gnupg.org/gcrypt/${suffix}" \\
-          \t\t\t\t"https://ftp.franken.de/pub/crypt/mirror/ftp.gnupg.org/gcrypt/${suffix}"; do
-          \t\t\t\techo "Primary source unavailable; trying mirror: ${mirror}"
-          \t\t\t\tif curl --fail --location --connect-timeout 12 --max-time 90 \\
-          \t\t\t\t\t--output "$TMPFILE" "$mirror"; then
-          \t\t\t\t\tURL="$mirror"
-          \t\t\t\t\terror=0
-          \t\t\t\t\tbreak
-          \t\t\t\tfi
-          \t\t\tdone
-          \t\tfi
-          \t\tif [[ "${error}" != 0 ]]; then
-          \t\t\t\techo "Failed to download $URL (primary and all GnuPG mirrors)" 1>&2
-          \t\t\treturn 1
-          \t\tfi'''
-          if download_source.count(failed_block) != 1:
-              raise SystemExit("Termux downloader failure block changed; refusing unsafe mirror patch.")
-          downloader.write_text(download_source.replace(failed_block, fallback_block, 1), encoding="utf-8")
-
-          # Upstream extracts every .deb in output/, including unrelated cached
-          # packages. Keep only selected bootstrap packages and runtime dependencies.
-          source = script.read_text(encoding="utf-8")
-          marker = '\t\t# Extract all debs.\n\t\textract_debs "$TERMUX_ARCH" || return $?'
-          filter_block = r'''
-          # Prune unrelated prebuilt packages before extracting the bootstrap.
-          BOOTSTRAP_ROOT_PACKAGES="${PACKAGES[*]}" python3 - "$TERMUX_BUILT_DEBS_DIRECTORY" "$TERMUX_ARCH" <<'PY_BOOTSTRAP_PRUNE'
-          import os, pathlib, re, subprocess, sys
-          out = pathlib.Path(sys.argv[1])
-          arch = sys.argv[2]
-          roots = os.environ["BOOTSTRAP_ROOT_PACKAGES"].split()
-          debs = sorted(out.glob("*.deb"))
-          packages, provides, fields = {}, {}, {}
-          def control(path):
-              raw = subprocess.check_output(["dpkg-deb", "-f", str(path)], text=True, stderr=subprocess.DEVNULL)
-              result, key = {}, None
-              for line in raw.splitlines():
-                  if line[:1].isspace() and key:
-                      result[key] += " " + line.strip()
-                  elif ": " in line:
-                      key, value = line.split(": ", 1); result[key] = value.strip()
-              return result
-          for deb in debs:
-              try: meta = control(deb)
-              except subprocess.CalledProcessError: continue
-              name, deb_arch = meta.get("Package"), meta.get("Architecture")
-              if not name or deb_arch not in (arch, "all"): continue
-              packages.setdefault(name, deb); fields.setdefault(name, meta)
-              for provided in re.findall(r"([a-z0-9][a-z0-9+.-]*)(?:\s*\([^)]*\))?", meta.get("Provides", "")):
-                  provides.setdefault(provided, name)
-          def split_top(value, sep=","):
-              parts, start, depth = [], 0, 0
-              for i, ch in enumerate(value):
-                  if ch == "(": depth += 1
-                  elif ch == ")": depth = max(0, depth - 1)
-                  elif ch == sep and depth == 0:
-                      parts.append(value[start:i].strip()); start = i + 1
-              parts.append(value[start:].strip())
-              return [part for part in parts if part]
-          selected, queue, missing = set(), list(roots), []
-          while queue:
-              name = queue.pop().split(":", 1)[0]
-              if name in selected: continue
-              actual = name if name in packages else provides.get(name)
-              if actual is None:
-                  missing.append(name); continue
-              selected.add(actual); meta = fields[actual]
-              for field in ("Pre-Depends", "Depends"):
-                  for group in split_top(meta.get(field, "")):
-                      resolved = None
-                      for alt in split_top(group, "|"):
-                          alt = re.sub(r"\[[^]]*\]|<[^>]*>", "", alt).strip()
-                          match = re.match(r"([a-z0-9][a-z0-9+.-]*)(?::[a-z0-9-]+)?", alt)
-                          if not match: continue
-                          candidate = match.group(1)
-                          candidate = candidate if candidate in packages else provides.get(candidate)
-                          if candidate: resolved = candidate; break
-                      if resolved: queue.append(resolved)
-                      else:
-                          names = [re.match(r"([a-z0-9][a-z0-9+.-]*)", a.strip()) for a in split_top(group, "|")]
-                          names = [m.group(1) for m in names if m]
-                          if names and all(n not in packages and n not in provides for n in names):
-                              print("WARN: no archive for virtual/system dependency:", group)
-          if missing:
-              raise SystemExit("Bootstrap root packages missing from output: " + ", ".join(sorted(set(missing))))
-          keep = {packages[name].resolve() for name in selected}
-          for deb in debs:
-              if deb.resolve() not in keep: deb.unlink()
-          print(f"Kept {len(keep)} runtime package archives out of {len(debs)} total; roots={roots}")
-          PY_BOOTSTRAP_PRUNE
-          '''
-          import textwrap
-          filter_block = textwrap.dedent(filter_block).strip("\n")
-          if source.count(marker) != 1:
-              raise SystemExit("Could not locate unique bootstrap extraction point; refusing to build an oversized/incomplete archive.")
-          script.write_text(source.replace(marker, filter_block + "\n" + marker, 1), encoding="utf-8")
-          print("Mapped bzip2 dependency, redirected ZIP output, and added runtime-dependency pruning.")
-          PY
-
-      - name: Build ARM32 bootstrap only
-        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd termux-packages
-          # This is a fresh runner/container, so do not pass -f: the upstream
-          # force-clean path can expand an unset per-architecture cache path to /*.
-          # A clean runner already guarantees that no stale package cache is reused.
-          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
-            --architectures "arm" 2>&1 | tee ../bootstrap-build.log
-          # Archive output is redirected to writable container /tmp above;
-          # never depend on the mounted checkout being writable by builder.
-          docker cp termux-package-builder:/tmp/bootstrap-arm.zip \
-            "$GITHUB_WORKSPACE/bootstrap-arm.zip"
-          test -s "$GITHUB_WORKSPACE/bootstrap-arm.zip"
-          size_bytes="$(stat -c '%s' "$GITHUB_WORKSPACE/bootstrap-arm.zip")"
-          echo "Pruned ARM32 bootstrap size: $size_bytes bytes"
-          if (( size_bytes > 52428800 )); then
-            echo "::error::ARM32 bootstrap exceeds 50 MiB; refusing to package an oversized APK."
+          apk="$(find app/build/outputs/apk/arm32/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$apk" && test -s "$apk"
+          size_bytes="$(stat -c '%s' "$apk")"
+          echo "Optimized ARM32 release APK: $apk"
+          echo "APK size: $(( (size_bytes + 1023) / 1024 )) KiB ($size_bytes bytes)"
+          if unzip -Z1 "$apk" | grep -E '(^|/)(bootstrap|bootstrap\.zip)(/|$)' >/dev/null; then
+            echo "::error::Bootstrap payload unexpectedly found inside APK."
             exit 1
           fi
+          echo "Verified: bootstrap ZIP is not bundled in the APK."
 
-      - name: Validate archives and generate pinned ABI metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          root="$GITHUB_WORKSPACE/bootstrap-artifacts"
-          mkdir -p "$root"
-          if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
-            echo "Using verified-source prebuilt bootstrap archives from Actions cache."
-          fi
-          declare -A ARCH_MAP=(
-            [armeabi-v7a]=arm
-          )
-          for abi in armeabi-v7a; do
-            upstream_arch="${ARCH_MAP[$abi]}"
-            if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
-              source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
-            else
-              source="$GITHUB_WORKSPACE/bootstrap-${upstream_arch}.zip"
-            if [[ ! -s "$source" ]]; then
-              source="$(find "$GITHUB_WORKSPACE/termux-packages" -type f -name "bootstrap-${upstream_arch}.zip" -print -quit)"
-            fi
-            fi
-            destination="$root/$abi"
-            [[ -n "$source" && -s "$source" ]] || { echo "::error::Missing generated bootstrap for $abi ($upstream_arch); searched under $GITHUB_WORKSPACE"; find "$GITHUB_WORKSPACE" -type f -name "bootstrap-*.zip" -print || true; exit 1; }
-            mkdir -p "$destination"
-            cp "$source" "$destination/bootstrap.zip"
-            size_bytes="$(stat -c '%s' "$destination/bootstrap.zip")"
-            echo "Validated input size for $abi bootstrap: $size_bytes bytes"
-            if (( size_bytes > 52428800 )); then
-              echo "::error::Bootstrap for $abi is larger than 50 MiB."
-              exit 1
-            fi
-            python3 - "$abi" "$destination/bootstrap.zip" "$CODE_STUDIO_PACKAGE" <<'PY'
-          import pathlib, sys, zipfile
-          abi, archive, package = sys.argv[1:]
-          with zipfile.ZipFile(archive) as zf:
-              names = {name.rstrip("/") for name in zf.namelist()}
-              if not names:
-                  raise SystemExit(f"{archive}: empty archive")
-              if zf.testzip() is not None:
-                  raise SystemExit(f"{archive}: corrupt ZIP entry")
-              for required in ("bin", "etc", "lib", "share"):
-                  if not any(name == required or name.startswith(required + "/") for name in names):
-                      raise SystemExit(f"{archive}: missing {required}/")
-              if not any(name in names for name in ("bin/sh", "bin/bash")):
-                  raise SystemExit(f"{archive}: missing shell executable")
-              if "SYMLINKS.txt" not in names:
-                  raise SystemExit(f"{archive}: missing SYMLINKS.txt")
-              symlinks = zf.read("SYMLINKS.txt").decode("utf-8", errors="strict")
-              if "/data/data/com.termux/files/usr" in symlinks:
-                  raise SystemExit(f"{archive}: contains stock Termux prefix")
-              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries")
-          PY
-            sha="$(sha256sum "$destination/bootstrap.zip" | cut -d ' ' -f 1)"
-            cat > "$destination/bootstrap.json" <<EOF
-          {
-            "abi": "$abi",
-            "version": "$BOOTSTRAP_VERSION",
-            "sha256": "$sha"
-          }
-          EOF
-          done
-          if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != "true" ]]; then
-            mkdir -p bootstrap-cache
-            for arch in arm; do
-              install -m 0644 "$root/armeabi-v7a/bootstrap.zip" "bootstrap-cache/bootstrap-arm.zip"
-            done
-          fi
-          find "$root" -type f -maxdepth 2 -print
-
-      - name: Save prebuilt bootstrap archives for future CI runs
-        if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: bootstrap-cache
-          key: bootstrap-prebuilt-v2-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
-
-      - name: Upload verified ABI bootstrap artifacts
+      - name: Upload optimized ARM32 release APK
         uses: actions/upload-artifact@v4
         with:
-          name: abi-bootstrap-artifacts
-          path: bootstrap-artifacts/
-          if-no-files-found: error
-          retention-days: 7
-
-  package:
-    name: 4 · Build APKs and verify embedded bootstrap
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: test
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-
-      - name: Assemble ARM32 APK without bundled bootstrap
-        run: gradle --no-daemon :app:assembleArm32Debug
-
-      - name: Upload verified APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-studio-abi-debug-apks
-          path: |
-            app/build/outputs/apk/arm32/debug/*.apk
+          name: code-studio-arm32-release-apk
+          path: app/build/outputs/apk/arm32/release/*.apk
           if-no-files-found: error
           retention-days: 14
