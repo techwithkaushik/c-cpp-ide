@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Typeface
+import android.os.Build
+import org.json.JSONObject
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.compose.foundation.background
@@ -58,19 +60,24 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
             try {
                 val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
                 if (!runtime.hasBootstrapLayout()) {
-                    RuntimeStatus(
-                        ready = false,
-                        message = "Runtime not installed. Install a bootstrap built for this app before starting a shell."
-                    )
+                    val installFailure = installBundledBootstrap(appContext, runtime)
+                    if (installFailure == null) {
+                        RuntimeStatus(true, "")
+                    } else {
+                        RuntimeStatus(ready = false, message = installFailure)
+                    }
                 } else {
                     val smokeTest = BootstrapSmokeTest(runtime).run()
                     if (smokeTest.success) {
                         RuntimeStatus(true, "")
                     } else {
-                        RuntimeStatus(
+                        // Repair an incomplete or stale private runtime from the
+                        // checksum-pinned bootstrap shipped inside this ABI APK.
+                        val installFailure = installBundledBootstrap(appContext, runtime)
+                        if (installFailure == null) RuntimeStatus(true, "")
+                        else RuntimeStatus(
                             ready = false,
-                            message = smokeTest.failureReason
-                                ?: "The embedded shell failed its execution test."
+                            message = smokeTest.failureReason ?: installFailure
                         )
                     }
                 }
@@ -148,6 +155,43 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
             if (view.mTermSession !== session) view.attachSession(session)
         }
     )
+}
+
+/**
+ * Installs the ABI-matched bootstrap bundled in this APK on first terminal use.
+ * The manifest digest is checked by BootstrapInstaller before any files are promoted.
+ * Returns null on success, otherwise a user-visible setup error.
+ */
+private fun installBundledBootstrap(
+    context: Context,
+    runtime: EmbeddedTermuxRuntime
+): String? {
+    val stagedArchive = File(context.cacheDir, "bundled-termux-bootstrap.zip")
+    return try {
+        val metadata = context.assets.open("bootstrap/bootstrap.json")
+            .bufferedReader().use { JSONObject(it.readText()) }
+        val expectedAbi = metadata.optString("abi")
+        val supportedAbis = Build.SUPPORTED_ABIS.toSet()
+        if (expectedAbi.isBlank() || expectedAbi !in supportedAbis) {
+            return "This APK's bootstrap ABI ($expectedAbi) does not match this device (${Build.SUPPORTED_ABIS.joinToString()})."
+        }
+        val sha256 = metadata.optString("sha256")
+        if (!sha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
+            return "The bundled bootstrap manifest has an invalid SHA-256 checksum."
+        }
+        context.assets.open("bootstrap/bootstrap.zip").use { input ->
+            stagedArchive.outputStream().buffered().use { output -> input.copyTo(output) }
+        }
+        runtime.installBootstrap(stagedArchive, sha256) {
+            runtime.layout.ensurePrivateDirectories()
+            BootstrapSmokeTest(runtime).run().success
+        }
+        null
+    } catch (error: Exception) {
+        "Embedded runtime setup failed: ${error.message ?: error.javaClass.simpleName}. Rebuild/install the APK with its matching bootstrap assets."
+    } finally {
+        stagedArchive.delete()
+    }
 }
 
 private class IdeTermuxSessionClient(
