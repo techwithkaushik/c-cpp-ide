@@ -61,6 +61,8 @@ class BootstrapInstaller(
         val staging = File(parent, ".${prefixDirectory.name}.staging-${UUID.randomUUID()}")
         val backup = File(parent, ".${prefixDirectory.name}.backup-${UUID.randomUUID()}")
         var promoted = false
+        var previousPrefixMoved = false
+        var newPrefixPromoted = false
 
         try {
             if (!staging.mkdir()) throw IOException("Unable to create staging directory")
@@ -130,11 +132,13 @@ class BootstrapInstaller(
                 if (!prefixDirectory.renameTo(backup)) {
                     throw IOException("Unable to move existing runtime prefix aside")
                 }
+                previousPrefixMoved = true
             }
             if (!staging.renameTo(prefixDirectory)) {
                 if (backup.exists()) backup.renameTo(prefixDirectory)
                 throw IOException("Unable to promote staged runtime prefix")
             }
+            newPrefixPromoted = true
             // Keep the previous runtime until the caller's executable smoke test passes.
             // Validation runs only after promotion because Termux binaries may contain
             // absolute paths compiled for the final app-private prefix.
@@ -148,14 +152,18 @@ class BootstrapInstaller(
         } finally {
             if (!promoted) {
                 staging.deleteRecursively()
-                // A failed post-promotion validation must remove the new tree before
-                // restoring the old one. If no old tree existed, remove the failed tree.
-                if (backup.exists()) {
-                    if (prefixDirectory.exists()) prefixDirectory.deleteRecursively()
+                // Never delete the current runtime when extraction or staged validation
+                // fails before the old prefix has been moved. Roll back only if promotion
+                // actually replaced the destination.
+                if (previousPrefixMoved && backup.exists()) {
+                    if (newPrefixPromoted && prefixDirectory.exists()) {
+                        prefixDirectory.deleteRecursively()
+                    }
                     if (!backup.renameTo(prefixDirectory)) {
                         throw IOException("Runtime validation failed and previous runtime could not be restored")
                     }
-                } else if (prefixDirectory.exists()) {
+                } else if (!previousPrefixMoved && newPrefixPromoted && prefixDirectory.exists()) {
+                    // First installation failed its post-promotion smoke test.
                     prefixDirectory.deleteRecursively()
                 }
             }
