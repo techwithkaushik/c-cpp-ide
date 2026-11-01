@@ -27,4 +27,5 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.xz)
     implementation(libs.jsch)
+    testImplementation(libs.junit)
 }
