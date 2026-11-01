@@ -7,7 +7,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
-import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 /**
@@ -78,8 +77,7 @@ class BootstrapInstaller(
                 previousPrefixMoved = true
             }
             if (!installRoot.mkdirs()) throw IOException("Unable to create runtime prefix: $installRoot")
-            val archivePrefix = detectArchivePrefix(archive)
-            var symlinkManifest = File(installRoot, "SYMLINKS.txt")
+            val symlinkManifest = File(installRoot, "SYMLINKS.txt")
 
             var entryCount = 0
             var expandedBytes = 0L
@@ -91,33 +89,14 @@ class BootstrapInstaller(
                     entryCount++
                     if (entryCount > maxEntries) throw IOException("Bootstrap contains too many entries")
 
-                    val rawName = entry.name
-                    // When the archive is an app-files snapshot, ignore sibling
-                    // folders such as home/ and projects/; they are not part of
-                    // PREFIX and must never be nested inside files/usr.
-                    val normalizedName = rawName.trimStart('/')
-                    val selectedName = if (archivePrefix.isEmpty()) {
-                        // A valid bootstrap ZIP may have unrelated app-files
-                        // folders alongside the real prefix (for example when
-                        // someone zipped the whole files/ directory). Never
-                        // import those folders into the runtime prefix.
-                        if (isNonBootstrapWrapperEntry(normalizedName)) continue
-                        normalizedName
-                    } else {
-                        when {
-                            normalizedName == "SYMLINKS.txt" -> normalizedName
-                            normalizedName == archivePrefix.removeSuffix("/") -> continue
-                            normalizedName.startsWith(archivePrefix) -> normalizedName.removePrefix(archivePrefix)
-                            else -> continue
-                        }
-                    }
-                    if (selectedName.isEmpty()) continue
-                    val relative = validateArchivePath(selectedName)
+                    // Only accept a bootstrap ZIP rooted at bin/, etc/, lib/,
+                    // share/, and SYMLINKS.txt—not an app-files snapshot or usr/ wrapper.
+                    val relative = validateArchivePath(entry.name)
                     if (!seen.add(relative)) throw IOException("Duplicate archive entry: $relative")
 
                     val target = File(installRoot, relative)
                     val canonicalTarget = target.canonicalFile
-                    val canonicalStaging = installRoot.canonicalFile
+                    val canonicalRoot = installRoot.canonicalFile
                     if (canonicalTarget != canonicalStaging &&
                         !canonicalTarget.path.startsWith(canonicalStaging.path + File.separator)
                     ) {
@@ -150,15 +129,6 @@ class BootstrapInstaller(
                 }
             }
 
-            // Prefer a manifest inside usr/ for wrapped archives, otherwise
-            // accept the conventional top-level SYMLINKS.txt.
-            if (archivePrefix.isNotEmpty()) {
-                val nestedManifest = File(installRoot, "SYMLINKS.txt")
-                if (!nestedManifest.isFile) {
-                    // The top-level manifest was copied above if present.
-                    symlinkManifest = nestedManifest
-                }
-            }
             if (processSymlinks && requireSymlinkManifest && !symlinkManifest.isFile) {
                 throw IOException("Termux bootstrap is missing SYMLINKS.txt; refusing to install an incomplete runtime")
             }
@@ -196,48 +166,7 @@ class BootstrapInstaller(
         }
     }
 
-    /**
-     * Returns "usr/" when the ZIP is an app-files snapshot containing
-     * usr/bin, usr/etc, usr/lib and usr/share; returns "" for a normal
-     * bootstrap ZIP whose entries start directly with bin/, etc/, lib/.
-     */
-    /**
-     * Exclude app-private files-directory content accidentally included next to
-     * the bootstrap root. These are not valid entries inside the Termux prefix.
-     */
-    private fun isNonBootstrapWrapperEntry(name: String): Boolean {
-        val first = name.substringBefore('/')
-        return first == "home" ||
-            first == "projects" ||
-            first == "usr" ||
-            first.startsWith(".usr.staging-") ||
-            first.startsWith(".usr.backup-") ||
-            first.startsWith(".usr.tmp-") ||
-            first.startsWith(".usr.staging")
-    }
-
-    private fun detectArchivePrefix(archive: File): String {
-        val names = HashSet<String>()
-        ZipFile(archive).use { zip ->
-            val entries = zip.entries()
-            while (entries.hasMoreElements()) {
-                val name = entries.nextElement().name.trimStart('/')
-                names.add(name)
-            }
-        }
-        val directBootstrap = listOf("bin/", "etc/", "lib/", "share/")
-            .all { prefix -> names.any { it.startsWith(prefix) } }
-        val wrappedBootstrap = listOf("usr/bin/", "usr/etc/", "usr/lib/", "usr/share/")
-            .all { prefix -> names.any { it.startsWith(prefix) } }
-        if (directBootstrap) return ""
-        if (wrappedBootstrap) return "usr/"
-        throw IOException(
-            "Invalid bootstrap ZIP layout: expected bin/, etc/, lib/, share/ at the ZIP root, " +
-                "or those directories under usr/. Select the bootstrap ZIP, not an app-files archive."
-        )
-    }
-
-    private fun createSymlinks(manifest: File, staging: File, finalPrefix: File): Int {
+    private fun createSymlinks(manifest: File, installRoot: File, finalPrefix: File): Int {
         var created = 0
         manifest.useLines { lines ->
             lines.forEachIndexed { index, raw ->
@@ -253,12 +182,12 @@ class BootstrapInstaller(
                 val rawTarget = line.substring(0, separator).trim()
                 val rawLink = line.substring(separator + 1).trim()
                 val linkRelative = validateArchivePath(rawLink)
-                val linkInStage = File(staging, linkRelative)
+                val linkInStage = File(installRoot, linkRelative)
                 val targetFile = if (rawTarget.startsWith("/")) {
                     // Official Termux bootstrap archives encode absolute links for
                     // Termux's own package prefix. Remap only these known prefixes
                     // into this IDE's private prefix; never permit arbitrary absolute
-                    // links to escape the staged runtime.
+                    // links to escape the installed runtime.
                     // The bootstrap must be built for this app package. Remapping
                     // another app's symlinks does not rewrite hard-coded ELF paths.
                     val sourcePrefixes = listOf(
@@ -345,7 +274,7 @@ class BootstrapInstaller(
         }
 
         // Some bootstrap archives expose sh/bash through symlinks whose target
-        // is outside the normal bin traversal. Resolve the final staged target
+        // is outside the normal bin traversal. Resolve the final runtime target
         // explicitly and restore its execute bit before promoting the prefix.
         val finalPrefixPath = finalPrefix.toPath().toAbsolutePath().normalize()
         listOf("bin/sh", "bin/bash").map { File(root, it) }
@@ -353,24 +282,24 @@ class BootstrapInstaller(
             .forEach { link ->
                 // Manifest links intentionally point at the final prefix, but
                 // during staging that path has not been promoted yet. Map it
-                // back into the staging tree before touching permissions.
+                // back into the runtime prefix before touching permissions.
                 val rawTarget = java.nio.file.Files.readSymbolicLink(link.toPath())
                 val resolvedTarget = if (rawTarget.isAbsolute) {
                     rawTarget.toAbsolutePath().normalize()
                 } else {
                     link.toPath().parent.resolve(rawTarget).toAbsolutePath().normalize()
                 }
-                val stagedTarget = if (resolvedTarget.startsWith(finalPrefixPath)) {
+                val resolvedExecutable = if (resolvedTarget.startsWith(finalPrefixPath)) {
                     val relative = finalPrefixPath.relativize(resolvedTarget)
                     root.toPath().resolve(relative).normalize().toFile()
                 } else {
                     resolvedTarget.toFile()
                 }
-                if (!stagedTarget.isFile) {
-                    throw IOException("Bootstrap shell target is missing: ${link.relativeTo(root)} -> $stagedTarget")
+                if (!resolvedExecutable.isFile) {
+                    throw IOException("Bootstrap shell target is missing: ${link.relativeTo(root)} -> $resolvedExecutable")
                 }
-                try { Os.chmod(stagedTarget.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod shell target ${link.relativeTo(root)} -> $stagedTarget: ${error.message}", error) }
-                if (!stagedTarget.canExecute()) throw IOException("Shell target is not executable after chmod: ${link.relativeTo(root)} -> $stagedTarget")
+                try { Os.chmod(resolvedExecutable.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod shell target ${link.relativeTo(root)} -> $resolvedExecutable: ${error.message}", error) }
+                if (!resolvedExecutable.canExecute()) throw IOException("Shell target is not executable after chmod: ${link.relativeTo(root)} -> $resolvedExecutable")
             }
         listOf("bin/sh", "bin/bash").forEach { shell ->
             val candidate = File(root, shell)
@@ -396,11 +325,11 @@ class BootstrapInstaller(
         val finalPrefix = finalPrefixDirectory.toPath().toAbsolutePath().normalize()
         val targetPath = if (rawTarget.isAbsolute) rawTarget.toAbsolutePath().normalize()
             else shell.toPath().parent.resolve(rawTarget).toAbsolutePath().normalize()
-        val stagedTarget = if (targetPath.startsWith(finalPrefix)) {
+        val resolvedExecutable = if (targetPath.startsWith(finalPrefix)) {
             root.toPath().resolve(finalPrefix.relativize(targetPath)).normalize().toFile()
         } else targetPath.toFile()
-        if (!stagedTarget.isFile || !stagedTarget.canExecute()) {
-            throw IOException("Termux shell symlink target is missing or not executable: bin/sh -> $stagedTarget")
+        if (!resolvedExecutable.isFile || !resolvedExecutable.canExecute()) {
+            throw IOException("Termux shell symlink target is missing or not executable: bin/sh -> $resolvedExecutable")
         }
         listOf("bin/bash", "bin/ls").forEach { alias ->
             val candidate = File(root, alias)
