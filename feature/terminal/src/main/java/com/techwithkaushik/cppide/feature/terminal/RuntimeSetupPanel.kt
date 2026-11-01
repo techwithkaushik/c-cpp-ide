@@ -118,9 +118,13 @@ fun RuntimeSetupPanel(
                                 }
                                 "Bootstrap verified (${installed.sha256.take(12)}…). Shell execution test passed."
                             } catch (error: Exception) {
-                                val reason = smoke?.failureReason
+                                val failedSmoke = smoke
+                                val reason = failedSmoke?.failureReason
                                 if (reason != null) {
-                                    "Setup failed: $reason. The previous runtime, if any, was restored."
+                                    val stderr = failedSmoke.stderr.trim().takeIf { it.isNotBlank() }
+                                    "Setup failed: $reason" +
+                                        (stderr?.let { " — stderr: ${it.take(400)}" } ?: "") +
+                                        ". The previous runtime, if any, was restored."
                                 } else {
                                     throw error
                                 }
