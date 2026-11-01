@@ -117,15 +117,15 @@ class BootstrapInstaller(
                 }
             }
 
-            val symlinkCount = if (symlinkManifest.isFile) {
-                createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile)
-            } else {
-                0
+            if (!symlinkManifest.isFile) {
+                throw IOException("Termux bootstrap is missing SYMLINKS.txt; refusing to install an incomplete runtime")
             }
+            val symlinkCount = createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile)
             symlinkManifest.delete()
 
             setExecutableBits(staging, prefixDirectory)
             validateBootstrapLayout(staging)
+            validateTermuxSymlinkLayout(staging, symlinkCount)
 
             // Keep the previous prefix until the staged tree is ready. Renames
             // are within the same parent filesystem, so promotion is atomic per rename.
@@ -314,6 +314,30 @@ class BootstrapInstaller(
             }
         }
     }
+    /**
+     * Validate canonical Termux command aliases after replaying SYMLINKS.txt.
+     * Termux bootstrap normally exposes bin/sh as a symlink to dash.
+     */
+    private fun validateTermuxSymlinkLayout(root: File, symlinkCount: Int) {
+        if (symlinkCount == 0) {
+            throw IOException("SYMLINKS.txt contained no symlinks; bootstrap extraction is incomplete")
+        }
+        val shell = File(root, "bin/sh")
+        if (!java.nio.file.Files.isSymbolicLink(shell.toPath())) {
+            throw IOException("Termux bootstrap expected bin/sh symlink from SYMLINKS.txt, but it was not created")
+        }
+        val target = shell.canonicalFile
+        if (!target.isFile || !target.canExecute()) {
+            throw IOException("Termux shell symlink target is missing or not executable: bin/sh -> $target")
+        }
+        listOf("bin/bash", "bin/ls").forEach { alias ->
+            val candidate = File(root, alias)
+            if (!candidate.exists() && !java.nio.file.Files.isSymbolicLink(candidate.toPath())) {
+                throw IOException("Termux SYMLINKS.txt alias was not installed: $alias")
+            }
+        }
+    }
+
     private fun validateBootstrapLayout(root: File) {
         val required = listOf("bin", "etc", "lib", "share")
         required.forEach { name ->
