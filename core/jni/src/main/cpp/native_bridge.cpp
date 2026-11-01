@@ -112,3 +112,225 @@ Java_com_techwithkaushik_cppide_core_jni_NativeEditorEngine_nativeDetectLanguage
     else if (ext == "yaml" || ext == "yml") language = "yaml";
     return env->NewStringUTF(language);
 }
+
+
+// Native PTY support for the app-owned Linux runtime. This is independent of any
+// third-party terminal emulator: the kernel PTY provides real tty semantics.
+#include <atomic>
+#include <cerrno>
+#include <csignal>
+#include <cstdlib>
+#include <cstring>
+#include <fcntl.h>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <termios.h>
+#include <unistd.h>
+
+namespace {
+struct PtyProcess {
+    int master_fd = -1;
+    pid_t child_pid = -1;
+    std::mutex mutex;
+};
+
+std::mutex g_pty_mutex;
+std::unordered_map<jlong, std::shared_ptr<PtyProcess>> g_ptys;
+std::atomic<jlong> g_next_pty{1};
+
+std::shared_ptr<PtyProcess> find_pty(jlong handle) {
+    std::lock_guard<std::mutex> lock(g_pty_mutex);
+    const auto it = g_ptys.find(handle);
+    return it == g_ptys.end() ? nullptr : it->second;
+}
+
+void throw_state(JNIEnv* env, const std::string& message) {
+    jclass type = env->FindClass("java/lang/IllegalStateException");
+    if (type != nullptr) env->ThrowNew(type, message.c_str());
+}
+}  // namespace
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
+    JNIEnv* env, jobject /* thiz */, jstring linker_value, jstring proot_value,
+    jstring rootfs_value, jstring shell_value, jstring temp_value) {
+    const std::string linker = to_utf8(env, linker_value);
+    const std::string proot = to_utf8(env, proot_value);
+    const std::string rootfs = to_utf8(env, rootfs_value);
+    const std::string shell = to_utf8(env, shell_value);
+    const std::string temp = to_utf8(env, temp_value);
+    if (linker.empty() || proot.empty() || rootfs.empty() || shell.empty() || temp.empty()) {
+        throw_state(env, "PTY launch arguments must not be empty.");
+        return 0;
+    }
+
+    const int master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (master < 0 || grantpt(master) != 0 || unlockpt(master) != 0) {
+        const int error = errno;
+        if (master >= 0) close(master);
+        throw_state(env, std::string("Could not allocate PTY: ") + std::strerror(error));
+        return 0;
+    }
+    char* slave_name = ptsname(master);
+    if (slave_name == nullptr) {
+        const int error = errno;
+        close(master);
+        throw_state(env, std::string("Could not resolve PTY slave: ") + std::strerror(error));
+        return 0;
+    }
+    const std::string slave_path(slave_name);
+    const pid_t child = fork();
+    if (child < 0) {
+        const int error = errno;
+        close(master);
+        throw_state(env, std::string("Could not fork PTY shell: ") + std::strerror(error));
+        return 0;
+    }
+
+    if (child == 0) {
+        setsid();
+        const int slave = open(slave_path.c_str(), O_RDWR);
+        if (slave < 0 || ioctl(slave, TIOCSCTTY, 0) != 0) _exit(126);
+        dup2(slave, STDIN_FILENO);
+        dup2(slave, STDOUT_FILENO);
+        dup2(slave, STDERR_FILENO);
+        if (slave > STDERR_FILENO) close(slave);
+        close(master);
+
+        setenv("HOME", "/root", 1);
+        setenv("TMPDIR", "/tmp", 1);
+        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
+        setenv("TERM", "xterm-256color", 1);
+        setenv("COLORTERM", "truecolor", 1);
+        setenv("LANG", "C.UTF-8", 1);
+        setenv("PROOT_TMP_DIR", temp.c_str(), 1);
+
+        std::vector<std::string> arguments = {
+            linker, proot, "-0", "-r", rootfs, "-w", "/root",
+            "-b", "/dev", "-b", "/proc", "-b", "/sys", shell, "-i"
+        };
+        std::vector<char*> argv;
+        argv.reserve(arguments.size() + 1);
+        for (auto& argument : arguments) argv.push_back(argument.data());
+        argv.push_back(nullptr);
+        execv(linker.c_str(), argv.data());
+        const char* error = std::strerror(errno);
+        dprintf(STDERR_FILENO, "Could not execute Android linker: %s\r\n", error);
+        _exit(127);
+    }
+
+    const jlong handle = g_next_pty.fetch_add(1);
+    auto pty = std::make_shared<PtyProcess>();
+    pty->master_fd = master;
+    pty->child_pid = child;
+    {
+        std::lock_guard<std::mutex> lock(g_pty_mutex);
+        g_ptys.emplace(handle, std::move(pty));
+    }
+    return handle;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeRead(
+    JNIEnv* env, jobject /* thiz */, jlong handle, jbyteArray buffer) {
+    auto pty = find_pty(handle);
+    if (!pty || buffer == nullptr) return 0;
+    const jsize length = env->GetArrayLength(buffer);
+    if (length <= 0) return 0;
+    int fd;
+    {
+        std::lock_guard<std::mutex> lock(pty->mutex);
+        fd = pty->master_fd;
+    }
+    if (fd < 0) return 0;
+    std::vector<jbyte> bytes(static_cast<size_t>(length));
+    ssize_t count;
+    do { count = read(fd, bytes.data(), bytes.size()); } while (count < 0 && errno == EINTR);
+    if (count < 0 && (errno == EIO || errno == EBADF || errno == EIO)) return 0;
+    if (count < 0) return -errno;
+    if (count > 0) env->SetByteArrayRegion(buffer, 0, static_cast<jsize>(count), bytes.data());
+    return static_cast<jint>(count);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeWrite(
+    JNIEnv* env, jobject /* thiz */, jlong handle, jbyteArray buffer) {
+    auto pty = find_pty(handle);
+    if (!pty || buffer == nullptr) return -EBADF;
+    const jsize length = env->GetArrayLength(buffer);
+    if (length <= 0) return 0;
+    int fd;
+    {
+        std::lock_guard<std::mutex> lock(pty->mutex);
+        fd = pty->master_fd;
+    }
+    if (fd < 0) return -EBADF;
+    jbyte* bytes = env->GetByteArrayElements(buffer, nullptr);
+    if (bytes == nullptr) return -ENOMEM;
+    ssize_t count;
+    do { count = write(fd, bytes, static_cast<size_t>(length)); } while (count < 0 && errno == EINTR);
+    const int error = errno;
+    env->ReleaseByteArrayElements(buffer, bytes, JNI_ABORT);
+    return count < 0 ? -error : static_cast<jint>(count);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeResize(
+    JNIEnv* /* env */, jobject /* thiz */, jlong handle, jint columns, jint rows) {
+    auto pty = find_pty(handle);
+    if (!pty) return JNI_FALSE;
+    int fd;
+    {
+        std::lock_guard<std::mutex> lock(pty->mutex);
+        fd = pty->master_fd;
+    }
+    if (fd < 0) return JNI_FALSE;
+    struct winsize size {};
+    size.ws_col = static_cast<unsigned short>(columns);
+    size.ws_row = static_cast<unsigned short>(rows);
+    return ioctl(fd, TIOCSWINSZ, &size) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeWait(
+    JNIEnv* /* env */, jobject /* thiz */, jlong handle) {
+    auto pty = find_pty(handle);
+    if (!pty) return -1;
+    int status = 0;
+    pid_t result;
+    do { result = waitpid(pty->child_pid, &status, 0); } while (result < 0 && errno == EINTR);
+    int exit_code = result < 0 ? -errno : WIFEXITED(status) ? WEXITSTATUS(status) : WIFSIGNALED(status) ? 128 + WTERMSIG(status) : -1;
+    {
+        std::lock_guard<std::mutex> lock(pty->mutex);
+        if (pty->master_fd >= 0) close(pty->master_fd);
+        pty->master_fd = -1;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_pty_mutex);
+        g_ptys.erase(handle);
+    }
+    return exit_code;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeClose(
+    JNIEnv* /* env */, jobject /* thiz */, jlong handle) {
+    auto pty = find_pty(handle);
+    if (!pty) return;
+    int fd;
+    pid_t child;
+    {
+        std::lock_guard<std::mutex> lock(pty->mutex);
+        fd = pty->master_fd;
+        pty->master_fd = -1;
+        child = pty->child_pid;
+    }
+    if (fd >= 0) close(fd);
+    if (child > 0) kill(-child, SIGTERM);
+}
