@@ -17,8 +17,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val process = try {
             ProcessBuilder(
                 paths.systemLinker.absolutePath, paths.proot.absolutePath,
-                "-0", "-r", root, "-w", "/",
-                "-b", "/dev", "-b", "/proc", "-b", "/sys",
+                "-r", root, "-w", "/",
+                "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
                 shell, "-c", "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'; test -x /bin/sh"
             ).directory(paths.base).apply {
                 environment()["HOME"] = "/root"
