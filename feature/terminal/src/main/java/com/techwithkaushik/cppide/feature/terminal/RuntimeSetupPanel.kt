@@ -14,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +44,44 @@ fun RuntimeSetupPanel(
     var selectedArchive by remember { mutableStateOf<Uri?>(null) }
     var sha256 by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var checkingInstalledRuntime by remember { mutableStateOf(false) }
     var status by remember(message) { mutableStateOf(message) }
+
+    val verifyInstalledRuntime: () -> Unit = {
+        if (!busy && !checkingInstalledRuntime) {
+            checkingInstalledRuntime = true
+            status = "Checking the installed runtime and executing a fixed shell smoke test…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        val runtime = EmbeddedTermuxRuntime(context.filesDir)
+                        if (!runtime.hasBootstrapLayout()) {
+                            "No complete bootstrap is installed. Select a ZIP below to install it."
+                        } else {
+                            val smoke = BootstrapSmokeTest(runtime).run()
+                            if (smoke.success) {
+                                "Runtime verified. Shell execution passed."
+                            } else {
+                                val detail = listOfNotNull(
+                                    smoke.failureReason,
+                                    smoke.stderr.trim().takeIf { it.isNotBlank() }?.let { "stderr: ${it.take(400)}" }
+                                ).joinToString(" — ")
+                                "Runtime verification failed: $detail. Select a matching bootstrap ZIP below to reinstall."
+                            }
+                        }
+                    } catch (error: Exception) {
+                        "Runtime check failed: ${error.message ?: error.javaClass.simpleName}"
+                    }
+                }
+                status = result
+                checkingInstalledRuntime = false
+            }
+        }
+    }
+
+    LaunchedEffect(context) {
+        verifyInstalledRuntime()
+    }
 
     val archivePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -61,13 +99,19 @@ fun RuntimeSetupPanel(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Embedded terminal setup", color = Color(0xFF8CC8FF), fontSize = 16.sp)
+        Button(
+            enabled = !busy && !checkingInstalledRuntime,
+            onClick = verifyInstalledRuntime
+        ) {
+            Text(if (checkingInstalledRuntime) "Checking runtime…" else "Verify installed runtime")
+        }
         Text(
             "A private Linux runtime is required. Import the app-specific bootstrap ZIP from the GitHub Actions artifact and enter its published SHA-256. Your existing Termux installation is not modified.",
             color = Color(0xFFE8EDF5),
             fontSize = 12.sp
         )
         Button(
-            enabled = !busy,
+            enabled = !busy && !checkingInstalledRuntime,
             onClick = { archivePicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
         ) {
             Text(if (selectedArchive == null) "Select bootstrap ZIP" else "Choose another ZIP")
@@ -143,7 +187,7 @@ fun RuntimeSetupPanel(
         ) {
             Text("Verify and install")
         }
-        if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
+        if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text(status, color = if (status.startsWith("Bootstrap verified")) Color(0xFF7DDBB0) else Color(0xFF9AA7B5), fontSize = 12.sp)
     }
 }
