@@ -18,7 +18,7 @@ env:
 
 jobs:
   release:
-    name: Build and verify signed release APKs for all ABIs
+    name: Build and verify signed arm32 release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -67,7 +67,7 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: gradle --no-daemon --build-cache :app:assembleArm32Release :app:assembleArm64Release :app:assembleX86Release :app:assembleX64Release
+        run: gradle --no-daemon --build-cache :app:assembleArm32Release
 
       - name: Verify APK signatures and ensure bootstrap is external
         shell: bash
@@ -81,11 +81,11 @@ jobs:
           fi
           declare -A APK_DIRS=(
             [arm32]="app/build/outputs/apk/arm32/release"
-            [arm64]="app/build/outputs/apk/arm64/release"
-            [x86]="app/build/outputs/apk/x86/release"
-            [x64]="app/build/outputs/apk/x64/release"
+            # [arm64]="app/build/outputs/apk/arm64/release"
+            # [x86]="app/build/outputs/apk/x86/release"
+            # [x64]="app/build/outputs/apk/x64/release"
           )
-          for abi in arm32 arm64 x86 x64; do
+          for abi in arm32; do
             dir="${APK_DIRS[$abi]}"
             apk="$(find "$dir" -maxdepth 1 -type f -name '*.apk' -print -quit)"
             test -n "$apk" && test -s "$apk" || { echo "::error::Missing release APK for $abi in $dir"; exit 1; }
@@ -97,7 +97,7 @@ jobs:
               exit 1
             fi
           done
-          echo "All four signed APKs verified; bootstrap files are not embedded."
+          echo "Signed arm32 APK verified; bootstrap files are not embedded."
 
       - name: Upload arm32 APK
         uses: actions/upload-artifact@v4
@@ -107,26 +107,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload arm64 APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-studio-release-apk-arm64
-          path: app/build/outputs/apk/arm64/release/*.apk
-          if-no-files-found: error
-          retention-days: 14
+      # - name: Upload arm64 APK
+      # uses: actions/upload-artifact@v4
+      # with:
+      # name: code-studio-release-apk-arm64
+      # path: app/build/outputs/apk/arm64/release/*.apk
+      # if-no-files-found: error
+      # retention-days: 14
 
-      - name: Upload x86 APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-studio-release-apk-x86
-          path: app/build/outputs/apk/x86/release/*.apk
-          if-no-files-found: error
-          retention-days: 14
+      # - name: Upload x86 APK
+      # uses: actions/upload-artifact@v4
+      # with:
+      # name: code-studio-release-apk-x86
+      # path: app/build/outputs/apk/x86/release/*.apk
+      # if-no-files-found: error
+      # retention-days: 14
 
-      - name: Upload x64 APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-studio-release-apk-x64
-          path: app/build/outputs/apk/x64/release/*.apk
-          if-no-files-found: error
-          retention-days: 14
+      # - name: Upload x64 APK
+      # uses: actions/upload-artifact@v4
+      # with:
+      # name: code-studio-release-apk-x64
+      # path: app/build/outputs/apk/x64/release/*.apk
+      # if-no-files-found: error
+      # retention-days: 14
