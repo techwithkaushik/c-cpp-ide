@@ -97,8 +97,8 @@ class BootstrapInstaller(
                     val target = File(installRoot, relative)
                     val canonicalTarget = target.canonicalFile
                     val canonicalRoot = installRoot.canonicalFile
-                    if (canonicalTarget != canonicalStaging &&
-                        !canonicalTarget.path.startsWith(canonicalStaging.path + File.separator)
+                    if (canonicalTarget != canonicalRoot &&
+                        !canonicalTarget.path.startsWith(canonicalRoot.path + File.separator)
                     ) {
                         throw IOException("Archive entry escapes runtime prefix")
                     }
