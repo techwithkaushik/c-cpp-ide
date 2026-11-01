@@ -21,7 +21,7 @@ data class SshHost(
     val expectedSha256Fingerprint: String? = null,
 ) {
     fun validate() {
-        require(host.matches(Regex("[A-Za-z0-9.-]{1,253}"))) { "Invalid SSH host." }
+        require(host.matches(Regex("[A-Za-z0-9.:-]{1,253}")) && host.any { it.isLetterOrDigit() }) { "Invalid SSH host or IP address." }
         require(port in 1..65535) { "SSH port must be between 1 and 65535." }
         require(username.matches(Regex("[A-Za-z0-9._-]{1,64}"))) { "Invalid SSH username." }
         require(!password.isNullOrEmpty() || privateKey != null) { "Provide a password or private key." }
