@@ -38,6 +38,7 @@ class BootstrapInstaller(
         archive: File,
         expectedSha256: String? = null,
         prefixDirectory: File,
+        processSymlinks: Boolean = true,
         validateInstalledPrefix: ((File) -> Boolean)? = null,
     ): Result {
         require(archive.isFile) { "Bootstrap archive does not exist" }
@@ -150,15 +151,24 @@ class BootstrapInstaller(
                     symlinkManifest = nestedManifest
                 }
             }
-            if (requireSymlinkManifest && !symlinkManifest.isFile) {
+            if (processSymlinks && requireSymlinkManifest && !symlinkManifest.isFile) {
                 throw IOException("Termux bootstrap is missing SYMLINKS.txt; refusing to install an incomplete runtime")
             }
-            val symlinkCount = if (symlinkManifest.isFile) createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile) else 0
+            // The no-symlinks path intentionally does not parse or replay
+            // SYMLINKS.txt. This makes it possible to test the archive's actual
+            // extracted files independently from the app's symlink handling.
+            val symlinkCount = if (processSymlinks && symlinkManifest.isFile) {
+                createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile)
+            } else {
+                0
+            }
             symlinkManifest.delete()
 
             setExecutableBits(staging, prefixDirectory)
-            validateBootstrapLayout(staging)
-            if (requireSymlinkManifest) validateTermuxSymlinkLayout(staging, prefixDirectory, symlinkCount)
+            validateBootstrapLayout(staging, requireShell = processSymlinks)
+            if (processSymlinks && requireSymlinkManifest) {
+                validateTermuxSymlinkLayout(staging, prefixDirectory, symlinkCount)
+            }
 
             // Keep the previous prefix until the staged tree is ready. Renames
             // are within the same parent filesystem, so promotion is atomic per rename.
@@ -403,13 +413,13 @@ class BootstrapInstaller(
         }
     }
 
-    private fun validateBootstrapLayout(root: File) {
+    private fun validateBootstrapLayout(root: File, requireShell: Boolean) {
         val required = listOf("bin", "etc", "lib", "share")
         required.forEach { name ->
             if (!File(root, name).exists()) throw IOException("Bootstrap is missing required path: $name")
         }
-        if (!File(root, "bin/sh").exists() && !File(root, "bin/bash").exists()) {
-            throw IOException("Bootstrap does not contain a shell entry point")
+        if (requireShell && !File(root, "bin/sh").exists() && !File(root, "bin/bash").exists()) {
+            throw IOException("Bootstrap does not contain a shell entry point after symlink processing")
         }
     }
 
