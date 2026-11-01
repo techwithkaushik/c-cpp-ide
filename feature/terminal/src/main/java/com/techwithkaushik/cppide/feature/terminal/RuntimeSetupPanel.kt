@@ -33,7 +33,7 @@ import java.io.File
 import java.io.IOException
 
 @Composable
-internal fun RuntimeSetupPanel(
+fun RuntimeSetupPanel(
     message: String,
     onRuntimeReady: () -> Unit,
     modifier: Modifier = Modifier,
