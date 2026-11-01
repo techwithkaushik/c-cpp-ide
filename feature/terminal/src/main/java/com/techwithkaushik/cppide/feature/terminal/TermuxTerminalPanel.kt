@@ -381,7 +381,9 @@ private class IdeTermuxViewClient(
 ) : TerminalViewClient {
     override fun onScale(scale: Float): Float = scale
     override fun onSingleTapUp(e: MotionEvent) = Unit
-    override fun shouldBackButtonBeMappedToEscape(): Boolean = true
+    // Android Back is handled by the IDE panel, not injected as Escape into
+    // the shell. Escape here can leave readline/completion prompts in a bad state.
+    override fun shouldBackButtonBeMappedToEscape(): Boolean = false
     override fun shouldEnforceCharBasedInput(): Boolean = true
     override fun shouldUseCtrlSpaceWorkaround(): Boolean = false
     override fun isTerminalViewSelected(): Boolean = true
