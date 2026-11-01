@@ -4,7 +4,7 @@ Code Studio is a Kotlin/Jetpack Compose Android IDE focused on C/C++, Python, we
 
 ## Runtime direction
 
-This branch is **Termux-free**: the Gradle build does not include a Termux app/runtime module or vendored Termux terminal emulator. It never reads or writes another app's private data. The app owns the Linux runtime under:
+This branch uses an app-owned Linux runtime: the Gradle build contains no external terminal-app runtime or vendored terminal emulator. It never reads or writes another app's private data. The app owns the Linux runtime under:
 
 ```text
 files/linux-runtime/
