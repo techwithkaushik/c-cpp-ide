@@ -101,7 +101,7 @@ class EmbeddedTermuxRuntime(
 
     fun installBootstrap(
         archive: File,
-        expectedSha256: String,
+        expectedSha256: String? = null,
         validateInstalledPrefix: ((File) -> Boolean)? = null,
     ): BootstrapInstaller.Result {
         layout.ensurePrivateDirectories()
