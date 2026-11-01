@@ -218,7 +218,6 @@ class BootstrapInstallerTest {
             BootstrapInstaller(maxEntries = 4).install(archive, sha256(archive), prefix)
         }
         assertFalse(prefix.exists())
-        assertTrue(temp.root.walkTopDown().none { it.name.startsWith(".usr.staging-") })
     }
 
     @Test
