@@ -97,7 +97,7 @@ internal fun IdeSettingsScreen(
         if (category == "Runtime & Bootstrap") {
             Column(Modifier.fillMaxSize().padding(10.dp)) {
                 Text("RUNTIME & BOOTSTRAP", color = SettingsAccent, fontSize = IdeDesignTokens.Typography.caption)
-                Text("Import or replace the app-specific bootstrap. The existing Termux app is not modified.", color = SettingsMuted, fontSize = IdeDesignTokens.Typography.caption, modifier = Modifier.padding(vertical = IdeDesignTokens.Spacing.sm))
+                Text("Set up the main terminal by importing the matching ABI artifact. Select bootstrap.zip and bootstrap.json from the same extracted GitHub Actions artifact; the manifest fills in the checksum and the app tests the shell before reporting success. The existing Termux app is not modified.", color = SettingsMuted, fontSize = IdeDesignTokens.Typography.caption, modifier = Modifier.padding(vertical = IdeDesignTokens.Spacing.sm))
                 RuntimeSetupPanel(
                     message = "Select the bootstrap ZIP for this IDE and enter its published SHA-256 checksum.",
                     onRuntimeReady = onRuntimeReady,
@@ -151,7 +151,14 @@ internal fun IdeSettingsScreen(
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
-                        SettingsCard("Input", "Shell session", "Interactive PTY with command input and terminal output")
+                        SettingsCard("Main terminal", "Runtime status", "The terminal requires an installed ABI-matched bootstrap and a passing shell execution test.")
+                        Button(
+                            onClick = { category = "Runtime & Bootstrap" },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Set up main terminal")
+                        }
+                        SettingsCard("Input", "Shell session", "Commands run inside the app-private Linux environment, not Android's fallback shell.")
                         SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
                     }
                     "Languages" -> {
