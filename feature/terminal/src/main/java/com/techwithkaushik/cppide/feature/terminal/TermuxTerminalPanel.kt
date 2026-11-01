@@ -177,7 +177,9 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
             }
         },
         update = { view ->
+            // Settings can change while this composable is absent; reapply live values on return.
             if (view.mTermSession !== session) view.attachSession(session)
+            if (view.textSize != terminalFontSize) view.setTextSize(terminalFontSize)
         }
     )
 }
