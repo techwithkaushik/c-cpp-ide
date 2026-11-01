@@ -48,6 +48,11 @@ data class RuntimeLayout private constructor(
             put("SHELL", inherited["SHELL"] ?: shell.absolutePath)
             put("LD_LIBRARY_PATH", listOf(libraryPath, inherited["LD_LIBRARY_PATH"])
                 .filterNotNull().filter { it.isNotBlank() }.distinct().joinToString(File.pathSeparator))
+            // Android 10+ blocks direct execve() of writable app-data files for targetSdk >= 29.
+            // Termux's exec interceptor is required so child commands are relaunched through
+            // /system/bin/linker instead of direct execve() from files/usr.
+            val termuxExec = File(prefix, "lib/libtermux-exec.so")
+            if (termuxExec.isFile) put("LD_PRELOAD", termuxExec.absolutePath)
             put("PATH", (pathEntries + inherited["PATH"].orEmpty().split(File.pathSeparator)
                 .filter { it.isNotBlank() }).distinct().joinToString(File.pathSeparator))
             put("LANG", inherited["LANG"] ?: "C.UTF-8")
