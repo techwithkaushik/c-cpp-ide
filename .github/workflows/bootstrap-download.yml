@@ -1,6 +1,10 @@
 name: Build and Upload Code Studio Bootstraps (All ABIs)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-download.yml"
   workflow_dispatch:
   schedule:
     # Refresh all ABI-specific archives weekly.
