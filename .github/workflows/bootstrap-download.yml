@@ -55,6 +55,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Upstream's fallback profile script assumes profile.d already exists.
+          # Ensure the destination directory exists in each freshly extracted rootfs.
+          generator="scripts/generate-bootstraps.sh"
+          sed -i '/@TERMUX__PREFIX__PROFILE_D_DIR@/i\\\t\t mkdir -p "${BOOTSTRAP_ROOTFS}/${TERMUX__PREFIX__PROFILE_D_DIR}"' "$generator"
           bash scripts/generate-bootstraps.sh --architectures arm,aarch64,i686,x86_64
           mkdir -p ../dist
           for pair in "arm:bootstrap-arm.zip" "aarch64:bootstrap-aarch64.zip" "i686:bootstrap-i686.zip" "x86_64:bootstrap-x86_64.zip"; do
