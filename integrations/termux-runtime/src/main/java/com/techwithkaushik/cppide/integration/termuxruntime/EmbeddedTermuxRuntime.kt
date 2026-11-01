@@ -39,23 +39,33 @@ data class RuntimeLayout private constructor(
         extraPathEntries: List<File> = emptyList(),
     ): Map<String, String> {
         val pathEntries = (listOf(bin) + extraPathEntries).map { it.absolutePath }
-        val libraryPath = File(prefix, "lib").absolutePath
         return inherited.toMutableMap().apply {
             put("PREFIX", prefix.absolutePath)
             put("TERMUX_PREFIX", prefix.absolutePath)
             put("HOME", home.absolutePath)
             put("TMPDIR", temporaryDirectory.absolutePath)
             put("SHELL", inherited["SHELL"] ?: shell.absolutePath)
-            put("LD_LIBRARY_PATH", listOf(libraryPath, inherited["LD_LIBRARY_PATH"])
-                .filterNotNull().filter { it.isNotBlank() }.distinct().joinToString(File.pathSeparator))
-            // Android 10+ blocks direct execve() of writable app-data files for targetSdk >= 29.
-            // Termux's exec interceptor is required so child commands are relaunched through
-            // /system/bin/linker instead of direct execve() from files/usr.
+
+            // Match Termux's Android execution environment: do not export
+            // PREFIX/lib through LD_LIBRARY_PATH on Android 7+, because it can
+            // make the system linker load incompatible libraries. Termux ELF
+            // binaries use their packaged RUNPATH for their shared libraries.
+            remove("LD_LIBRARY_PATH")
+
+            // Android 10+ blocks direct execve() of writable app-data files for
+            // targetSdk >= 29. The initial shell must use the system linker;
+            // termux-exec then handles child execs and /bin, /usr/bin paths.
             val termuxExec = File(prefix, "lib/libtermux-exec.so")
-            if (termuxExec.isFile) put("LD_PRELOAD", termuxExec.absolutePath)
+            if (termuxExec.isFile) {
+                put("LD_PRELOAD", termuxExec.absolutePath)
+            } else {
+                remove("LD_PRELOAD")
+            }
+
             put("PATH", (pathEntries + inherited["PATH"].orEmpty().split(File.pathSeparator)
                 .filter { it.isNotBlank() }).distinct().joinToString(File.pathSeparator))
             put("LANG", inherited["LANG"] ?: "C.UTF-8")
+        }
         }
     }
 
