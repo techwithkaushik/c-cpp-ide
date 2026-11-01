@@ -121,7 +121,7 @@ class BootstrapInstaller(
             }
             symlinkManifest.delete()
 
-            setExecutableBits(staging)
+            setExecutableBits(staging, prefixDirectory)
             validateBootstrapLayout(staging)
 
             // Keep the previous prefix until the staged tree is ready. Renames
@@ -250,7 +250,7 @@ class BootstrapInstaller(
         return normalized.toString()
     }
 
-    private fun setExecutableBits(root: File) {
+    private fun setExecutableBits(root: File, finalPrefix: File) {
         // ZIP extraction does not preserve Unix mode bits. Restore traversal
         // permissions for directories before making command files executable.
         root.walkTopDown().forEach { entry ->
@@ -278,15 +278,32 @@ class BootstrapInstaller(
         // Some bootstrap archives expose sh/bash through symlinks whose target
         // is outside the normal bin traversal. Resolve the final staged target
         // explicitly and restore its execute bit before promoting the prefix.
+        val finalPrefixPath = finalPrefix.toPath().toAbsolutePath().normalize()
         listOf("bin/sh", "bin/bash").map { File(root, it) }
             .filter { java.nio.file.Files.isSymbolicLink(it.toPath()) }
             .forEach { link ->
-                val target = link.toPath().toRealPath().toFile()
-                if (!target.isFile) throw IOException("Bootstrap shell target is not a file: ${link.relativeTo(root)}")
-                target.setReadable(true, false)
-                target.setWritable(true, true)
-                if (!target.setExecutable(true, false) && !target.canExecute()) {
-                    throw IOException("Unable to mark shell target executable: ${link.relativeTo(root)} -> $target")
+                // Manifest links intentionally point at the final prefix, but
+                // during staging that path has not been promoted yet. Map it
+                // back into the staging tree before touching permissions.
+                val rawTarget = java.nio.file.Files.readSymbolicLink(link.toPath())
+                val resolvedTarget = if (rawTarget.isAbsolute) {
+                    rawTarget.toAbsolutePath().normalize()
+                } else {
+                    link.toPath().parent.resolve(rawTarget).toAbsolutePath().normalize()
+                }
+                val stagedTarget = if (resolvedTarget.startsWith(finalPrefixPath)) {
+                    val relative = finalPrefixPath.relativize(resolvedTarget)
+                    root.toPath().resolve(relative).normalize().toFile()
+                } else {
+                    resolvedTarget.toFile()
+                }
+                if (!stagedTarget.isFile) {
+                    throw IOException("Bootstrap shell target is missing: ${link.relativeTo(root)} -> $stagedTarget")
+                }
+                stagedTarget.setReadable(true, false)
+                stagedTarget.setWritable(true, true)
+                if (!stagedTarget.setExecutable(true, false) && !stagedTarget.canExecute()) {
+                    throw IOException("Unable to mark shell target executable: ${link.relativeTo(root)} -> $stagedTarget")
                 }
             }
         listOf("bin/sh", "bin/bash").forEach { shell ->
