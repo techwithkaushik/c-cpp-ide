@@ -10,6 +10,11 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,7 +51,7 @@ private data class RuntimeStatus(
  * fixed smoke-test command. Android's /system/bin/sh is never used as fallback.
  */
 @Composable
-fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
+fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Unit = {}) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val layout = remember(appContext) { RuntimeLayout.fromAppFilesDirectory(appContext.filesDir) }
@@ -92,9 +97,17 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
 
     val shell = remember(layout, runtimeStatus.ready) {
         if (!runtimeStatus.ready) null
-        else listOf(File(layout.prefix, "bin/sh"), File(layout.prefix, "bin/bash"))
+        else listOf(File(layout.prefix, "bin/bash"), File(layout.prefix, "bin/sh"))
             .firstOrNull { it.isFile && it.canExecute() }
     }
+    val shellArguments = remember(shell) {
+        if (shell?.name == "bash") arrayOf("--login") else emptyArray()
+    }
+    val terminalPreferences = remember(appContext) {
+        appContext.getSharedPreferences("ide_settings", Context.MODE_PRIVATE)
+    }
+    val terminalFontSize = terminalPreferences.getInt("terminal_font_size", 13)
+    val autoShowKeyboard = terminalPreferences.getBoolean("terminal_auto_keyboard", true)
 
     if (!runtimeStatus.ready || shell == null) {
         val message = if (runtimeStatus.ready) {
@@ -102,11 +115,19 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
         } else {
             runtimeStatus.message
         }
-        RuntimeSetupPanel(
-            message = message,
-            onRuntimeReady = { runtimeRefreshToken++ },
-            modifier = modifier
-        )
+        Column(
+            modifier = modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Terminal runtime unavailable", color = Color(0xFFE8EDF5))
+            Text(message, color = Color(0xFF9AA8BA))
+            Text(
+                "Open Settings → Runtime & Bootstrap to select the correct bootstrap ZIP and verify its SHA-256 checksum.",
+                color = Color(0xFF9AA8BA)
+            )
+            Button(onClick = onOpenSettings) { Text("Open Runtime Settings") }
+            Button(onClick = { runtimeRefreshToken++ }) { Text("Retry runtime check") }
+        }
         return
     }
 
@@ -122,7 +143,7 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
         TerminalSession(
             shell.absolutePath,
             home.absolutePath,
-            arrayOf("--login"),
+            shellArguments,
             environment,
             2_000,
             terminalClient
@@ -137,7 +158,7 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize().background(Color(0xFF0D1117)),
         factory = { viewContext ->
             TerminalView(viewContext, null).apply {
-                setTextSize(13)
+                setTextSize(terminalFontSize)
                 setTypeface(Typeface.MONOSPACE)
                 setTerminalViewClient(IdeTermuxViewClient(viewContext))
                 attachSession(session)
@@ -145,9 +166,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
                 isFocusableInTouchMode = true
                 post {
                     requestFocus()
-                    (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
-                        android.view.inputmethod.InputMethodManager)
-                        ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                    if (autoShowKeyboard) {
+                        (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                            android.view.inputmethod.InputMethodManager)
+                            ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                    }
                 }
             }
         },
