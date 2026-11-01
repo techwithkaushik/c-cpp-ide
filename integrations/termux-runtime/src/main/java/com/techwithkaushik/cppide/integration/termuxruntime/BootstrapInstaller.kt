@@ -7,6 +7,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 /**
@@ -71,7 +72,12 @@ class BootstrapInstaller(
 
         try {
             if (!staging.mkdir()) throw IOException("Unable to create staging directory")
-            val symlinkManifest = File(staging, "SYMLINKS.txt")
+            // Some ZIPs are accidentally packaged as an app-files snapshot
+            // (home/, projects/, usr/...) instead of a bootstrap prefix
+            // (bin/, etc/, lib/, share/...). Detect that wrapper and install
+            // only its usr/ subtree into the actual prefix.
+            val archivePrefix = detectArchivePrefix(archive)
+            var symlinkManifest = File(staging, "SYMLINKS.txt")
             var entryCount = 0
             var expandedBytes = 0L
             val seen = HashSet<String>()
@@ -83,7 +89,21 @@ class BootstrapInstaller(
                     if (entryCount > maxEntries) throw IOException("Bootstrap contains too many entries")
 
                     val rawName = entry.name
-                    val relative = validateArchivePath(rawName)
+                    // When the archive is an app-files snapshot, ignore sibling
+                    // folders such as home/ and projects/; they are not part of
+                    // PREFIX and must never be nested inside files/usr.
+                    val selectedName = if (archivePrefix.isEmpty()) {
+                        rawName
+                    } else {
+                        when {
+                            rawName == "SYMLINKS.txt" -> rawName
+                            rawName == archivePrefix.removeSuffix("/") -> continue
+                            rawName.startsWith(archivePrefix) -> rawName.removePrefix(archivePrefix)
+                            else -> continue
+                        }
+                    }
+                    if (selectedName.isEmpty()) continue
+                    val relative = validateArchivePath(selectedName)
                     if (!seen.add(relative)) throw IOException("Duplicate archive entry: $relative")
 
                     val target = File(staging, relative)
@@ -121,6 +141,15 @@ class BootstrapInstaller(
                 }
             }
 
+            // Prefer a manifest inside usr/ for wrapped archives, otherwise
+            // accept the conventional top-level SYMLINKS.txt.
+            if (archivePrefix.isNotEmpty()) {
+                val nestedManifest = File(staging, "SYMLINKS.txt")
+                if (!nestedManifest.isFile) {
+                    // The top-level manifest was copied above if present.
+                    symlinkManifest = nestedManifest
+                }
+            }
             if (requireSymlinkManifest && !symlinkManifest.isFile) {
                 throw IOException("Termux bootstrap is missing SYMLINKS.txt; refusing to install an incomplete runtime")
             }
@@ -173,6 +202,32 @@ class BootstrapInstaller(
                 }
             }
         }
+    }
+
+    /**
+     * Returns "usr/" when the ZIP is an app-files snapshot containing
+     * usr/bin, usr/etc, usr/lib and usr/share; returns "" for a normal
+     * bootstrap ZIP whose entries start directly with bin/, etc/, lib/.
+     */
+    private fun detectArchivePrefix(archive: File): String {
+        val names = HashSet<String>()
+        ZipFile(archive).use { zip ->
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val name = entries.nextElement().name.trimStart('/')
+                names.add(name)
+            }
+        }
+        val directBootstrap = listOf("bin/", "etc/", "lib/", "share/")
+            .all { prefix -> names.any { it.startsWith(prefix) } }
+        val wrappedBootstrap = listOf("usr/bin/", "usr/etc/", "usr/lib/", "usr/share/")
+            .all { prefix -> names.any { it.startsWith(prefix) } }
+        if (directBootstrap) return ""
+        if (wrappedBootstrap) return "usr/"
+        throw IOException(
+            "Invalid bootstrap ZIP layout: expected bin/, etc/, lib/, share/ at the ZIP root, " +
+                "or those directories under usr/. Select the bootstrap ZIP, not an app-files archive."
+        )
     }
 
     private fun createSymlinks(manifest: File, staging: File, finalPrefix: File): Int {
