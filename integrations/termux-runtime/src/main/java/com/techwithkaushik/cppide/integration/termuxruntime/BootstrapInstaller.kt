@@ -142,6 +142,7 @@ class BootstrapInstaller(
             }
             symlinkManifest.delete()
 
+            validateNoStockTermuxPrefix(installRoot)
             setExecutableBits(installRoot, installRoot)
             validateBootstrapLayout(installRoot, requireShell = processSymlinks)
             if (processSymlinks && requireSymlinkManifest) {
@@ -336,6 +337,50 @@ class BootstrapInstaller(
                 throw IOException("Termux SYMLINKS.txt alias was not installed: $alias")
             }
         }
+    }
+
+    /**
+     * Prevent installing a bootstrap whose executable/runtime files still point
+     * at the separate Termux app. Rewriting SYMLINKS.txt cannot fix absolute
+     * paths compiled into termux-exec or other ELF/runtime files.
+     */
+    private fun validateNoStockTermuxPrefix(root: File) {
+        val forbidden = listOf(
+            "/data/data/com.termux/files/usr".toByteArray(Charsets.UTF_8),
+            "/data/user/0/com.termux/files/usr".toByteArray(Charsets.UTF_8),
+        )
+        val runtimeRoots = listOf("bin", "lib", "libexec", "etc")
+            .map { File(root, it) }
+            .filter { it.exists() }
+        runtimeRoots.forEach { runtimeRoot ->
+            runtimeRoot.walkTopDown().forEach { file ->
+                if (!file.isFile || java.nio.file.Files.isSymbolicLink(file.toPath())) return@forEach
+                val content = try { file.readBytes() } catch (error: Exception) {
+                    throw IOException("Unable to validate bootstrap runtime file: ${file.relativeTo(root)}", error)
+                }
+                if (forbidden.any { needle -> content.containsBytes(needle) }) {
+                    throw IOException(
+                        "Bootstrap file ${file.relativeTo(root)} embeds /data/data/com.termux. " +
+                            "Select a bootstrap rebuilt for com.techwithkaushik.cppide."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun ByteArray.containsBytes(needle: ByteArray): Boolean {
+        if (needle.isEmpty() || needle.size > size) return false
+        for (start in 0..(size - needle.size)) {
+            var matches = true
+            for (offset in needle.indices) {
+                if (this[start + offset] != needle[offset]) {
+                    matches = false
+                    break
+                }
+            }
+            if (matches) return true
+        }
+        return false
     }
 
     private fun validateBootstrapLayout(root: File, requireShell: Boolean) {
