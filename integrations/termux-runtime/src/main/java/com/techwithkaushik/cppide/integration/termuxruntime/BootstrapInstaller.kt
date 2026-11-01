@@ -138,13 +138,10 @@ class BootstrapInstaller(
             val manifestText = if (symlinkManifest.isFile) symlinkManifest.readText(Charsets.UTF_8) else ""
             val usesStockTermuxPrefix = manifestText.contains("/data/data/com.termux/files/usr") ||
                 manifestText.contains("/data/user/0/com.termux/files/usr")
-            if (usesStockTermuxPrefix) {
-                // Stock Termux bootstrap shell startup files can contain absolute
-                // paths to the separate Termux app. Rewrite only UTF-8 text files;
-                // never patch ELF binaries. All paths remain inside this app's
-                // private files directory.
-                rewriteStockTermuxTextPaths(installRoot)
-            }
+            // Relocate any stock Termux absolute paths found in text configs or
+            // shell scripts regardless of how SYMLINKS.txt encodes its targets.
+            // Only UTF-8 text is rewritten; ELF binaries are never modified.
+            rewriteStockTermuxTextPaths(installRoot)
             val symlinkCount = if (processSymlinks && symlinkManifest.isFile) {
                 createSymlinks(symlinkManifest, installRoot, installRoot)
             } else {
