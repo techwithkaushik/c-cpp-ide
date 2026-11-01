@@ -134,7 +134,14 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier) {
                 setTypeface(Typeface.MONOSPACE)
                 setTerminalViewClient(IdeTermuxViewClient(viewContext))
                 attachSession(session)
-                requestFocus()
+                isFocusable = true
+                isFocusableInTouchMode = true
+                post {
+                    requestFocus()
+                    (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                        android.view.inputmethod.InputMethodManager)
+                        ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                }
             }
         },
         update = { view ->
