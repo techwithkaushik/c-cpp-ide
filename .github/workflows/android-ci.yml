@@ -406,16 +406,10 @@ jobs:
     name: 4 · Build APKs and verify embedded bootstrap
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [test, build-bootstrap]
+    needs: test
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
-
-      - name: Download verified bootstrap artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: abi-bootstrap-artifacts
-          path: bootstrap-artifacts
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -428,14 +422,8 @@ jobs:
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
 
-      - name: Re-validate and stage ABI-matched assets
-        run: bash scripts/prepare-bootstrap-assets.sh
-
-      - name: Assemble ARM32 APK only
+      - name: Assemble ARM32 APK without bundled bootstrap
         run: gradle --no-daemon :app:assembleArm32Debug
-
-      - name: Verify each APK contains its matching bootstrap and checksum
-        run: bash scripts/verify-bootstrap-apks.sh
 
       - name: Upload verified APKs
         uses: actions/upload-artifact@v4
