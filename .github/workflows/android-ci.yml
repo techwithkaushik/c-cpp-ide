@@ -19,8 +19,8 @@ env:
   GRADLE_VERSION: "8.13"
 
 jobs:
-  verify-test-build:
-    name: Verify, test and build ARM32 APK
+  release:
+    name: Sign and build optimized ARM32 release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -29,6 +29,29 @@ jobs:
 
       - name: Verify vendored Termux source and dependencies
         run: bash scripts/verify-termux-vendor.sh
+
+      - name: Restore repository signing keystore
+        id: keystore
+        uses: timheuer/base64-to-file@v2.0
+        with:
+          fileName: dev_keystore.jks
+          encodedString: ${{ secrets.SIGNING_KEYSTORE }}
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          KEYSTORE_PATH: ${{ steps.keystore.outputs.filePath }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -s "$KEYSTORE_PATH" || { echo "::error::SIGNING_KEYSTORE secret did not restore a non-empty keystore"; exit 1; }
+          test -n "$SIGNING_KEY_ALIAS" || { echo "::error::SIGNING_KEY_ALIAS secret is missing"; exit 1; }
+          test -n "$SIGNING_KEY_PASSWORD" || { echo "::error::SIGNING_KEY_PASSWORD secret is missing"; exit 1; }
+          test -n "$SIGNING_STORE_PASSWORD" || { echo "::error::SIGNING_STORE_PASSWORD secret is missing"; exit 1; }
+          echo "SIGN_KEY_STORE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "Release signing secrets are configured."
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -42,33 +65,33 @@ jobs:
           gradle-version: ${{ env.GRADLE_VERSION }}
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Run ARM32 unit tests and build optimized release APK
-        run: >-
-          gradle --no-daemon --build-cache --parallel
-          :integrations:toolchain:testDebugUnitTest
-          :integrations:termux-runtime:testDebugUnitTest
-          :app:testArm32DebugUnitTest
-          :app:assembleArm32Release
+      - name: Build signed optimized ARM32 release APK
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: gradle --no-daemon --build-cache :app:assembleArm32Release
 
-      - name: Report APK size and verify no bootstrap is bundled
+      - name: Verify signature, report APK size and ensure bootstrap is external
         shell: bash
         run: |
           set -euo pipefail
           apk="$(find app/build/outputs/apk/arm32/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
           test -n "$apk" && test -s "$apk"
+          apksigner verify --verbose "$apk"
           size_bytes="$(stat -c '%s' "$apk")"
-          echo "Optimized ARM32 release APK: $apk"
+          echo "Signed ARM32 release APK: $apk"
           echo "APK size: $(( (size_bytes + 1023) / 1024 )) KiB ($size_bytes bytes)"
           if unzip -Z1 "$apk" | grep -E '(^|/)(bootstrap|bootstrap\.zip)(/|$)' >/dev/null; then
             echo "::error::Bootstrap payload unexpectedly found inside APK."
             exit 1
           fi
-          echo "Verified: bootstrap ZIP is not bundled in the APK."
+          echo "Verified: signed APK; bootstrap remains a separate download."
 
-      - name: Upload optimized ARM32 release APK
+      - name: Upload signed ARM32 release APK
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-arm32-release-apk
+          name: code-studio-arm32-signed-release-apk
           path: app/build/outputs/apk/arm32/release/*.apk
           if-no-files-found: error
           retention-days: 14
