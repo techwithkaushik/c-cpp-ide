@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.integration.termuxruntime
 
+import android.system.Os
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -264,22 +265,16 @@ class BootstrapInstaller(
         root.walkTopDown().forEach { entry ->
             if (java.nio.file.Files.isSymbolicLink(entry.toPath())) return@forEach
             if (entry.isDirectory) {
-                entry.setReadable(true, false)
-                entry.setWritable(true, true)
-                if (!entry.setExecutable(true, false) && !entry.canExecute()) {
-                    throw IOException("Unable to set bootstrap directory permissions: ${entry.relativeTo(root)}")
-                }
+                try { Os.chmod(entry.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod bootstrap directory ${entry.relativeTo(root)}: ${error.message}", error) }
+                if (!entry.canExecute()) throw IOException("Bootstrap directory is not executable after chmod: ${entry.relativeTo(root)}")
             }
         }
         val executableRoots = listOf(File(root, "bin"), File(root, "libexec"), File(root, "lib/apt/methods"))
         executableRoots.filter { it.exists() }.forEach { executableRoot ->
             executableRoot.walkTopDown().forEach { file ->
                 if (java.nio.file.Files.isSymbolicLink(file.toPath()) || !file.isFile) return@forEach
-                file.setReadable(true, false)
-                file.setWritable(true, true)
-                if (!file.setExecutable(true, false) && !file.canExecute()) {
-                    throw IOException("Unable to mark bootstrap executable: ${file.relativeTo(root)}")
-                }
+                try { Os.chmod(file.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod bootstrap executable ${file.relativeTo(root)}: ${error.message}", error) }
+                if (!file.canExecute()) throw IOException("Bootstrap executable bit is missing after chmod: ${file.relativeTo(root)}")
             }
         }
 
@@ -308,16 +303,14 @@ class BootstrapInstaller(
                 if (!stagedTarget.isFile) {
                     throw IOException("Bootstrap shell target is missing: ${link.relativeTo(root)} -> $stagedTarget")
                 }
-                stagedTarget.setReadable(true, false)
-                stagedTarget.setWritable(true, true)
-                if (!stagedTarget.setExecutable(true, false) && !stagedTarget.canExecute()) {
-                    throw IOException("Unable to mark shell target executable: ${link.relativeTo(root)} -> $stagedTarget")
-                }
+                try { Os.chmod(stagedTarget.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod shell target ${link.relativeTo(root)} -> $stagedTarget: ${error.message}", error) }
+                if (!stagedTarget.canExecute()) throw IOException("Shell target is not executable after chmod: ${link.relativeTo(root)} -> $stagedTarget")
             }
         listOf("bin/sh", "bin/bash").forEach { shell ->
             val candidate = File(root, shell)
-            if (candidate.exists() && !candidate.canExecute()) {
-                throw IOException("Bootstrap shell is not executable after extraction: $shell")
+            if (candidate.exists()) {
+                val target = try { candidate.canonicalFile } catch (_: Exception) { candidate }
+                if (!candidate.canExecute() || !target.canExecute()) throw IOException("Bootstrap shell lacks execute permission: $shell (link=${candidate.canExecute()}, target=${target.canExecute()}, targetPath=$target)")
             }
         }
     }
