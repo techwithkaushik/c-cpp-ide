@@ -112,7 +112,7 @@ internal fun IdeSettingsScreen(
                     "Runtime & Bootstrap" -> {
                         SettingsHeading("RUNTIME & BOOTSTRAP", "Install terminal runtime.")
                         RuntimeSetupPanel(
-                            message = "Choose the bootstrap ZIP for this app and device ABI. Files extract directly into the app-private usr/ prefix.",
+                            message = "Install an Ubuntu rootfs and a SHA-256-verified Android PRoot runtime into this app-private Linux runtime directory.",
                             onRuntimeReady = onRuntimeReady,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -147,7 +147,7 @@ internal fun IdeSettingsScreen(
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
-                        SettingsCard("Main terminal", "Runtime status", "The terminal requires an installed ABI-matched bootstrap and a passing shell execution test.")
+                        SettingsCard("Main terminal", "Ubuntu / SSH", "Open a local Ubuntu shell or connect directly to an SSH host. No external terminal app is required.")
                         Button(
                             onClick = { category = "Runtime & Bootstrap" },
                             modifier = Modifier.fillMaxWidth()
@@ -166,8 +166,8 @@ internal fun IdeSettingsScreen(
                     }
                     "Build & Run" -> {
                         SettingsHeading("BUILD & RUN", "Build options.")
-                        SettingsCard("Target environment", "Linux", "Embedded app-private runtime; no external Termux app is required")
-                        SettingsCard("Bootstrap architecture", "Current APK", "ABI-matched bootstrap is required; ARM32 APK uses armeabi-v7a")
+                        SettingsCard("Target environment", "Ubuntu + SSH", "App-owned Ubuntu rootfs or direct SSH session; no Termux prefix or data is used.")
+                        SettingsCard("Linux runtime", "App-private", "Ubuntu rootfs and Android PRoot must match the device ABI and pass runtime validation.")
                         SettingsCard("Compiler", "C / C++", "Compiler availability depends on the selected bootstrap and installed packages")
                         SettingsCard("Run output", "Output panel", "Program output appears in the IDE output panel when the runner is connected")
                     }
@@ -182,7 +182,7 @@ internal fun IdeSettingsScreen(
                         SettingsCard("Application", "Code Studio", "Android-native coding workspace")
                         SettingsCard("Architecture", "Current device APK", "Bootstrap ABI must match this device and APK")
                         SettingsCard("Privacy", "Runtime files", "Runtime and projects are stored in app-private storage")
-                        SettingsCard("Troubleshooting", "Terminal", "Open Runtime & Bootstrap and install the matching ZIP.")
+                        SettingsCard("Troubleshooting", "Terminal", "Open Runtime & Bootstrap to import a validated Ubuntu rootfs and PRoot runtime.")
                     }
                 }
                 Spacer(Modifier.height(18.dp))
