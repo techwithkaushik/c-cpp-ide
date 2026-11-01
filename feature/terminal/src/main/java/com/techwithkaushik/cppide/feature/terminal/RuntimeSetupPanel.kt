@@ -1,7 +1,6 @@
 package com.techwithkaushik.cppide.feature.terminal
 
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -47,7 +46,6 @@ fun RuntimeSetupPanel(
     var checkingInstalledRuntime by remember { mutableStateOf(false) }
     var status by remember(message) { mutableStateOf(message) }
 
-    val supportedAbis = remember { Build.SUPPORTED_ABIS.toSet() }
     val verifyInstalledRuntime: () -> Unit = {
         if (!busy && !checkingInstalledRuntime) {
             checkingInstalledRuntime = true
@@ -173,7 +171,7 @@ fun RuntimeSetupPanel(
                 }
             }
         ) {
-            Text(if (busy) "Setting up terminal…" else "3 · Install and test main terminal")
+            Text(if (busy) "Setting up terminal…" else "2 · Install and test main terminal")
         }
         if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text(
