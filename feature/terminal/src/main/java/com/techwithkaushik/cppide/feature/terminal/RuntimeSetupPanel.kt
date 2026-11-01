@@ -101,8 +101,8 @@ fun RuntimeSetupPanel(
             selectedAbi = null
             if (uri == null) return@rememberLauncherForActivityResult
             scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    try {
+                val parsed = try {
+                    withContext(Dispatchers.IO) {
                         val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                             ?: throw IOException("Android could not open bootstrap.json")
                         val json = JSONObject(raw)
@@ -118,23 +118,20 @@ fun RuntimeSetupPanel(
                             )
                         }
                         Triple(abi, digest, version)
-                    } catch (error: Exception) {
-                        throw IOException(error.message ?: "Invalid bootstrap.json", error)
                     }
+                } catch (error: Exception) {
+                    selectedManifest = null
+                    selectedAbi = null
+                    sha256 = ""
+                    status = "Manifest error: ${error.message ?: error.javaClass.simpleName}"
+                    null
                 }
-                result.fold(
-                    onSuccess = { (abi, digest, version) ->
-                        selectedAbi = abi
-                        sha256 = digest
-                        status = "Manifest verified: ABI $abi, version $version. Make sure the ZIP is from the same artifact."
-                    },
-                    onFailure = { error ->
-                        selectedManifest = null
-                        selectedAbi = null
-                        sha256 = ""
-                        status = "Manifest error: ${error.message ?: error.javaClass.simpleName}"
-                    }
-                )
+                if (parsed != null) {
+                    val (abi, digest, version) = parsed
+                    selectedAbi = abi
+                    sha256 = digest
+                    status = "Manifest verified: ABI $abi, version $version. Make sure the ZIP is from the same artifact."
+                }
             }
         }
     )
