@@ -213,8 +213,8 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setenv("PROOT_TMP_DIR", temp.c_str(), 1);
 
         std::vector<std::string> arguments = {
-            linker, proot, "-0", "-r", rootfs, "-w", "/root",
-            "-b", "/dev", "-b", "/proc", "-b", "/sys", shell, "-i"
+            linker, proot, "-r", rootfs, "-w", "/root",
+            "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys", shell, "-i"
         };
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
