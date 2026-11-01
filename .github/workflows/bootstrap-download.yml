@@ -1,0 +1,89 @@
+name: Download Termux Bootstrap (ARM32)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Refresh the downloadable bootstrap weekly without rebuilding it from source.
+    - cron: "20 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: termux-bootstrap-download
+  cancel-in-progress: true
+
+jobs:
+  download-bootstrap:
+    name: Fetch and verify official ARM32 bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve latest official Termux bootstrap release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_json="$(curl --fail --silent --show-error --location \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            'https://api.github.com/repos/termux/termux-packages/releases?per_page=20')"
+          asset="$(jq -cer '[.[] | select(.tag_name | startswith("bootstrap-")) | . as $r | .assets[] | select(.name == "bootstrap-arm.zip") | {tag: $r.tag_name, url: .browser_download_url, digest: (.digest // "")}] | first' <<< "$release_json")"
+          tag="$(jq -r '.tag' <<< "$asset")"
+          url="$(jq -r '.url' <<< "$asset")"
+          digest="$(jq -r '.digest' <<< "$asset")"
+          [[ -n "$tag" && "$url" == https://github.com/termux/termux-packages/releases/download/*/bootstrap-arm.zip ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Selected official release: $tag"
+
+      - name: Download official ARM32 bootstrap ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          curl --fail --show-error --location --retry 3 --retry-all-errors \
+            "${{ steps.release.outputs.url }}" -o dist/bootstrap-arm.zip
+          test -s dist/bootstrap-arm.zip
+          unzip -tq dist/bootstrap-arm.zip
+          # This app installs the archive as a Termux prefix, so reject unrelated archives.
+          unzip -Z1 dist/bootstrap-arm.zip | grep -Eq '^(bin/|usr/bin/|etc/|share/)'
+          sha256sum dist/bootstrap-arm.zip | tee dist/bootstrap-arm.zip.sha256
+          echo "Downloaded size: $(du -h dist/bootstrap-arm.zip | cut -f1)"
+          echo "SHA-256: $(cut -d' ' -f1 dist/bootstrap-arm.zip.sha256)"
+          if [[ -n "${{ steps.release.outputs.digest }}" ]]; then
+            expected="${{ steps.release.outputs.digest }}"
+            expected="${expected#sha256:}"
+            actual="$(sha256sum dist/bootstrap-arm.zip | cut -d' ' -f1)"
+            [[ "$actual" == "$expected" ]] || { echo "::error::SHA-256 mismatch"; exit 1; }
+          else
+            echo "::notice::Release API did not expose an asset digest; ZIP integrity and local SHA-256 were checked."
+          fi
+
+      - name: Add installation instructions
+        shell: bash
+        run: |
+          cat > dist/README.txt <<'EOF'
+          Code Studio — ARM32 Termux bootstrap
+          ====================================
+          Source: official termux/termux-packages GitHub release
+          Release: ${{ steps.release.outputs.tag }}
+
+          1. Download bootstrap-arm.zip and bootstrap-arm.zip.sha256.
+          2. In Code Studio, open Settings > Runtime & Bootstrap.
+          3. Choose Install Bootstrap and select bootstrap-arm.zip.
+          4. Enter the SHA-256 value from bootstrap-arm.zip.sha256 when prompted.
+          5. Wait for runtime verification to pass before opening Terminal.
+
+          Use this archive only for ARM32 / armeabi-v7a devices. Do not rename
+          another architecture's archive to bootstrap-arm.zip.
+          EOF
+
+      - name: Upload downloadable bootstrap bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-termux-bootstrap-arm32-${{ steps.release.outputs.tag }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
