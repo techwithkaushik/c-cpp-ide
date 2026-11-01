@@ -1,22 +1,13 @@
 # Ubuntu runtime + direct local/SSH execution plan
 
 **Branch:** `feature/ubuntu-runtime-ssh`  
-**Status:** Draft migration contract; not production-ready until the acceptance gates below pass.
+**Status:** Implementation in progress. The app-owned rootfs importer, official Ubuntu Base downloader, pinned upstream PRoot downloader, local shell launcher, and direct password-based SSH shell are implemented. Device-level validation and full terminal emulation remain outstanding.
 
 ## Product boundary
 
 This branch targets an app-owned Ubuntu/Linux userspace. It must not install, download, invoke, or read a separately installed Termux environment. It must not use `/data/data/com.termux`, Termux bootstrap artifacts, Termux package repositories, or Termux-specific environment variables as runtime dependencies.
 
-The rootfs is stored under the app's private storage, for example:
-
-```text
-noBackupFilesDir/linux/
-  downloads/
-  staging/<install-id>/
-  distributions/ubuntu/
-  active/
-  backups/
-```
+The rootfs is stored under `files/linux-runtime/distributions/ubuntu/`, with staging and PRoot files kept under `files/linux-runtime/`.
 
 The app creates every path. Archive-provided paths may never determine the installation destination.
 
@@ -46,7 +37,7 @@ The target is selected **before** opening a terminal or running a build. The ter
 
 - Provide a first-class **Connect over SSH** target in the same target picker used by local Linux.
 - Collect host, port (default 22), username, authentication method, and optional remote workspace path before launching the terminal.
-- Support key-based authentication and passphrase-protected keys; store secrets using Android Keystore-backed encryption. Never log private keys, passwords, or passphrases.
+- The current UI supports password authentication; the session layer accepts key material, but private-key import and Keystore-backed credential storage are still pending. Never log credentials.
 - Verify host keys and show a first-connect fingerprint confirmation. Do not silently accept changed host keys.
 - After connection, create the terminal channel directly and open the remote workspace. Do not show or require a local terminal as a setup prerequisite.
 - Builds, compiler/LSP commands, and terminal sessions run on the selected remote host when SSH is the active target. Show connection/reconnection state and actionable errors.
