@@ -188,13 +188,13 @@ fun RuntimeSetupPanel(
         )
         Button(
             enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
-            onClick = { installBootstrap(withSymlinks = true) }
+            onClick = { installBootstrap(true) }
         ) {
             Text(if (busy) "Setting up terminal…" else "2 · Install bootstrap WITH symlinks")
         }
         Button(
             enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
-            onClick = { installBootstrap(withSymlinks = false) }
+            onClick = { installBootstrap(false) }
         ) {
             Text(if (busy) "Setting up terminal…" else "3 · Install bootstrap WITHOUT symlinks")
         }
@@ -202,7 +202,7 @@ fun RuntimeSetupPanel(
         Text(
             status,
             color = if (
-                status.startsWith("Bootstrap installed and verified") ||
+                status.startsWith("Bootstrap installed") ||
                 status.startsWith("Runtime verified")
             ) Color(0xFF7DDBB0) else Color(0xFF9AA7B5),
             fontSize = 12.sp
