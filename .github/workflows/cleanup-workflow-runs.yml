@@ -14,10 +14,10 @@ on:
         type: number
         default: 20
       dry_run:
-        description: "Preview only; do not delete anything"
+        description: "Preview only; set true to avoid deletion"
         required: true
         type: boolean
-        default: true
+        default: false
   schedule:
     - cron: "20 3 * * 0"
 
