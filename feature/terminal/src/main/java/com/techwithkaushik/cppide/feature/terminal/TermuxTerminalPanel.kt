@@ -137,8 +137,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
         ).map { (key, value) -> "$key=$value" }.toTypedArray()
     }
     val linker = remember { AndroidRuntimeLauncher.systemLinker }
-    val sessionArguments = remember(shell, shellArguments) {
-        arrayOf(shell.absolutePath, *shellArguments)
+    // TerminalSession passes this array directly as argv[] to execvp().
+    // Since the executable is the Android linker, argv[0] must be the linker,
+    // argv[1] the Termux shell ELF, and only then shell flags such as --login.
+    val sessionArguments = remember(linker, shell, shellArguments) {
+        arrayOf(linker.absolutePath, shell.absolutePath, *shellArguments)
     }
     val session = remember(shell, home, environment.contentHashCode()) {
         TerminalSession(
