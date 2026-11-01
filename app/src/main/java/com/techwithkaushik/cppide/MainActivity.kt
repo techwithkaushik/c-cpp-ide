@@ -1,6 +1,6 @@
 package com.techwithkaushik.cppide
 
-import com.techwithkaushik.cppide.feature.terminal.TermuxTerminalPanel
+import com.techwithkaushik.cppide.feature.terminal.LinuxTerminalPanel
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 
 import android.os.Bundle
@@ -229,8 +229,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Startup no longer enters the legacy Ubuntu/PRoot installer flow.
-    // Termux runtime readiness is handled by the dedicated integration bootstrap.
+    // Linux runtime readiness is owned by the app's Ubuntu runtime integration.
     BackHandler(enabled = screen != IdeScreen.Welcome) {
         // Close transient UI first. In particular, Android Back must dismiss
         // the terminal bottom sheet even while the embedded TerminalView owns
@@ -1844,7 +1843,7 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         }
         when (selected) {
             ToolPanel.Terminal -> {
-                TermuxTerminalPanel(
+                LinuxTerminalPanel(
                     Modifier.weight(1f).fillMaxWidth(),
                     onOpenSettings = onOpenSettings,
                     onCloseTerminal = onClose
