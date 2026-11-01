@@ -57,6 +57,7 @@ private data class LinuxTerminalTab(
     val title: String,
     val output: MutableState<String>,
     val send: (String) -> Unit,
+    val interrupt: () -> Unit,
     val session: AutoCloseable,
 )
 
@@ -69,12 +70,13 @@ private object LinuxTerminalSessions {
 
     fun select(id: Int) { if (tabs.any { it.id == id }) selectedId = id }
 
-    fun add(title: String, session: AutoCloseable, input: OutputStream, initialOutput: String = ""): LinuxTerminalTab {
+    fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, initialOutput: String = ""): LinuxTerminalTab {
         val tab = LinuxTerminalTab(
             id = nextId++,
             title = title,
             output = mutableStateOf(initialOutput),
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
+            interrupt = interrupt,
             session = session
         )
         tabs.add(tab)
@@ -156,7 +158,7 @@ fun LinuxTerminalPanel(
             busy = false
             result.onSuccess { session ->
                 val title = "SSH ${sshHost.username}@${sshHost.host}"
-                val tab = LinuxTerminalSessions.add(title, session, session.input, "Connected to ${sshHost.host}:\n")
+                val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, initialOutput = "Connected to ${sshHost.host}:\n")
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
@@ -189,7 +191,7 @@ fun LinuxTerminalPanel(
                     }
                     busy = false
                     result.onSuccess { session ->
-                        val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, "Ubuntu shell started.\n")
+                        val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\n")
                         session.readOutput(
                             onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                             onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[Shell exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
@@ -244,9 +246,11 @@ fun LinuxTerminalPanel(
                     Button(onClick = {
                         val line = command
                         command = ""
-                        LinuxTerminalSessions.append(active, "\n$line\n")
                         try { active.send(line + "\n") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
                     }) { Text("Send") }
+                    OutlinedButton(onClick = { runCatching { active.interrupt() }.onFailure { error = it.message } }) {
+                        Text("Ctrl-C")
+                    }
                 }
             }
             error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
