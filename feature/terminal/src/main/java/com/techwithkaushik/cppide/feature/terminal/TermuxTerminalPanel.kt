@@ -6,6 +6,8 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -62,7 +64,11 @@ private data class RuntimeStatus(
  * fixed smoke-test command. Android's /system/bin/sh is never used as fallback.
  */
 @Composable
-fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Unit = {}) {
+fun TermuxTerminalPanel(
+    modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
+    onCloseTerminal: () -> Unit = {},
+) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val layout = remember(appContext) { RuntimeLayout.fromAppFilesDirectory(appContext.filesDir) }
@@ -163,11 +169,26 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
     // keep running with their scrollback, cwd, environment and foreground job.
     val tabs = TerminalSessionRegistry.tabs
     val selectedTabId = TerminalSessionRegistry.selectedTabId
+
+    DisposableEffect(onCloseTerminal) {
+        TerminalSessionRegistry.onLastSessionExited = onCloseTerminal
+        onDispose {
+            if (TerminalSessionRegistry.onLastSessionExited === onCloseTerminal) {
+                TerminalSessionRegistry.onLastSessionExited = null
+            }
+        }
+    }
+
     androidx.compose.runtime.LaunchedEffect(runtimeStatus.ready, shell.absolutePath, home.absolutePath, environment.contentHashCode()) {
-        if (runtimeStatus.ready && tabs.isEmpty()) {
-            TerminalSessionRegistry.createTab(
-                appContext, linker, shell, shellArguments, home, environment, terminalFontSize
-            )
+        // Create the first session once. If the user exits the final shell,
+        // don't immediately respawn it just because the registry is empty.
+        if (runtimeStatus.ready && !TerminalSessionRegistry.initialSessionCreated) {
+            TerminalSessionRegistry.initialSessionCreated = true
+            if (tabs.isEmpty()) {
+                TerminalSessionRegistry.createTab(
+                    appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                )
+            }
         }
     }
 
@@ -319,10 +340,35 @@ private object TerminalSessionRegistry {
     val tabs = mutableStateListOf<TerminalTab>()
     var selectedTabId by mutableIntStateOf(0)
         private set
+    var initialSessionCreated = false
+    var onLastSessionExited: (() -> Unit)? = null
     private var nextId = 1
 
     fun select(id: Int) {
         if (tabs.any { it.id == id }) selectedTabId = id
+    }
+
+    /**
+     * A finished shell is removed from the registry. If it was selected, move
+     * to the immediately previous tab (4 -> 3 -> 2 -> 1). Exiting the final
+     * shell closes the terminal panel instead of creating a replacement shell.
+     */
+    fun onSessionFinished(session: TerminalSession) {
+        val index = tabs.indexOfFirst { it.session === session }
+        if (index < 0) return
+        val wasSelected = tabs[index].id == selectedTabId
+        val removed = tabs.removeAt(index)
+        removed.client.attach(null)
+
+        if (tabs.isEmpty()) {
+            selectedTabId = 0
+            onLastSessionExited?.invoke()
+            return
+        }
+
+        if (wasSelected) {
+            selectedTabId = tabs.getOrNull(index - 1)?.id ?: tabs.first().id
+        }
     }
 
     fun createTab(
@@ -357,10 +403,13 @@ private object TerminalSessionRegistry {
         val removed = tabs.removeAt(index)
         removed.client.attach(null)
         removed.session.finishIfRunning()
-        if (selectedTabId == id) {
-            selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
-                ?: tabs.lastOrNull()?.id
-                ?: 0
+        if (tabs.isEmpty()) {
+            selectedTabId = 0
+            onLastSessionExited?.invoke()
+        } else if (selectedTabId == id) {
+            // Closing a selected tab follows shell-exit behavior: select the
+            // immediately previous tab, falling back to the first remaining tab.
+            selectedTabId = tabs.getOrNull(index - 1)?.id ?: tabs.first().id
         }
     }
 }
@@ -384,6 +433,11 @@ private class IdeTermuxSessionClient(
 
     override fun onSessionFinished(finishedSession: TerminalSession) {
         terminalView?.post { terminalView?.onScreenUpdated() }
+        // Session callbacks can arrive off the UI thread. Update Compose state
+        // and dismiss the sheet on the main thread.
+        Handler(Looper.getMainLooper()).post {
+            TerminalSessionRegistry.onSessionFinished(finishedSession)
+        }
     }
 
     override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
