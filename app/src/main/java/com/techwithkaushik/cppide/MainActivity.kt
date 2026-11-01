@@ -232,10 +232,13 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     // Startup no longer enters the legacy Ubuntu/PRoot installer flow.
     // Termux runtime readiness is handled by the dedicated integration bootstrap.
     BackHandler(enabled = screen != IdeScreen.Welcome) {
-        if (drawerState.isOpen) {
-            scope.launch { drawerState.close() }
-        } else {
-            when (screen) {
+        // Close transient UI first. In particular, Android Back must dismiss
+        // the terminal bottom sheet even while the embedded TerminalView owns
+        // keyboard focus; it must not be forwarded into the shell.
+        when {
+            showToolPanel -> showToolPanel = false
+            drawerState.isOpen -> scope.launch { drawerState.close() }
+            else -> when (screen) {
                 IdeScreen.Workspace -> screen = IdeScreen.Projects
                 IdeScreen.Projects -> if (!onboardingPreferences.getBoolean(IdeDesignTokens.Preference.WELCOME_COMPLETED, false)) screen = IdeScreen.Welcome
                 IdeScreen.Settings -> screen = settingsReturnScreen
