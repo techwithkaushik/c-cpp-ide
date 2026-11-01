@@ -431,7 +431,7 @@ private fun IdeUiPrototype() {
                                 fileContents[activeFile] = code
                                 dirtyFiles.toList().forEach { file -> runCatching { projectStorage.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
                             }
-                            "Settings" -> settingsReturnScreen = screen; screen = IdeScreen.Settings
+                            "Settings" -> { settingsReturnScreen = screen; screen = IdeScreen.Settings }
                             "File Explorer" -> { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } }
                             "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                             "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
@@ -508,7 +508,7 @@ private fun IdeUiPrototype() {
                                                         .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                                                 }
                                             }
-                                            "Settings" -> showSettings = true
+                                            "Settings" -> { settingsReturnScreen = screen; screen = IdeScreen.Settings }
                                             "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                                         }
                                     }
