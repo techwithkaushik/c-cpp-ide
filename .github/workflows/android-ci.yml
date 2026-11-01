@@ -99,14 +99,34 @@ jobs:
           done
           echo "All four signed APKs verified; bootstrap files are not embedded."
 
-      - name: Upload APKs only (separate from bootstrap artifacts)
+      - name: Upload arm32 APK
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-release-apks-all-abis
-          path: |
-            app/build/outputs/apk/arm32/release/*.apk
-            app/build/outputs/apk/arm64/release/*.apk
-            app/build/outputs/apk/x86/release/*.apk
-            app/build/outputs/apk/x64/release/*.apk
+          name: code-studio-release-apk-arm32
+          path: app/build/outputs/apk/arm32/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload arm64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-release-apk-arm64
+          path: app/build/outputs/apk/arm64/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-release-apk-x86
+          path: app/build/outputs/apk/x86/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-release-apk-x64
+          path: app/build/outputs/apk/x64/release/*.apk
           if-no-files-found: error
           retention-days: 14
