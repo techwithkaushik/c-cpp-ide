@@ -34,7 +34,8 @@ class ProotInstaller(private val paths: LinuxRuntimePaths) {
                         candidate.outputStream().buffered().use { tar.copyTo(it) }
                         if (candidate.length() != entry.size) throw IOException("Truncated PRoot binary.")
                         if (!candidate.setExecutable(true, true)) throw IOException("Cannot mark PRoot executable.")
-                        if (candidate.readBytes().take(4) != listOf(0x7f, 0x45, 0x4c, 0x46)) {
+                        val magic = candidate.inputStream().use { stream -> ByteArray(4).also { if (stream.read(it) != 4) throw IOException("Truncated PRoot ELF.") } }
+                        if (magic.map { it.toInt() and 0xff } != listOf(0x7f, 0x45, 0x4c, 0x46)) {
                             throw IOException("The selected PRoot file is not an ELF executable.")
                         }
                         found = true
