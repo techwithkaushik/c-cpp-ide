@@ -41,12 +41,15 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
         val connection = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 30_000
-            instanceFollowRedirects = false
+            instanceFollowRedirects = true
             requestMethod = "GET"
         }
         try {
             val code = connection.responseCode
             if (code !in 200..299) throw IllegalStateException("Ubuntu download failed with HTTP $code.")
+            if (connection.url.protocol != "https" || connection.url.host !in setOf("cdimage.ubuntu.com", "releases.cdimage.ubuntu.com")) {
+                throw SecurityException("Ubuntu download redirected to an untrusted host.")
+            }
             val length = connection.contentLengthLong
             if (length > maxBytes) throw IllegalStateException("Ubuntu download exceeds the size limit.")
             destination.parentFile?.mkdirs()
