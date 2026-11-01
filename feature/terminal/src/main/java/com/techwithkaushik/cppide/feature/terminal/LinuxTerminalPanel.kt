@@ -3,6 +3,7 @@ package com.techwithkaushik.cppide.feature.terminal
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
@@ -131,8 +134,30 @@ fun LinuxTerminalPanel(
     var port by remember { mutableStateOf("22") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var privateKeyUri by remember { mutableStateOf<Uri?>(null) }
+    var privateKeyBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var privateKeyPassphrase by remember { mutableStateOf("") }
     var expectedFingerprint by remember { mutableStateOf("") }
     var fingerprintConfirmation by remember { mutableStateOf<String?>(null) }
+
+    val privateKeyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        privateKeyUri = uri
+        privateKeyBytes = null
+        if (uri != null) {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw IllegalStateException("Could not read the selected private key.")
+                        if (bytes.size !in 1..128 * 1024) throw IllegalStateException("Private key file must be at most 128 KiB.")
+                        Result.success(bytes)
+                    } catch (e: Exception) { Result.failure<ByteArray>(e) }
+                }
+                result.onSuccess { privateKeyBytes = it }
+                    .onFailure { error = it.message ?: "Could not load private key." }
+            }
+        }
+    }
 
     DisposableEffect(onCloseTerminal) {
         LinuxTerminalSessions.onLastSessionExited = onCloseTerminal
@@ -143,7 +168,7 @@ fun LinuxTerminalPanel(
 
     fun connectSsh(expected: String?) {
         val sshHost = try {
-            SshHost(host.trim(), port.toIntOrNull() ?: 22, username.trim(), password = password, expectedSha256Fingerprint = expected ?: sshHostKeyPrefs.getString("${host.trim()}:${port.toIntOrNull() ?: 22}", null))
+            SshHost(host.trim(), port.toIntOrNull() ?: 22, username.trim(), password = password.ifBlank { null }, privateKey = privateKeyBytes, privateKeyPassphrase = privateKeyPassphrase.ifBlank { null }, expectedSha256Fingerprint = expected ?: sshHostKeyPrefs.getString("${host.trim()}:${port.toIntOrNull() ?: 22}", null))
         } catch (e: Exception) {
             error = e.message ?: "Invalid SSH settings."
             return
@@ -165,6 +190,9 @@ fun LinuxTerminalPanel(
                 )
                 showSshDialog = false
                 password = ""
+                privateKeyBytes = null
+                privateKeyUri = null
+                privateKeyPassphrase = ""
             }.onFailure { e ->
                 if (e is HostKeyConfirmationRequired) {
                     fingerprintConfirmation = e.fingerprint
@@ -267,7 +295,14 @@ fun LinuxTerminalPanel(
                     OutlinedTextField(host, { host = it; expectedFingerprint = "" }, label = { Text("Host / IP") }, singleLine = true)
                     OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5); expectedFingerprint = "" }, label = { Text("Port") }, singleLine = true)
                     OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true)
-                    OutlinedTextField(password, { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    OutlinedTextField(password, { password = it }, label = { Text("Password (optional if using key)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    OutlinedButton(onClick = { privateKeyPicker.launch(arrayOf("application/octet-stream", "text/plain", "*/*")) }) {
+                        Text(if (privateKeyUri == null) "Select private key (optional)" else "Change private key")
+                    }
+                    privateKeyUri?.let { Text(if (privateKeyBytes == null) "Reading private key…" else "Private key loaded into memory", color = Color(0xFF9AA7B5), fontSize = 10.sp) }
+                    if (privateKeyBytes != null) {
+                        OutlinedTextField(privateKeyPassphrase, { privateKeyPassphrase = it }, label = { Text("Key passphrase (if encrypted)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    }
                     expectedFingerprint.takeIf { it.isNotBlank() }?.let {
                         Text("Trusted host fingerprint: $it", color = Color(0xFF9AA7B5), fontSize = 10.sp)
                     }
