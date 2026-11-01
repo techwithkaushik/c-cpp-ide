@@ -303,7 +303,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 uiFontScale = uiFontScale,
                 onUiFontScaleChange = onUiFontScaleChange,
                 onBack = { screen = settingsReturnScreen },
-                onRuntimeReady = { }
+                onRuntimeReady = { screen = settingsReturnScreen }
             )
             IdeScreen.Projects -> ProjectListScreen(
                 projects = projects,
