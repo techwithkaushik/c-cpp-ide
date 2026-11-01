@@ -27,5 +27,5 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.xz)
     implementation(libs.jsch)
-    testImplementation(libs.junit)
+    testImplementation("junit:junit:4.13.2")
 }
