@@ -251,16 +251,30 @@ class BootstrapInstaller(
     }
 
     private fun setExecutableBits(root: File) {
+        // ZIP extraction does not preserve Unix mode bits. Restore traversal
+        // permissions for directories before making command files executable.
+        root.walkTopDown().forEach { entry ->
+            if (java.nio.file.Files.isSymbolicLink(entry.toPath())) return@forEach
+            if (entry.isDirectory) {
+                entry.setReadable(true, false)
+                entry.setWritable(true, true)
+                if (!entry.setExecutable(true, false) && !entry.canExecute()) {
+                    throw IOException("Unable to set bootstrap directory permissions: ${entry.relativeTo(root)}")
+                }
+            }
+        }
         val executableRoots = listOf(File(root, "bin"), File(root, "libexec"), File(root, "lib/apt/methods"))
         executableRoots.filter { it.exists() }.forEach { executableRoot ->
-            executableRoot.walkTopDown().filter { it.isFile }.forEach { file ->
+            executableRoot.walkTopDown().forEach { file ->
+                if (java.nio.file.Files.isSymbolicLink(file.toPath()) || !file.isFile) return@forEach
+                file.setReadable(true, false)
+                file.setWritable(true, true)
                 if (!file.setExecutable(true, false) && !file.canExecute()) {
                     throw IOException("Unable to mark bootstrap executable: ${file.relativeTo(root)}")
                 }
             }
         }
     }
-
     private fun validateBootstrapLayout(root: File) {
         val required = listOf("bin", "etc", "lib", "share")
         required.forEach { name ->
