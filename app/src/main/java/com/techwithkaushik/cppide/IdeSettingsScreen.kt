@@ -22,8 +22,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -66,12 +64,11 @@ internal fun IdeSettingsScreen(
 ) {
     val context = LocalContext.current.applicationContext
     val prefs = remember(context) { context.getSharedPreferences(SettingsPreference.FILE, Context.MODE_PRIVATE) }
-    var category by rememberSaveable { mutableStateOf("Overview") }
+    var category by rememberSaveable { mutableStateOf("Interface") }
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
-    var searchQuery by rememberSaveable { mutableStateOf("") }
     var resetMessage by rememberSaveable { mutableStateOf("") }
-    val categories = listOf("Overview", "UI", "Editor", "Terminal", "Runtime & Bootstrap", "Languages", "Build & Run", "Keyboard", "About")
+    val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap", "Languages", "Build & Run", "Keyboard", "About")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
         Row(
@@ -83,9 +80,6 @@ internal fun IdeSettingsScreen(
             Column(Modifier.weight(1f)) {
                 Text("Settings", color = SettingsText, fontSize = 22.sp)
             }
-            TextButton(onClick = { category = "Overview" }) {
-                Text("Overview", color = SettingsMuted)
-            }
         }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = IdeDesignTokens.Spacing.sm),
@@ -96,22 +90,17 @@ internal fun IdeSettingsScreen(
                 else OutlinedButton(onClick = { category = item }) { Text(item, fontSize = 11.sp) }
             }
         }
-        OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth().padding(12.dp), singleLine = true, label = { Text("🔎 Search settings", color = SettingsMuted) }, placeholder = { Text("Search font, theme, keyboard...", color = SettingsMuted) }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = SettingsText, unfocusedTextColor = SettingsText, focusedBorderColor = SettingsAccent, unfocusedBorderColor = IdeDesignTokens.Color.Divider))
-        if (searchQuery.isNotBlank()) {
-            val results = listOf("UI" to "Interface text scale and color scheme", "Editor" to "Editor font size, word wrap, theme", "Terminal" to "Terminal font size and keyboard", "Runtime & Bootstrap" to "Main terminal bootstrap", "Languages" to "Language tooling", "Build & Run" to "Build and execution", "Keyboard" to "Shortcuts", "About" to "Application information").filter { it.first.contains(searchQuery, true) || it.second.contains(searchQuery, true) }
-            results.forEach { result -> TextButton(onClick = { category = result.first; searchQuery = "" }, modifier = Modifier.fillMaxWidth()) { Text("⌕  " + result.first + " — " + result.second, color = SettingsText) } }
-        }
         Divider(color = IdeDesignTokens.Color.Divider)
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("✦  " + category, color = SettingsAccent, modifier = Modifier.weight(1f))
+            Text(category, color = SettingsAccent, modifier = Modifier.weight(1f))
             TextButton(onClick = {
                 when (category) {
-                    "UI" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
+                    "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
                     "Terminal" -> { terminalFontSize = 13f; autoKeyboard = true; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).apply() }
                     else -> resetMessage = "This section has no saved preferences to reset yet."
                 }
-                if (category == "UI" || category == "Editor" || category == "Terminal") resetMessage = category + " settings reset to defaults."
+                if (category == "Interface" || category == "Editor" || category == "Terminal") resetMessage = category + " reset."
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
         if (resetMessage.isNotBlank()) Text(resetMessage, color = SettingsMuted, modifier = Modifier.padding(horizontal = 14.dp))
@@ -121,37 +110,26 @@ internal fun IdeSettingsScreen(
         ) {
                 when (category) {
                     "Runtime & Bootstrap" -> {
-                        SettingsHeading("▣  RUNTIME & BOOTSTRAP", "Set up the main terminal with the bootstrap that matches this device.")
+                        SettingsHeading("RUNTIME & BOOTSTRAP", "Install terminal runtime.")
                         RuntimeSetupPanel(
                             message = "Choose the bootstrap ZIP for this app and device ABI. Files extract directly into the app-private usr/ prefix.",
                             onRuntimeReady = onRuntimeReady,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    "Overview" -> {
-                        SettingsHeading("⌂  IDE CONFIGURATION", "All preferences are grouped here. Changes to editor and terminal controls are saved on this device.")
-                        SettingsCard("Workspace", "Current project", projectName)
-                        SettingsCard("Editor", "Current theme", editorTheme)
-                        SettingsCard("Terminal", "Embedded runtime", "App-private Termux-compatible Linux environment")
-                        SettingsCard("Bootstrap", "Manual setup", "Open Runtime & Bootstrap to select or replace a bootstrap ZIP")
-                        SettingsCard("Language support", "Primary focus", "C, C++, Python, shell, JavaScript/TypeScript, JSON, TOML, YAML, HTML and CSS")
-                    }
-                    "UI" -> {
-                        SettingsHeading("◈  USER INTERFACE", "Interface and workspace preferences.")
-                        SettingsCard("Layout", "Workspace", "VS Code-style drawer, editor tabs, file explorer and draggable bottom tool panel")
-                        SettingsCard("Interface text scale", "Current scale", "${(uiFontScale * 100).toInt()}%")
-                        Slider(value = uiFontScale, onValueChange = onUiFontScaleChange, valueRange = 0.85f..1.25f, steps = 7)
-                        SettingsCard("Navigation", "Settings page", "This is a dedicated full-screen page. Use Back to return to the previous screen.")
-                        SettingsCard("Color scheme", "Current app shell", "Dark IDE palette")
+                    "Interface" -> {
+                        SettingsHeading("INTERFACE", "Adjust text size.")
+                        SettingsCard("Text size", "Interface", "${(uiFontScale * 100).toInt()}%")
+                        Slider(value = uiFontScale, onValueChange = { onUiFontScaleChange(it); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, it).apply() }, valueRange = 0.85f..1.25f, steps = 7)
                     }
                     "Editor" -> {
-                        SettingsHeading("✎  EDITOR", "Tune reading and editing comfort.")
+                        SettingsHeading("EDITOR", "Text and appearance.")
                         SettingsCard("Editor font size", "Current size", "${editorFontSize.toInt()} sp")
                         Slider(value = editorFontSize, onValueChange = { onEditorFontSizeChange(it); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, it).apply() }, valueRange = 10f..24f)
                         SettingsSwitch("Word wrap", "Wrap long lines in the editor", editorWordWrap) {
                             onEditorWordWrapChange(it); prefs.edit().putBoolean(SettingsPreference.EDITOR_WORD_WRAP, it).apply()
                         }
-                        SettingsHeading("EDITOR COLOR THEME", "Choose an editor palette.")
+                        SettingsHeading("COLOR THEME", "Choose a theme.")
                         listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
                             SettingsChoice(theme, editorTheme == theme) {
                                 onEditorThemeChange(theme); prefs.edit().putString(SettingsPreference.EDITOR_THEME, theme).apply()
@@ -160,7 +138,7 @@ internal fun IdeSettingsScreen(
                         SettingsCard("Editor engine", "Implementation", "Sora code editor")
                     }
                     "Terminal" -> {
-                        SettingsHeading("⌘  TERMINAL", "Keyboard, font and interactive shell preferences.")
+                        SettingsHeading("TERMINAL", "Font and keyboard.")
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
@@ -180,31 +158,31 @@ internal fun IdeSettingsScreen(
                         SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
                     }
                     "Languages" -> {
-                        SettingsHeading("⌁  LANGUAGES & TOOLS", "Language tooling paths are configurable per language.")
+                        SettingsHeading("LANGUAGES & TOOLS", "Available language tools.")
                         listOf("C / C++ — clangd, clang, clang++", "Python — pyright, python", "JavaScript / TypeScript — typescript-language-server, prettier", "Lua — lua-language-server", "Rust — rust-analyzer, rustc", "Text, JSON, TOML, YAML, HTML and CSS").forEach {
                             SettingsCard(it.substringBefore(" — "), "Tooling", it.substringAfter(" — ", it))
                         }
                         SettingsCard("Custom executable paths", "Advanced", "Use the Languages tab in the existing tooling configuration to save and validate custom paths.")
                     }
                     "Build & Run" -> {
-                        SettingsHeading("▶  BUILD & RUN", "Build and execution settings.")
+                        SettingsHeading("BUILD & RUN", "Build options.")
                         SettingsCard("Target environment", "Linux", "Embedded app-private runtime; no external Termux app is required")
                         SettingsCard("Bootstrap architecture", "Current APK", "ABI-matched bootstrap is required; ARM32 APK uses armeabi-v7a")
                         SettingsCard("Compiler", "C / C++", "Compiler availability depends on the selected bootstrap and installed packages")
                         SettingsCard("Run output", "Output panel", "Program output appears in the IDE output panel when the runner is connected")
                     }
                     "Keyboard" -> {
-                        SettingsHeading("⌨  KEYBOARD & SHORTCUTS", "Terminal keyboard behavior.")
+                        SettingsHeading("KEYBOARD & SHORTCUTS", "Common shortcuts.")
                         SettingsCard("Terminal", "Show keyboard", if (autoKeyboard) "Automatically on terminal open" else "Tap terminal to show keyboard")
                         SettingsCard("Common actions", "Editor", "Ctrl+S Save · Ctrl+F Find · Ctrl+Z Undo · Ctrl+Shift+P Command Palette")
                         SettingsCard("Terminal controls", "Interactive", "Enter runs commands; Ctrl+C interrupts foreground processes when supported")
                     }
                     else -> {
-                        SettingsHeading("ⓘ  ABOUT CODE STUDIO", "IDE version and runtime notes.")
+                        SettingsHeading("ABOUT", "App information.")
                         SettingsCard("Application", "Code Studio", "Android-native coding workspace")
                         SettingsCard("Architecture", "Current device APK", "Bootstrap ABI must match this device and APK")
                         SettingsCard("Privacy", "Runtime files", "Runtime and projects are stored in app-private storage")
-                        SettingsCard("Troubleshooting", "Terminal won't open", "Open Runtime & Bootstrap, select the correct ZIP, and verify the SHA-256 shown by CI.")
+                        SettingsCard("Troubleshooting", "Terminal", "Open Runtime & Bootstrap and install the matching ZIP.")
                     }
                 }
                 Spacer(Modifier.height(18.dp))
