@@ -94,22 +94,19 @@ internal fun IdeSettingsScreen(
             }
         }
         Divider(color = IdeDesignTokens.Color.Divider)
-        if (category == "Runtime & Bootstrap") {
-            Column(Modifier.fillMaxSize().padding(10.dp)) {
-                Text("RUNTIME & BOOTSTRAP", color = SettingsAccent, fontSize = IdeDesignTokens.Typography.caption)
-                Text("Set up the main terminal by importing the matching ABI artifact. Select bootstrap.zip and bootstrap.json from the same extracted GitHub Actions artifact; the manifest fills in the checksum and the app tests the shell before reporting success. The existing Termux app is not modified.", color = SettingsMuted, fontSize = IdeDesignTokens.Typography.caption, modifier = Modifier.padding(vertical = IdeDesignTokens.Spacing.sm))
-                RuntimeSetupPanel(
-                    message = "Select the bootstrap ZIP for this IDE and enter its published SHA-256 checksum.",
-                    onRuntimeReady = onRuntimeReady,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                )
-            }
-        } else {
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
-            ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
+        ) {
                 when (category) {
+                    "Runtime & Bootstrap" -> {
+                        SettingsHeading("RUNTIME & BOOTSTRAP", "Set up the main terminal with the bootstrap that matches this device.")
+                        RuntimeSetupPanel(
+                            message = "Choose the bootstrap.zip and bootstrap.json files from the same ABI artifact.",
+                            onRuntimeReady = onRuntimeReady,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     "Overview" -> {
                         SettingsHeading("IDE CONFIGURATION", "All preferences are grouped here. Changes to editor and terminal controls are saved on this device.")
                         SettingsCard("Workspace", "Current project", projectName)
@@ -190,7 +187,6 @@ internal fun IdeSettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(18.dp))
-            }
         }
     }
 }
