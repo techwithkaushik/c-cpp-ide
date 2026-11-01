@@ -280,9 +280,8 @@ class BootstrapInstaller(
         listOf("bin/sh", "bin/bash").map { File(root, it) }
             .filter { java.nio.file.Files.isSymbolicLink(it.toPath()) }
             .forEach { link ->
-                // Manifest links intentionally point at the final prefix, but
-                // during staging that path has not been promoted yet. Map it
-                // back into the runtime prefix before touching permissions.
+                // Manifest links point at the final prefix; resolve their
+                // target back into the extracted runtime tree for permission checks.
                 val rawTarget = java.nio.file.Files.readSymbolicLink(link.toPath())
                 val resolvedTarget = if (rawTarget.isAbsolute) {
                     rawTarget.toAbsolutePath().normalize()
