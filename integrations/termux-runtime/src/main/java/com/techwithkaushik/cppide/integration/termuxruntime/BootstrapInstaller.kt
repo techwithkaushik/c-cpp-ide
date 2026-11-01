@@ -24,6 +24,7 @@ class BootstrapInstaller(
     private val maxExpandedBytes: Long = DEFAULT_MAX_EXPANDED_BYTES,
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
     private val expectedBootstrapPrefix: String = DEFAULT_BOOTSTRAP_PREFIX,
+    private val requireSymlinkManifest: Boolean = false,
 ) {
     data class Result(
         val prefix: File,
@@ -117,15 +118,15 @@ class BootstrapInstaller(
                 }
             }
 
-            if (!symlinkManifest.isFile) {
+            if (requireSymlinkManifest && !symlinkManifest.isFile) {
                 throw IOException("Termux bootstrap is missing SYMLINKS.txt; refusing to install an incomplete runtime")
             }
-            val symlinkCount = createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile)
+            val symlinkCount = if (symlinkManifest.isFile) createSymlinks(symlinkManifest, staging, prefixDirectory.absoluteFile) else 0
             symlinkManifest.delete()
 
             setExecutableBits(staging, prefixDirectory)
             validateBootstrapLayout(staging)
-            validateTermuxSymlinkLayout(staging, symlinkCount)
+            if (requireSymlinkManifest) validateTermuxSymlinkLayout(staging, symlinkCount)
 
             // Keep the previous prefix until the staged tree is ready. Renames
             // are within the same parent filesystem, so promotion is atomic per rename.
