@@ -6,6 +6,7 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
+import android.os.Process
 import java.security.MessageDigest
 import java.util.Locale
 
@@ -37,9 +38,14 @@ class ProotInstaller(private val paths: LinuxRuntimePaths) {
                         candidate.outputStream().buffered().use { tar.copyTo(it) }
                         if (candidate.length() != entry.size) throw IOException("Truncated PRoot binary.")
                         if (!candidate.setExecutable(true, true)) throw IOException("Cannot mark PRoot executable.")
-                        val magic = candidate.inputStream().use { stream -> ByteArray(4).also { if (stream.read(it) != 4) throw IOException("Truncated PRoot ELF.") } }
-                        if (magic.map { it.toInt() and 0xff } != listOf(0x7f, 0x45, 0x4c, 0x46)) {
+                        val header = candidate.inputStream().use { stream -> ByteArray(20).also { if (stream.read(it) != it.size) throw IOException("Truncated PRoot ELF header.") } }
+                        if (header.take(4).map { it.toInt() and 0xff } != listOf(0x7f, 0x45, 0x4c, 0x46)) {
                             throw IOException("The selected PRoot file is not an ELF executable.")
+                        }
+                        val machine = (header[18].toInt() and 0xff) or ((header[19].toInt() and 0xff) shl 8)
+                        val expectedMachine = if (Process.is64Bit()) 183 else 40
+                        if (machine != expectedMachine) {
+                            throw IOException("PRoot ABI mismatch: ELF machine=$machine, expected=$expectedMachine.")
                         }
                         found = true
                         break
