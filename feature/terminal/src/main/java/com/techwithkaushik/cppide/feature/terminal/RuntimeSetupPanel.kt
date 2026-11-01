@@ -89,13 +89,81 @@ fun RuntimeSetupPanel(
     )
 
 
+    val installBootstrap: (Boolean) -> Unit = { withSymlinks ->
+        val uri = selectedArchive
+        if (uri != null && !busy && !checkingInstalledRuntime) {
+            busy = true
+            status = if (withSymlinks) {
+                "Installing bootstrap, processing SYMLINKS.txt, and testing the shell…"
+            } else {
+                "Installing bootstrap WITHOUT processing SYMLINKS.txt, then testing the shell…"
+            }
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    val stagedArchive = File(context.cacheDir, "selected-code-studio-bootstrap.zip")
+                    try {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: throw IOException("Android could not open the selected archive")
+                        input.use { source ->
+                            stagedArchive.outputStream().buffered().use { target ->
+                                val buffer = ByteArray(8192)
+                                var total = 0L
+                                while (true) {
+                                    val count = source.read(buffer)
+                                    if (count < 0) break
+                                    total += count
+                                    if (total > MAX_ARCHIVE_BYTES) throw IOException("Bootstrap ZIP exceeds the 512 MiB import limit")
+                                    target.write(buffer, 0, count)
+                                }
+                            }
+                        }
+                        val runtime = EmbeddedTermuxRuntime(context.filesDir)
+                        var smoke: BootstrapSmokeTest.Result? = null
+                        try {
+                            val installed = runtime.installBootstrap(
+                                archive = stagedArchive,
+                                expectedSha256 = null,
+                                processSymlinks = withSymlinks,
+                            ) {
+                                runtime.layout.ensurePrivateDirectories()
+                                smoke = BootstrapSmokeTest(runtime).run()
+                                smoke?.success == true
+                            }
+                            val mode = if (withSymlinks) "with symlinks" else "without symlinks"
+                            "Bootstrap installed $mode and verified. Created ${installed.symlinksCreated} symlinks; shell execution passed."
+                        } catch (error: Exception) {
+                            val failedSmoke = smoke
+                            val reason = failedSmoke?.failureReason
+                            if (reason != null) {
+                                val stderr = failedSmoke.stderr.trim().takeIf { it.isNotBlank() }
+                                val mode = if (withSymlinks) "with symlinks" else "without symlinks"
+                                "Setup failed ($mode): $reason" +
+                                    (stderr?.let { " — stderr: ${it.take(400)}" } ?: "") +
+                                    ". The previous runtime, if any, was restored."
+                            } else {
+                                throw error
+                            }
+                        }
+                    } catch (error: Exception) {
+                        "Setup failed: ${error.message ?: error.javaClass.simpleName}"
+                    } finally {
+                        stagedArchive.delete()
+                    }
+                }
+                status = result
+                busy = false
+                if (result.startsWith("Bootstrap installed")) onRuntimeReady()
+            }
+        }
+    }
+
     Column(
         modifier = modifier.fillMaxWidth().background(Color(0xFF0D1117), RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Main terminal setup", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Text(
-            "Install the app-private Termux-compatible environment. Select the bootstrap ZIP built for this app and device ABI. Installation extracts files, replays SYMLINKS.txt, restores executable permissions, and tests the shell. Your existing Termux installation is not touched.",
+            "Select the bootstrap ZIP built for this app and device ABI, then choose a test mode. WITH symlinks processes SYMLINKS.txt; WITHOUT symlinks skips it completely so shell behavior can be compared. Both modes test shell execution and restore the previous runtime if the test fails. Your existing Termux installation is not touched.",
             color = Color(0xFFE8EDF5),
             fontSize = 12.sp
         )
@@ -115,63 +183,15 @@ fun RuntimeSetupPanel(
         )
         Button(
             enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
-            onClick = {
-                val uri = selectedArchive ?: return@Button
-                busy = true
-                status = "Installing bootstrap, applying SYMLINKS.txt, and testing the shell…"
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        val stagedArchive = File(context.cacheDir, "selected-code-studio-bootstrap.zip")
-                        try {
-                            val input = context.contentResolver.openInputStream(uri)
-                                ?: throw IOException("Android could not open the selected archive")
-                            input.use { source ->
-                                stagedArchive.outputStream().buffered().use { target ->
-                                    val buffer = ByteArray(8192)
-                                    var total = 0L
-                                    while (true) {
-                                        val count = source.read(buffer)
-                                        if (count < 0) break
-                                        total += count
-                                        if (total > MAX_ARCHIVE_BYTES) throw IOException("Bootstrap ZIP exceeds the 512 MiB import limit")
-                                        target.write(buffer, 0, count)
-                                    }
-                                }
-                            }
-                            val runtime = EmbeddedTermuxRuntime(context.filesDir)
-                            var smoke: BootstrapSmokeTest.Result? = null
-                            try {
-                                val installed = runtime.installBootstrap(stagedArchive, null) {
-                                    runtime.layout.ensurePrivateDirectories()
-                                    smoke = BootstrapSmokeTest(runtime).run()
-                                    smoke?.success == true
-                                }
-                                "Bootstrap installed and verified. Created ${installed.symlinksCreated} symlinks; shell execution passed."
-                            } catch (error: Exception) {
-                                val failedSmoke = smoke
-                                val reason = failedSmoke?.failureReason
-                                if (reason != null) {
-                                    val stderr = failedSmoke.stderr.trim().takeIf { it.isNotBlank() }
-                                    "Setup failed: $reason" +
-                                        (stderr?.let { " — stderr: ${it.take(400)}" } ?: "") +
-                                        ". The previous runtime, if any, was restored."
-                                } else {
-                                    throw error
-                                }
-                            }
-                        } catch (error: Exception) {
-                            "Setup failed: ${error.message ?: error.javaClass.simpleName}"
-                        } finally {
-                            stagedArchive.delete()
-                        }
-                    }
-                    status = result
-                    busy = false
-                    if (result.startsWith("Bootstrap installed and verified")) onRuntimeReady()
-                }
-            }
+            onClick = { installBootstrap(withSymlinks = true) }
         ) {
-            Text(if (busy) "Setting up terminal…" else "2 · Install and test main terminal")
+            Text(if (busy) "Setting up terminal…" else "2 · Install bootstrap WITH symlinks")
+        }
+        Button(
+            enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
+            onClick = { installBootstrap(withSymlinks = false) }
+        ) {
+            Text(if (busy) "Setting up terminal…" else "3 · Install bootstrap WITHOUT symlinks")
         }
         if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text(
