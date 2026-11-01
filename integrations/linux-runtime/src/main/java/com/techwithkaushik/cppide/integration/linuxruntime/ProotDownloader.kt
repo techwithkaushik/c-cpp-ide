@@ -25,32 +25,38 @@ class ProotDownloader(private val paths: LinuxRuntimePaths) {
         }
         val url = URL("https://github.com/proot-me/proot-rs/releases/download/v0.1.0/$asset")
         val archive = File(paths.base, asset)
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            connectTimeout = 20_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-        }
         try {
-            if (connection.responseCode !in 200..299) throw IllegalStateException("PRoot download failed with HTTP ${connection.responseCode}.")
-            if (connection.contentLengthLong > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
-            FileOutputStream(archive).use { out ->
-                connection.inputStream.use { input ->
-                    val buffer = ByteArray(32 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        total += n
-                        if (total > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
-                        out.write(buffer, 0, n)
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 20_000
+                readTimeout = 30_000
+                instanceFollowRedirects = true
+            }
+            try {
+                if (connection.responseCode !in 200..299) throw IllegalStateException("PRoot download failed with HTTP ${connection.responseCode}.")
+                if (connection.url.protocol != "https" || connection.url.host !in setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")) {
+                    throw SecurityException("PRoot download redirected to an untrusted host.")
+                }
+                if (connection.contentLengthLong > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
+                FileOutputStream(archive).use { out ->
+                    connection.inputStream.use { input ->
+                        val buffer = ByteArray(32 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            total += n
+                            if (total > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
+                            out.write(buffer, 0, n)
+                        }
                     }
                 }
-            }
-        } finally { connection.disconnect() }
-        val digest = sha256(archive)
-        ProotInstaller(paths).installFromPinnedRelease(archive)
-        archive.delete()
-        return Result(digest, paths.proot.length(), "proot-rs v0.1.0")
+            } finally { connection.disconnect() }
+            val digest = sha256(archive)
+            ProotInstaller(paths).installFromPinnedRelease(archive)
+            return Result(digest, paths.proot.length(), "proot-rs v0.1.0")
+        } finally {
+            archive.delete()
+        }
     }
 
     private fun sha256(file: File): String {
