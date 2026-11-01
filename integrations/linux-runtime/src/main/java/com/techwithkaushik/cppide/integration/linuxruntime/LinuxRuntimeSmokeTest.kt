@@ -13,6 +13,10 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         if (!paths.proot.isFile) return Result(false, null, "", "PRoot binary is missing.")
         if (!paths.systemLinker.isFile) return Result(false, null, "", "Android system linker is missing.")
         val root = paths.ubuntuRoot.absolutePath
+        val hostTemp = File(paths.base, "tmp").apply {
+            if (!exists() && !mkdirs()) return Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath")
+            if (!isDirectory || !canWrite()) return Result(false, null, "", "PRoot host temporary directory is not writable: $absolutePath")
+        }
         val shell = if (File(paths.ubuntuRoot, "bin/sh").exists()) "/bin/sh" else "/usr/bin/sh"
         val process = try {
             ProcessBuilder(
@@ -22,10 +26,11 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 "--", shell, "-c", "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'; test -x /bin/sh"
             ).directory(paths.base).apply {
                 environment()["HOME"] = "/root"
-                environment()["TMPDIR"] = "/tmp"
+                // PRoot runs on Android: its loader temp files must use an existing host path.
+                environment()["TMPDIR"] = hostTemp.absolutePath
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                 environment()["TERM"] = "xterm"
-                environment()["PROOT_TMP_DIR"] = File(paths.base, "tmp").apply { mkdirs() }.absolutePath
+                environment()["PROOT_TMP_DIR"] = hostTemp.absolutePath
             }.start()
         } catch (e: Exception) {
             return Result(false, null, "", "Could not launch PRoot: ${e.message ?: e.javaClass.simpleName}")
