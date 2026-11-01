@@ -274,6 +274,27 @@ class BootstrapInstaller(
                 }
             }
         }
+
+        // Some bootstrap archives expose sh/bash through symlinks whose target
+        // is outside the normal bin traversal. Resolve the final staged target
+        // explicitly and restore its execute bit before promoting the prefix.
+        listOf("bin/sh", "bin/bash").map { File(root, it) }
+            .filter { java.nio.file.Files.isSymbolicLink(it.toPath()) }
+            .forEach { link ->
+                val target = link.toPath().toRealPath().toFile()
+                if (!target.isFile) throw IOException("Bootstrap shell target is not a file: ${link.relativeTo(root)}")
+                target.setReadable(true, false)
+                target.setWritable(true, true)
+                if (!target.setExecutable(true, false) && !target.canExecute()) {
+                    throw IOException("Unable to mark shell target executable: ${link.relativeTo(root)} -> $target")
+                }
+            }
+        listOf("bin/sh", "bin/bash").forEach { shell ->
+            val candidate = File(root, shell)
+            if (candidate.exists() && !candidate.canExecute()) {
+                throw IOException("Bootstrap shell is not executable after extraction: $shell")
+            }
+        }
     }
     private fun validateBootstrapLayout(root: File) {
         val required = listOf("bin", "etc", "lib", "share")
