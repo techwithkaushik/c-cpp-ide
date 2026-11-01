@@ -1,69 +1,62 @@
-# Code Studio — Multi-language IDE for Android
+# Code Studio — Ubuntu + SSH IDE for Android
 
-A VS Code-inspired, multi-language Android IDE built with Kotlin, Jetpack Compose, AIDL, and native integrations. The architecture targets file-aware language tooling, a managed Linux userspace, terminal sessions, and project-level toolchain configuration.
+Code Studio is a Kotlin/Jetpack Compose Android IDE focused on C/C++, Python, web files, and an app-owned Linux runtime.
 
-## Module architecture
+## Runtime direction
+
+This branch is **Termux-free**: the Gradle build does not include a Termux app/runtime module or vendored Termux terminal emulator. It never reads or writes another app's private data. The app owns the Linux runtime under:
 
 ```text
-c-cpp-ide/
-├── app/                         # Compose app shell, navigation, Hilt composition root
-├── services/
-│   └── daemon/                  # Isolated compiler/debugger process and AIDL service implementations
-├── core/
-│   ├── aidl/                    # Stable IPC contracts shared by client and daemon
-│   ├── jni/                     # C++20, CMake, Tree-sitter and PTY JNI bridge
-│   ├── lsp/                     # LSP protocol models, transport and client orchestration
-│   └── designsystem/            # Material 3 theme and reusable editor-oriented UI primitives
-├── feature/
-│   ├── editor/                  # Workspace, tabs, editor state and code rendering
-│   ├── terminal/                # Terminal UI and PTY session presentation
-│   └── explorer/                # Workspace file tree and Git status presentation
-├── gradle/
-│   └── libs.versions.toml       # Central dependency and plugin catalog
-├── settings.gradle.kts          # Central module registry and repository policy
-└── build.gradle.kts              # Root plugin declarations
+files/linux-runtime/
+├── distributions/ubuntu/   # Ubuntu Base rootfs
+├── bin/proot               # Android PRoot executable
+├── staging/                # private transactional staging
+└── runtime.properties      # installed runtime metadata
 ```
 
-## Process and data boundaries
+### Ubuntu setup
 
-- `:app` and feature modules own UI state and presentation; long-running compiler/debugger processes must never run on the UI thread.
-- `:services:daemon` is intended to run in a dedicated Android process (`android:process=":ide_daemon"`) and exposes the AIDL contracts.
-- `:core:aidl` is the IPC contract module; keep its types stable and parcelable-friendly.
-- `:core:lsp` owns LSP framing/JSON and request lifecycle. The daemon should own local toolchain process I/O and relay bounded events to clients.
-- `:core:jni` contains native C++20 integrations (Tree-sitter/PTY); native calls must not block Compose's main thread.
+Open **Settings → Runtime & Bootstrap**.
 
-## Foundation status
+- **Download official Ubuntu Base 24.04.5** downloads the architecture-matched Ubuntu Base archive and verifies it against Ubuntu's official `SHA256SUMS`.
+- **Download pinned Android PRoot** downloads the fixed upstream `proot-rs v0.1.0` Android asset. That old upstream release does not publish an asset digest; the app pins the URL/version, enforces a size limit, and validates the ELF architecture. This remains a supply-chain and compatibility limitation that should be replaced by a project-built, digest-published PRoot release before a production release.
+- Import options are available for a local Ubuntu rootfs archive or a PRoot archive with an explicit SHA-256.
+- A real shell smoke test must pass before setup reports the runtime as ready.
 
-This commit establishes the module registry, dependency catalog, and initial compiler/LSP IPC contracts. Module implementations, Android manifests, native dependencies, and executable toolchain packaging are intentionally staged for later steps.
+Ubuntu Base is a minimal userspace, not a complete compiler toolchain. Use Ubuntu's package manager from the Ubuntu shell to install the tools you need. The app does not fall back to Android's host shell if the runtime is missing or fails.
 
+## Terminal targets
 
-## Runtime and bootstrap direction
+The terminal panel supports:
 
-The standalone IDE must work without requiring a separately installed Termux app and must not ask users to paste a compiler/rootfs URL. Linux setup completion must mean the selected userspace and Android-compatible execution runtime have passed a real shell smoke test—not just that a rootfs archive was extracted. The selected direction is an app-managed Ubuntu rootfs bootstrap with ABI selection and a project-controlled, versioned manifest. The rootfs is only a userspace base: the execution layer and Android-compatible compiler/runtime must be proven before it can be marked ready.
+- **Local Ubuntu** — starts a persistent shell through the native PTY bridge and app-owned PRoot runtime.
+- **Connect SSH** — opens a remote SSH shell directly from the terminal panel without first opening a local shell.
+- Multiple live tabs that remain in the app process when the bottom panel is hidden and reopened.
+- First-connection SSH SHA-256 fingerprint confirmation. Trusted fingerprints are saved app-privately; a changed host key is rejected.
+- Password authentication in the current UI. Private-key import and Keystore-backed secret management remain future work.
 
-Read [ADR 0002 — Ubuntu rootfs bootstrap](docs/architecture/adr-0002-ubuntu-rootfs-bootstrap.md) for the bootstrap flow, security constraints, and device validation gates. The first-run setup has two paths—[Download from Internet or Use Downloaded Rootfs from Storage](docs/architecture/rootfs-setup-screen.md)—and both use the same validation and installation pipeline. The existing `:integrations:toolchain` implementation contains archive/download safety primitives, but no production Ubuntu rootfs artifacts or validated Android execution layer are claimed yet.
+The terminal view currently presents text output and line-oriented input with Ctrl-C support; a full VT/xterm rendering layer, resize propagation for all terminal sizes, SSH private-key UI, and editor/build-to-remote-workspace integration are not yet complete. Do not treat this as feature parity with a desktop terminal emulator.
 
-## Optional Termux integration spike
+## Module layout
 
-Termux remains a separate optional integration experiment, not a prerequisite for the standalone runtime. **The cross-app transport has not yet been validated on-device.** AIDL describes communication inside the IDE; it does not grant access to Termux's private files or implement a Termux service.
+- `:app`: Compose IDE shell and settings
+- `:feature:editor`: editor UI
+- `:feature:terminal`: local Ubuntu and SSH terminal UI/session tabs
+- `:integrations:linux-runtime`: rootfs validation/install, PRoot setup, local PTY shell, SSH shell and host-key pinning
+- `:core:jni`: native C++20 editor helpers and kernel PTY bridge
+- `:integrations:toolchain`: compiler/tool discovery
 
-Read these architecture records before adding a Termux adapter:
+## CI policy
 
-- [ADR 0001 — Termux integration architecture](docs/architecture/adr-0001-termux-integration.md)
-- [Termux capability spike — on-device validation matrix](docs/architecture/termux-capability-spike.md)
+Only `.github/workflows/android-ci.yml` is the automatic Android CI workflow on this branch. It runs Linux runtime unit tests and builds/verifies the signed ARM32 APK. It does not rebuild a bootstrap or rootfs on every app commit. Other ABI flavors remain disabled from release verification until they are intentionally re-enabled.
 
-The first spike evaluates the documented Termux command API for finite commands. Persistent clangd LSP, terminal, and debugger sessions require a separately proven, authorized bidirectional transport. They must not be implemented using an unverified cross-UID socket, localhost TCP, root, SELinux changes, or direct reads of Termux private data. Do not mark these capabilities supported until their validation gates pass.
+## Current validation status
 
+CI compilation and tests are required for every PR update. A passing CI build does not replace testing on a physical Android device. Before this branch is ready to merge, verify:
 
-## Current Termux spike
-
-The current branch includes a temporary diagnostic screen and a minimal `:integrations:termux` adapter. The screen checks whether Termux is visible, whether its RUN_COMMAND service resolves, whether the IDE permission is granted, and whether a fixed harmless command returns the expected marker.
-
-This remains a **capability spike, not a device-validated production compiler integration**. The adapter has an initial argv-based C/C++ compile-and-run spike using Termux clang/clang++, with bounded arguments and executable output restricted to Termux home or usr/tmp. This is one language adapter, not the IDE's product scope. It does not yet provide workspace synchronization, a code editor flow, persistent LSP streams, terminal PTY, or debugging. The compile/run path has unit tests but still requires a successful CI run and real-device validation. See [the validation matrix](docs/architecture/termux-capability-spike.md) before treating any capability as supported.
-
-
-## Multi-language workspace and tools
-
-Code Studio is intended to be file-first: the active file selects the language service, and missing language tools are installed only when requested. Users can configure absolute executable paths for pre-downloaded tools under Settings → Languages. These paths are persisted per language and tool role; they become active only when the runtime process launcher resolves them.
-
-See [file-aware language tooling and workspace architecture](docs/architecture/language-tooling-and-workspace.md) for the runtime activation gate, on-demand tool installation, LSP diagnostics, and external path contract.
+1. Ubuntu download/checksum/extraction and rollback on the target device.
+2. PRoot startup and the shell smoke test on Android 10+ ARM32.
+3. Real interactive local shell, Ctrl-C, exit, tab persistence and process cleanup.
+4. SSH first-connect fingerprint confirmation, trusted reconnect and changed-key rejection.
+5. C17/C++20 compile-and-run inside Ubuntu.
+6. No runtime access to another app's private data and no fallback to Android's host shell.
