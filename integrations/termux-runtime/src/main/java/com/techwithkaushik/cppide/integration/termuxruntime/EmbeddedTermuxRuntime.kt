@@ -143,6 +143,15 @@ class EmbeddedTermuxRuntime(
         return result
     }
 
+    /**
+     * Repair absolute paths in an existing imported Termux bootstrap in place.
+     * This does not download, rebuild, or reinstall any bootstrap files.
+     */
+    fun repairInstalledRuntimePaths() {
+        installer.repairInstalledRuntimePaths(layout.prefix)
+        layout.ensurePrivateDirectories()
+    }
+
     /** Structural check only; a real executable smoke test still has to run. */
     fun hasBootstrapLayout(): Boolean {
         val prefix = layout.prefix
