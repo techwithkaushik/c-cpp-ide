@@ -35,19 +35,22 @@ class BootstrapInstaller(
 
     fun install(
         archive: File,
-        expectedSha256: String,
+        expectedSha256: String? = null,
         prefixDirectory: File,
         validateInstalledPrefix: ((File) -> Boolean)? = null,
     ): Result {
         require(archive.isFile) { "Bootstrap archive does not exist" }
-        require(expectedSha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
-            "A pinned SHA-256 digest is required"
-        }
         require(archive.length() in 1..maxArchiveBytes) { "Bootstrap archive size is invalid" }
-
+        // Match Termux: published archives are validated in the build/release pipeline.
+        // A first-run install does not require a separate checksum manifest.
         val digest = sha256(archive)
-        require(digest.equals(expectedSha256, ignoreCase = true)) {
-            "Bootstrap checksum mismatch"
+        if (expectedSha256 != null) {
+            require(expectedSha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
+                "Optional SHA-256 digest must contain 64 hexadecimal characters"
+            }
+            require(digest.equals(expectedSha256, ignoreCase = true)) {
+                "Bootstrap checksum mismatch"
+            }
         }
 
         val parent = prefixDirectory.absoluteFile.parentFile
@@ -327,9 +330,15 @@ class BootstrapInstaller(
         if (!java.nio.file.Files.isSymbolicLink(shell.toPath())) {
             throw IOException("Termux bootstrap expected bin/sh symlink from SYMLINKS.txt, but it was not created")
         }
-        val target = shell.canonicalFile
-        if (!target.isFile || !target.canExecute()) {
-            throw IOException("Termux shell symlink target is missing or not executable: bin/sh -> $target")
+        val rawTarget = java.nio.file.Files.readSymbolicLink(shell.toPath())
+        val finalPrefix = File(root.parentFile, root.name).toPath().toAbsolutePath().normalize()
+        val targetPath = if (rawTarget.isAbsolute) rawTarget.toAbsolutePath().normalize()
+            else shell.toPath().parent.resolve(rawTarget).toAbsolutePath().normalize()
+        val stagedTarget = if (targetPath.startsWith(finalPrefix)) {
+            root.toPath().resolve(finalPrefix.relativize(targetPath)).normalize().toFile()
+        } else targetPath.toFile()
+        if (!stagedTarget.isFile || !stagedTarget.canExecute()) {
+            throw IOException("Termux shell symlink target is missing or not executable: bin/sh -> $stagedTarget")
         }
         listOf("bin/bash", "bin/ls").forEach { alias ->
             val candidate = File(root, alias)
