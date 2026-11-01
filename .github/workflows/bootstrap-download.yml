@@ -1,89 +1,108 @@
-name: Download Termux Bootstrap (ARM32)
+name: Build and Upload Termux Bootstraps (All ABIs)
 
 on:
   workflow_dispatch:
   schedule:
-    # Refresh the downloadable bootstrap weekly without rebuilding it from source.
+    # Refresh all official ABI bootstrap archives weekly.
     - cron: "20 4 * * 1"
 
 permissions:
   contents: read
 
 concurrency:
-  group: termux-bootstrap-download
+  group: termux-bootstrap-all-abis
   cancel-in-progress: true
 
 jobs:
-  download-bootstrap:
-    name: Fetch and verify official ARM32 bootstrap
+  bootstrap-bundles:
+    name: Fetch, verify and package all ABI bootstraps
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - name: Resolve latest official Termux bootstrap release
+      - name: Resolve latest official release containing every supported ABI
         id: release
         shell: bash
         run: |
           set -euo pipefail
-          release_json="$(curl --fail --silent --show-error --location \
+          release_json="$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
             -H 'Accept: application/vnd.github+json' \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
-            'https://api.github.com/repos/termux/termux-packages/releases?per_page=20')"
-          asset="$(jq -cer '[.[] | select(.tag_name | startswith("bootstrap-")) | . as $r | .assets[] | select(.name == "bootstrap-arm.zip") | {tag: $r.tag_name, url: .browser_download_url, digest: (.digest // "")}] | first' <<< "$release_json")"
+            'https://api.github.com/repos/termux/termux-packages/releases?per_page=30')"
+          asset="$(jq -cer '
+            [.[] | select(.tag_name | startswith("bootstrap-")) | . as $r |
+              ([ "bootstrap-arm.zip", "bootstrap-aarch64.zip", "bootstrap-i686.zip", "bootstrap-x86_64.zip" ] as $required |
+               select(($required - [$r.assets[].name]) | length == 0) |
+               {tag: $r.tag_name, assets: [$r.assets[] | select(.name as $n | $required | index($n)) |
+                 {name, url: .browser_download_url, digest: (.digest // "")}]})] | first
+          ' <<< "$release_json")"
           tag="$(jq -r '.tag' <<< "$asset")"
-          url="$(jq -r '.url' <<< "$asset")"
-          digest="$(jq -r '.digest' <<< "$asset")"
-          [[ -n "$tag" && "$url" == https://github.com/termux/termux-packages/releases/download/*/bootstrap-arm.zip ]]
+          [[ -n "$tag" && "$tag" == bootstrap-* ]]
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Selected official release: $tag"
+          jq -c '.assets[]' <<< "$asset" > "$RUNNER_TEMP/bootstrap-assets.jsonl"
+          echo "Using official Termux bootstrap release: $tag"
+          cat "$RUNNER_TEMP/bootstrap-assets.jsonl"
 
-      - name: Download official ARM32 bootstrap ZIP
+      - name: Download and verify each ABI archive
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          curl --fail --show-error --location --retry 3 --retry-all-errors \
-            "${{ steps.release.outputs.url }}" -o dist/bootstrap-arm.zip
-          test -s dist/bootstrap-arm.zip
-          unzip -tq dist/bootstrap-arm.zip
-          # This app installs the archive as a Termux prefix, so reject unrelated archives.
-          unzip -Z1 dist/bootstrap-arm.zip | grep -Eq '^(bin/|usr/bin/|etc/|share/)'
-          sha256sum dist/bootstrap-arm.zip | tee dist/bootstrap-arm.zip.sha256
-          echo "Downloaded size: $(du -h dist/bootstrap-arm.zip | cut -f1)"
-          echo "SHA-256: $(cut -d' ' -f1 dist/bootstrap-arm.zip.sha256)"
-          if [[ -n "${{ steps.release.outputs.digest }}" ]]; then
-            expected="${{ steps.release.outputs.digest }}"
-            expected="${expected#sha256:}"
-            actual="$(sha256sum dist/bootstrap-arm.zip | cut -d' ' -f1)"
-            [[ "$actual" == "$expected" ]] || { echo "::error::SHA-256 mismatch"; exit 1; }
-          else
-            echo "::notice::Release API did not expose an asset digest; ZIP integrity and local SHA-256 were checked."
-          fi
+          while IFS= read -r asset; do
+            name="$(jq -r '.name' <<< "$asset")"
+            url="$(jq -r '.url' <<< "$asset")"
+            expected="$(jq -r '.digest' <<< "$asset")"
+            [[ "$url" == https://github.com/termux/termux-packages/releases/download/*/"$name" ]]
+            curl --fail --show-error --location --retry 3 --retry-all-errors "$url" -o "dist/$name"
+            test -s "dist/$name"
+            unzip -tq "dist/$name"
+            # Validate this is a Termux prefix archive, not an unrelated ZIP.
+            unzip -Z1 "dist/$name" | grep -Eq '^(bin/|usr/bin/|etc/|share/)'
+            actual="sha256:$(sha256sum "dist/$name" | cut -d' ' -f1)"
+            if [[ -n "$expected" ]]; then
+              [[ "$actual" == "$expected" ]] || { echo "::error::$name upstream SHA-256 mismatch"; exit 1; }
+            else
+              echo "::error::Official release did not provide a digest for $name; refusing an unverifiable archive."
+              exit 1
+            fi
+            sha256sum "dist/$name" > "dist/$name.sha256"
+            echo "Verified $name ($(du -h "dist/$name" | cut -f1)) $actual"
+          done < "$RUNNER_TEMP/bootstrap-assets.jsonl"
 
-      - name: Add installation instructions
+      - name: Write ABI mapping and installation instructions
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
-          cat > dist/README.txt <<'EOF'
-          Code Studio — ARM32 Termux bootstrap
-          ====================================
-          Source: official termux/termux-packages GitHub release
-          Release: ${{ steps.release.outputs.tag }}
+          cat > dist/README.txt <<EOF
+          Code Studio — Termux bootstrap bundle (all supported ABIs)
+          ==========================================================
+          Source: official termux/termux-packages release
+          Release: $RELEASE_TAG
 
-          1. Download bootstrap-arm.zip and bootstrap-arm.zip.sha256.
-          2. In Code Studio, open Settings > Runtime & Bootstrap.
-          3. Choose Install Bootstrap and select bootstrap-arm.zip.
-          4. Enter the SHA-256 value from bootstrap-arm.zip.sha256 when prompted.
-          5. Wait for runtime verification to pass before opening Terminal.
+          Files and Android ABI mapping:
+            bootstrap-arm.zip       -> armeabi-v7a (32-bit ARM)
+            bootstrap-aarch64.zip   -> arm64-v8a (64-bit ARM)
+            bootstrap-i686.zip      -> x86 (32-bit Intel)
+            bootstrap-x86_64.zip    -> x86_64 (64-bit Intel)
 
-          Use this archive only for ARM32 / armeabi-v7a devices. Do not rename
-          another architecture's archive to bootstrap-arm.zip.
+          Install only the archive matching the device's Android ABI.
+          In Code Studio, open Settings > Runtime & Bootstrap > Install Bootstrap,
+          select the matching ZIP, and enter the SHA-256 from its .sha256 file.
+          Wait for runtime verification to succeed before opening Terminal.
+
+          These are upstream prebuilt Termux bootstrap archives, downloaded and
+          verified here; this workflow does not compile Termux packages from source.
+          The APK intentionally does not bundle any bootstrap archive.
           EOF
+          printf 'release=%s\n' "$RELEASE_TAG" > dist/RELEASE.txt
+          (cd dist && sha256sum bootstrap-*.zip > SHA256SUMS)
 
-      - name: Upload downloadable bootstrap bundle
+      - name: Upload all four verified ABI bootstraps
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-termux-bootstrap-arm32-${{ steps.release.outputs.tag }}
+          name: code-studio-termux-bootstrap-all-abis-${{ steps.release.outputs.tag }}
           path: dist/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
