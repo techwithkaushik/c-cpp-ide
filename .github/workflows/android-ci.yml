@@ -18,7 +18,7 @@ env:
 
 jobs:
   release:
-    name: Sign and build optimized ARM32 release APK
+    name: Build and verify signed release APKs for all ABIs
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -49,7 +49,7 @@ jobs:
           test -n "$SIGNING_KEY_PASSWORD" || { echo "::error::SIGNING_KEY_PASSWORD secret is missing"; exit 1; }
           test -n "$SIGNING_STORE_PASSWORD" || { echo "::error::SIGNING_STORE_PASSWORD secret is missing"; exit 1; }
           echo "SIGN_KEY_STORE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "Release signing secrets are configured."
+          echo "Gradle signing secrets are configured."
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -61,41 +61,52 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Build signed optimized ARM32 release APK
+      - name: Build all ABI release APKs with Gradle signing
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: gradle --no-daemon --build-cache :app:assembleArm32Release
+        run: gradle --no-daemon --build-cache :app:assembleArm32Release :app:assembleArm64Release :app:assembleX86Release :app:assembleX64Release
 
-      - name: Verify signature, report APK size and ensure bootstrap is external
+      - name: Verify APK signatures and ensure bootstrap is external
         shell: bash
         run: |
           set -euo pipefail
-          apk="$(find app/build/outputs/apk/arm32/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
-          test -n "$apk" && test -s "$apk"
           sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner -print 2>/dev/null | sort -V | tail -n 1)"
           if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
             echo "::error::Could not find Android SDK build-tools apksigner under $sdk_root/build-tools"
             exit 1
           fi
-          "$apksigner" verify --verbose "$apk"
-          size_bytes="$(stat -c '%s' "$apk")"
-          echo "Signed ARM32 release APK: $apk"
-          echo "APK size: $(( (size_bytes + 1023) / 1024 )) KiB ($size_bytes bytes)"
-          if unzip -Z1 "$apk" | grep -E '(^|/)(bootstrap|bootstrap\.zip)(/|$)' >/dev/null; then
-            echo "::error::Bootstrap payload unexpectedly found inside APK."
-            exit 1
-          fi
-          echo "Verified: signed APK; bootstrap remains a separate download."
+          declare -A APK_DIRS=(
+            [arm32]="app/build/outputs/apk/arm32/release"
+            [arm64]="app/build/outputs/apk/arm64/release"
+            [x86]="app/build/outputs/apk/x86/release"
+            [x64]="app/build/outputs/apk/x64/release"
+          )
+          for abi in arm32 arm64 x86 x64; do
+            dir="${APK_DIRS[$abi]}"
+            apk="$(find "$dir" -maxdepth 1 -type f -name '*.apk' -print -quit)"
+            test -n "$apk" && test -s "$apk" || { echo "::error::Missing release APK for $abi in $dir"; exit 1; }
+            "$apksigner" verify --verbose "$apk"
+            size_bytes="$(stat -c '%s' "$apk")"
+            echo "Verified Gradle-signed $abi APK: $apk ($(( (size_bytes + 1023) / 1024 )) KiB)"
+            if unzip -Z1 "$apk" | grep -E '(^|/)(bootstrap|bootstrap\.zip)(/|$)' >/dev/null; then
+              echo "::error::Bootstrap payload unexpectedly found inside $apk"
+              exit 1
+            fi
+          done
+          echo "All four signed APKs verified; bootstrap files are not embedded."
 
-      - name: Upload signed ARM32 release APK
+      - name: Upload APKs only (separate from bootstrap artifacts)
         uses: actions/upload-artifact@v4
         with:
-          name: code-studio-arm32-signed-release-apk
-          path: app/build/outputs/apk/arm32/release/*.apk
+          name: code-studio-release-apks-all-abis
+          path: |
+            app/build/outputs/apk/arm32/release/*.apk
+            app/build/outputs/apk/arm64/release/*.apk
+            app/build/outputs/apk/x86/release/*.apk
+            app/build/outputs/apk/x64/release/*.apk
           if-no-files-found: error
           retention-days: 14
