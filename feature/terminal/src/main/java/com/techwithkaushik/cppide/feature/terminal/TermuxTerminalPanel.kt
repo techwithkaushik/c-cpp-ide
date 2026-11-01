@@ -150,8 +150,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
         )
     }
 
-    DisposableEffect(session) {
-        onDispose { session.finishIfRunning() }
+    DisposableEffect(session, terminalClient) {
+        onDispose {
+            terminalClient.attach(null)
+            session.finishIfRunning()
+        }
     }
 
     AndroidView(
