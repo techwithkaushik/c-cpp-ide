@@ -118,8 +118,8 @@ class EmbeddedTermuxRuntime(
             processSymlinks = processSymlinks,
             validateInstalledPrefix = validateInstalledPrefix,
         )
-        // Promotion replaces the entire prefix tree, so recreate private runtime
-        // directories such as PREFIX/tmp that may not be present in the archive.
+        // Installation extracts directly into files/usr, replacing the previous
+        // prefix only transactionally; recreate private directories such as PREFIX/tmp.
         layout.ensurePrivateDirectories()
         return result
     }
