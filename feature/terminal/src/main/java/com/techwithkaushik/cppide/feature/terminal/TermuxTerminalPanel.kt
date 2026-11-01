@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.integration.termuxruntime.BootstrapSmokeTest
 import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
 import com.techwithkaushik.cppide.integration.termuxruntime.RuntimeLayout
@@ -99,10 +100,10 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
         if (shell?.name == "bash") arrayOf("--login") else emptyArray()
     }
     val terminalPreferences = remember(appContext) {
-        appContext.getSharedPreferences("ide_settings", Context.MODE_PRIVATE)
+        appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE)
     }
-    val terminalFontSize = terminalPreferences.getInt("terminal_font_size", 13)
-    val autoShowKeyboard = terminalPreferences.getBoolean("terminal_auto_keyboard", true)
+    val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE)
+    val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
 
     if (!runtimeStatus.ready || shell == null) {
         val message = if (runtimeStatus.ready) {
@@ -111,11 +112,11 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
             runtimeStatus.message
         }
         Column(
-            modifier = modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(18.dp),
+            modifier = modifier.fillMaxSize().background(IdeDesignTokens.Color.Background).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Terminal runtime unavailable", color = Color(0xFFE8EDF5))
-            Text(message, color = Color(0xFF9AA8BA))
+            Text("Terminal runtime unavailable", color = IdeDesignTokens.Color.TextPrimary)
+            Text(message, color = IdeDesignTokens.Color.TextSecondary)
             Text(
                 "Open Settings → Runtime & Bootstrap to select the correct bootstrap ZIP and verify its SHA-256 checksum.",
                 color = Color(0xFF9AA8BA)
