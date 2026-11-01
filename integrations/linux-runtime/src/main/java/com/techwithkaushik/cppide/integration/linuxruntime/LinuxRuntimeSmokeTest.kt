@@ -19,7 +19,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 paths.systemLinker.absolutePath, paths.proot.absolutePath,
                 "-r", root, "-w", "/",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
-                shell, "-c", "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'; test -x /bin/sh"
+                "--", shell, "-c", "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'; test -x /bin/sh"
             ).directory(paths.base).apply {
                 environment()["HOME"] = "/root"
                 environment()["TMPDIR"] = "/tmp"
