@@ -149,6 +149,30 @@ class BootstrapInstallerTest {
     }
 
     @Test
+    fun skipsSymlinkManifestCompletelyWhenSymlinkProcessingIsDisabled() {
+        val archive = createArchive(
+            "bin/bash" to "shell",
+            "etc/profile" to "profile",
+            "lib/runtime.so" to "library",
+            "share/doc/readme" to "docs",
+            "SYMLINKS.txt" to "${BootstrapInstaller.DEFAULT_BOOTSTRAP_PREFIX}/bin/bash ← bin/sh\\n",
+        )
+        val prefix = File(temp.root, "runtime/usr")
+
+        val result = BootstrapInstaller(requireSymlinkManifest = true).install(
+            archive = archive,
+            expectedSha256 = null,
+            prefixDirectory = prefix,
+            processSymlinks = false,
+        )
+
+        assertEquals(0, result.symlinksCreated)
+        assertTrue(File(prefix, "bin/bash").isFile)
+        assertFalse(java.nio.file.Files.isSymbolicLink(File(prefix, "bin/sh").toPath()))
+        assertFalse(File(prefix, "SYMLINKS.txt").exists())
+    }
+
+    @Test
     fun rejectsChecksumMismatchBeforeExtraction() {
         val archive = createArchive(
             "bin/bash" to "shell",
