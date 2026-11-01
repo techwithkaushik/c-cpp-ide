@@ -52,27 +52,25 @@ android {
     signingConfigs {
         create("release") {
             val signingStore = System.getenv("SIGN_KEY_STORE")
+                ?: error("SIGN_KEY_STORE must point to the restored repository keystore")
             val signingAlias = System.getenv("SIGNING_KEY_ALIAS")
+                ?: error("SIGNING_KEY_ALIAS repository secret is required")
             val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                ?: error("SIGNING_KEY_PASSWORD repository secret is required")
             val signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
-            if (!signingStore.isNullOrBlank()) {
-                storeFile = file(signingStore)
-                keyAlias = signingAlias
-                keyPassword = signingKeyPassword
-                storePassword = signingStorePassword
-            }
+                ?: error("SIGNING_STORE_PASSWORD repository secret is required")
+            storeFile = file(signingStore)
+            require(storeFile.isFile) { "Release keystore does not exist: $signingStore" }
+            keyAlias = signingAlias
+            keyPassword = signingKeyPassword
+            storePassword = signingStorePassword
         }
     }
 
     buildTypes {
         getByName("release") {
-            // CI can build an unsigned artifact when signing secrets are not configured.
-            // Production signing is enabled only when a keystore path is supplied.
-            signingConfig = if (System.getenv("SIGN_KEY_STORE").isNullOrBlank()) {
-                null
-            } else {
-                signingConfigs.getByName("release")
-            }
+            // Release artifacts must always use the repository-provided signing keystore.
+            signingConfig = signingConfigs.getByName("release")
             // Keep the distributed APK small; the bootstrap is installed separately by the user.
             isMinifyEnabled = true
             isShrinkResources = true
