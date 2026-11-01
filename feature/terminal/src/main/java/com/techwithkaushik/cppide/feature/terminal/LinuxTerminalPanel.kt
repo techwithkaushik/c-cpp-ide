@@ -1,0 +1,299 @@
+package com.techwithkaushik.cppide.feature.terminal
+
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
+import com.techwithkaushik.cppide.integration.linuxruntime.HostKeyConfirmationRequired
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.linuxruntime.LocalLinuxSession
+import com.techwithkaushik.cppide.integration.linuxruntime.SshHost
+import com.techwithkaushik.cppide.integration.linuxruntime.SshShellSession
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.OutputStream
+
+private data class LinuxTerminalTab(
+    val id: Int,
+    val title: String,
+    val output: MutableState<String>,
+    val send: (String) -> Unit,
+    val close: () -> Unit,
+    val session: AutoCloseable,
+)
+
+private object LinuxTerminalSessions {
+    val tabs = mutableStateListOf<LinuxTerminalTab>()
+    var selectedId by mutableIntStateOf(0)
+        private set
+    var onLastSessionExited: (() -> Unit)? = null
+    private var nextId = 1
+
+    fun select(id: Int) { if (tabs.any { it.id == id }) selectedId = id }
+
+    fun add(title: String, session: AutoCloseable, input: OutputStream, initialOutput: String = ""): LinuxTerminalTab {
+        val tab = LinuxTerminalTab(
+            id = nextId++,
+            title = title,
+            output = mutableStateOf(initialOutput),
+            send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
+            close = { closeTab(nextId - 1) },
+            session = session
+        )
+        tabs.add(tab)
+        selectedId = tab.id
+        return tab
+    }
+
+    fun append(tab: LinuxTerminalTab, text: String) {
+        if (tabs.none { it.id == tab.id }) return
+        val combined = tab.output.value + stripTerminalControls(text)
+        tab.output.value = if (combined.length > MAX_SCROLLBACK) combined.takeLast(MAX_SCROLLBACK) else combined
+    }
+
+    fun finish(tab: LinuxTerminalTab) {
+        val index = tabs.indexOfFirst { it.id == tab.id }
+        if (index < 0) return
+        tabs.removeAt(index)
+        runCatching { tab.session.close() }
+        if (tabs.isEmpty()) {
+            selectedId = 0
+            onLastSessionExited?.invoke()
+        } else if (selectedId == tab.id) {
+            selectedId = tabs.getOrNull(index - 1)?.id ?: tabs.first().id
+        }
+    }
+
+    fun closeTab(id: Int) {
+        tabs.firstOrNull { it.id == id }?.let(::finish)
+    }
+
+    private fun stripTerminalControls(value: String): String =
+        value.replace(Regex("\u001B\\[[0-?]*[ -/]*[@-~]"), "")
+            .replace(Regex("\u001B\\][^\u0007]*(?:\u0007|\u001B\\\\)"), "")
+}
+
+@Composable
+fun LinuxTerminalPanel(
+    modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
+    onCloseTerminal: () -> Unit = {},
+) {
+    val context = LocalContext.current.applicationContext
+    val paths = remember(context) { LinuxRuntimePaths(context.filesDir) }
+    val scope = rememberCoroutineScope()
+    val handler = remember { Handler(Looper.getMainLooper()) }
+    var command by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var showSshDialog by remember { mutableStateOf(false) }
+    var host by remember { mutableStateOf("") }
+    var port by remember { mutableStateOf("22") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var expectedFingerprint by remember { mutableStateOf("") }
+    var fingerprintConfirmation by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(onCloseTerminal) {
+        LinuxTerminalSessions.onLastSessionExited = onCloseTerminal
+        onDispose {
+            if (LinuxTerminalSessions.onLastSessionExited === onCloseTerminal) LinuxTerminalSessions.onLastSessionExited = null
+        }
+    }
+
+    fun connectSsh(expected: String?) {
+        val sshHost = try {
+            SshHost(host.trim(), port.toIntOrNull() ?: 22, username.trim(), password = password, expectedSha256Fingerprint = expected)
+        } catch (e: Exception) {
+            error = e.message ?: "Invalid SSH settings."
+            return
+        }
+        busy = true
+        error = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try { Result.success(SshShellSession.connect(sshHost)) }
+                catch (e: Exception) { Result.failure<SshShellSession>(e) }
+            }
+            busy = false
+            result.onSuccess { session ->
+                val title = "SSH ${sshHost.username}@${sshHost.host}"
+                val tab = LinuxTerminalSessions.add(title, session, session.input, "Connected to ${sshHost.host}:\n")
+                session.readOutput(
+                    onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
+                    onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
+                )
+                showSshDialog = false
+                password = ""
+            }.onFailure { e ->
+                if (e is HostKeyConfirmationRequired) {
+                    fingerprintConfirmation = e.fingerprint
+                    expectedFingerprint = e.fingerprint
+                } else error = e.message ?: e.javaClass.simpleName
+            }
+        }
+    }
+
+    Column(modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !busy, onClick = {
+                if (!paths.ready()) {
+                    error = if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime Settings."
+                    else "The app-owned PRoot binary is missing or invalid. Open Runtime Settings."
+                    return@Button
+                }
+                busy = true
+                error = null
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        try { Result.success(LocalLinuxSession.start(paths)) }
+                        catch (e: Exception) { Result.failure<LocalLinuxSession>(e) }
+                    }
+                    busy = false
+                    result.onSuccess { session ->
+                        val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, "Ubuntu shell started.\n")
+                        session.readOutput(
+                            onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
+                            onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[Shell exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
+                        )
+                    }.onFailure { error = it.message ?: "Could not start Ubuntu shell." }
+                }
+            }) { Text("Local Ubuntu") }
+            OutlinedButton(enabled = !busy, onClick = { showSshDialog = true }) { Text("Connect SSH") }
+            if (busy) Text("Connecting…", color = Color(0xFF9AA7B5), modifier = Modifier.padding(top = 12.dp))
+        }
+
+        if (LinuxTerminalSessions.tabs.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LinuxTerminalSessions.tabs.forEach { tab ->
+                    Row(
+                        Modifier.background(if (tab.id == LinuxTerminalSessions.selectedId) Color(0xFF173D5C) else Color(0xFF151B23), RoundedCornerShape(8.dp))
+                            .clickable { LinuxTerminalSessions.select(tab.id) }.padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(tab.title, color = Color(0xFFE8EDF5))
+                        Text("×", color = Color(0xFF9AA7B5), modifier = Modifier.clickable { LinuxTerminalSessions.closeTab(tab.id) })
+                    }
+                }
+            }
+        }
+
+        val active = LinuxTerminalSessions.tabs.firstOrNull { it.id == LinuxTerminalSessions.selectedId }
+        if (active == null) {
+            Column(Modifier.weight(1f).fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Linux terminal", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                Text("Choose Local Ubuntu to open a persistent shell in the app-owned rootfs, or Connect SSH to open a remote shell directly. No setup shell is required before SSH.", color = Color(0xFF9AA7B5), fontSize = 12.sp)
+                Button(onClick = onOpenSettings) { Text("Ubuntu runtime setup") }
+                error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
+            }
+        } else {
+            Column(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF080B10), RoundedCornerShape(8.dp)).padding(8.dp)) {
+                Text(
+                    active.output.value,
+                    color = Color(0xFFE6EDF3),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = command,
+                        onValueChange = { command = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        label = { Text("Command / input") },
+                    )
+                    Button(onClick = {
+                        val line = command
+                        command = ""
+                        LinuxTerminalSessions.append(active, "\n$line\n")
+                        try { active.send(line + "\n") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                    }) { Text("Send") }
+                }
+            }
+            error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
+        }
+    }
+
+    if (showSshDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) showSshDialog = false },
+            title = { Text("Connect directly over SSH") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("SSH opens a remote shell directly; local Ubuntu setup is not required.", fontSize = 12.sp)
+                    OutlinedTextField(host, { host = it }, label = { Text("Host / IP") }, singleLine = true)
+                    OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5) }, label = { Text("Port") }, singleLine = true)
+                    OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true)
+                    OutlinedTextField(password, { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    expectedFingerprint.takeIf { it.isNotBlank() }?.let {
+                        Text("Trusted host fingerprint: $it", color = Color(0xFF9AA7B5), fontSize = 10.sp)
+                    }
+                    error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 11.sp) }
+                }
+            },
+            confirmButton = { Button(enabled = !busy, onClick = { connectSsh(expectedFingerprint.ifBlank { null }) }) { Text(if (busy) "Connecting…" else "Connect") } },
+            dismissButton = { TextButton(onClick = { showSshDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    fingerprintConfirmation?.let { fingerprint ->
+        AlertDialog(
+            onDismissRequest = { fingerprintConfirmation = null; expectedFingerprint = "" },
+            title = { Text("Verify SSH server") },
+            text = {
+                Text("First connection to $host presented this SHA-256 host key:\n\n$fingerprint\n\nOnly trust it if it matches the fingerprint provided by your server administrator. No shell commands have been sent.", color = Color(0xFFE8EDF5))
+            },
+            confirmButton = {
+                Button(onClick = {
+                    fingerprintConfirmation = null
+                    connectSsh(fingerprint)
+                }) { Text("Trust fingerprint and connect") }
+            },
+            dismissButton = {
+                TextButton(onClick = { fingerprintConfirmation = null; expectedFingerprint = ""; showSshDialog = true }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+private const val MAX_SCROLLBACK = 300_000
