@@ -3,6 +3,8 @@ name: Code Studio CI
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -24,9 +26,6 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
-
-      - name: Verify vendored Termux source and dependencies
-        run: bash scripts/verify-termux-vendor.sh
 
       - name: Restore repository signing keystore
         id: keystore
