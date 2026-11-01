@@ -66,6 +66,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -79,6 +80,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
@@ -86,6 +88,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.io.File
@@ -108,19 +111,32 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(
-                colorScheme = androidx.compose.material3.darkColorScheme(
-                    primary = IdeAccent,
-                    onPrimary = Color(0xFF071426),
-                    background = IdeBackground,
-                    surface = IdeSurface,
-                    onSurface = Color(0xFFE8EDF5),
-                    onSurfaceVariant = IdeMuted,
-                    secondary = IdeGreen
-                )
-            ) {
-                Surface(Modifier.fillMaxSize(), color = IdeBackground) {
-                    IdeUiPrototype()
+            val settings = getSharedPreferences("ide_settings", MODE_PRIVATE)
+            var uiFontScale by rememberSaveable {
+                mutableStateOf(settings.getFloat("ui_font_scale", 1.0f).coerceIn(0.85f, 1.25f))
+            }
+            val systemDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(systemDensity.density, uiFontScale)) {
+                MaterialTheme(
+                    colorScheme = androidx.compose.material3.darkColorScheme(
+                        primary = IdeAccent,
+                        onPrimary = Color(0xFF071426),
+                        background = IdeBackground,
+                        surface = IdeSurface,
+                        onSurface = Color(0xFFE8EDF5),
+                        onSurfaceVariant = IdeMuted,
+                        secondary = IdeGreen
+                    )
+                ) {
+                    Surface(Modifier.fillMaxSize(), color = IdeBackground) {
+                        IdeUiPrototype(
+                            uiFontScale = uiFontScale,
+                            onUiFontScaleChange = {
+                                uiFontScale = it.coerceIn(0.85f, 1.25f)
+                                settings.edit().putFloat("ui_font_scale", uiFontScale).apply()
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -129,7 +145,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun IdeUiPrototype() {
+private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> Unit) {
     val appContext = LocalContext.current
     val projectStorage = remember(appContext) { ProjectStorage(appContext) }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
@@ -283,6 +299,8 @@ private fun IdeUiPrototype() {
                 editorTheme = editorTheme,
                 onEditorThemeChange = { editorTheme = it },
                 projectName = selectedProject,
+                uiFontScale = uiFontScale,
+                onUiFontScaleChange = onUiFontScaleChange,
                 onBack = { screen = settingsReturnScreen },
                 onRuntimeReady = { }
             )
