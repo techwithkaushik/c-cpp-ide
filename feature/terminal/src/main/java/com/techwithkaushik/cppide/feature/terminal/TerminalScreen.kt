@@ -116,7 +116,10 @@ internal class TerminalScreen(
             }
             'J' -> when (parameters.firstOrNull() ?: 0) {
                 0 -> { eraseLineFromCursor(); for (i in row + 1 until rows) cells[i].fill(' ') }
-                1 -> { for (i in 0 until row) cells[i].fill(' '); for (i in 0..row) for (j in 0..if (i == row) column.coerceAtMost(columns - 1) else columns - 1) cells[i][j] = ' ' }
+                1 -> {
+                    for (i in 0 until row) cells[i].fill(' ')
+                    for (j in 0..column.coerceAtMost(columns - 1)) cells[row][j] = ' '
+                }
                 2, 3 -> { cells = Array(rows) { CharArray(columns) { ' ' } }; row = 0; column = 0; if (parameters.firstOrNull() == 3) scrollback.clear() }
             }
             'K' -> when (parameters.firstOrNull() ?: 0) {
