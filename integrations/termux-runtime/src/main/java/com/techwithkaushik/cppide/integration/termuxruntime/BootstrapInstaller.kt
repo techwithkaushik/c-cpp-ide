@@ -177,6 +177,14 @@ class BootstrapInstaller(
         }
     }
 
+    /**
+     * Repair already-installed stock Termux text configuration paths without
+     * downloading or rebuilding the bootstrap. Safe to call on app startup.
+     */
+    fun repairInstalledRuntimePaths(prefixDirectory: File) {
+        if (prefixDirectory.isDirectory) rewriteStockTermuxTextPaths(prefixDirectory.canonicalFile)
+    }
+
     private fun rewriteStockTermuxTextPaths(prefix: File) {
         val filesDirectory = prefix.parentFile
             ?: throw IOException("Bootstrap prefix has no files directory")
