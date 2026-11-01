@@ -1844,7 +1844,11 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         }
         when (selected) {
             ToolPanel.Terminal -> {
-                TermuxTerminalPanel(Modifier.weight(1f).fillMaxWidth(), onOpenSettings = onOpenSettings)
+                TermuxTerminalPanel(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    onOpenSettings = onOpenSettings,
+                    onCloseTerminal = onClose
+                )
             }
             ToolPanel.Build -> {
                 ToolStatusCard("BUILD STATUS", "Waiting for runtime", "Build tools are resolved from the active file and workspace.", "Language toolchain · Not active", IdeAccent)
