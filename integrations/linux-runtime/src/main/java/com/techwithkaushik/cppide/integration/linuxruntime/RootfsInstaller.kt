@@ -95,7 +95,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             if (!aptSourcesDir.exists() && !aptSourcesDir.mkdirs()) throw IOException("Cannot create Ubuntu APT sources directory.")
             File(aptSourcesDir, "ubuntu.sources").writeText(
                 "Types: deb\n" +
-                    "URIs: http://ports.ubuntu.com/ubuntu-ports\n" +
+                    "URIs: https://ports.ubuntu.com/ubuntu-ports\n" +
                     "Suites: noble noble-updates noble-backports noble-security\n" +
                     "Components: main universe restricted multiverse\n" +
                     "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n"
