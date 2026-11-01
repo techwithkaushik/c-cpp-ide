@@ -1505,6 +1505,7 @@ private fun WorkspaceScreen(
     onCloseToolPanel: () -> Unit,
     onPanel: (ToolPanel) -> Unit
 ) {
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
