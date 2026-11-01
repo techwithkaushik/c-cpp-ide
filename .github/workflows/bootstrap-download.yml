@@ -1,4 +1,4 @@
-name: Termux ARM32 Bootstrap
+name: Termux Multi-ABI Bootstrap
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: termux-arm32-bootstrap-${{ github.workflow }}-${{ github.ref }}
+  group: termux-multi-abi-bootstrap-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -31,7 +31,7 @@ env:
 
 jobs:
   build-bootstrap:
-    name: 3 · Build and verify ARM32 bootstrap only
+    name: Build and verify bootstrap for all Android ABIs
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -44,7 +44,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bootstrap-cache
-          key: bootstrap-prebuilt-v2-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
+          key: bootstrap-prebuilt-v3-${{ env.TERMUX_PACKAGES_REF }}-${{ env.CODE_STUDIO_PACKAGE }}-${{ runner.os }}
 
       - name: Checkout pinned Termux packages source
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
@@ -230,7 +230,7 @@ jobs:
           print("Mapped bzip2 dependency, redirected ZIP output, and added runtime-dependency pruning.")
           PY
 
-      - name: Build ARM32 bootstrap only
+      - name: Build bootstraps for all four ABIs
         if: ${{ steps.bootstrap-cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
@@ -240,18 +240,20 @@ jobs:
           # force-clean path can expand an unset per-architecture cache path to /*.
           # A clean runner already guarantees that no stale package cache is reused.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
-            --architectures "arm" 2>&1 | tee ../bootstrap-build.log
+            --architectures "arm aarch64 i686 x86_64" 2>&1 | tee ../bootstrap-build.log
           # Archive output is redirected to writable container /tmp above;
           # never depend on the mounted checkout being writable by builder.
-          docker cp termux-package-builder:/tmp/bootstrap-arm.zip \
-            "$GITHUB_WORKSPACE/bootstrap-arm.zip"
-          test -s "$GITHUB_WORKSPACE/bootstrap-arm.zip"
-          size_bytes="$(stat -c '%s' "$GITHUB_WORKSPACE/bootstrap-arm.zip")"
-          echo "Pruned ARM32 bootstrap size: $size_bytes bytes"
-          if (( size_bytes > 52428800 )); then
-            echo "::error::ARM32 bootstrap exceeds 50 MiB; refusing to package an oversized APK."
-            exit 1
-          fi
+          for arch in arm aarch64 i686 x86_64; do
+            docker cp "termux-package-builder:/tmp/bootstrap-${arch}.zip" \
+              "$GITHUB_WORKSPACE/bootstrap-${arch}.zip"
+            test -s "$GITHUB_WORKSPACE/bootstrap-${arch}.zip"
+            size_bytes="$(stat -c '%s' "$GITHUB_WORKSPACE/bootstrap-${arch}.zip")"
+            echo "Pruned ${arch} bootstrap size: $size_bytes bytes"
+            if (( size_bytes > 52428800 )); then
+              echo "::error::${arch} bootstrap exceeds 50 MiB."
+              exit 1
+            fi
+          done
 
       - name: Validate archives and generate pinned ABI metadata
         shell: bash
@@ -264,8 +266,11 @@ jobs:
           fi
           declare -A ARCH_MAP=(
             [armeabi-v7a]=arm
+            [arm64-v8a]=aarch64
+            [x86]=i686
+            [x86_64]=x86_64
           )
-          for abi in armeabi-v7a; do
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
             upstream_arch="${ARCH_MAP[$abi]}"
             if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
               source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
@@ -317,8 +322,9 @@ jobs:
           done
           if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != "true" ]]; then
             mkdir -p bootstrap-cache
-            for arch in arm; do
-              install -m 0644 "$root/armeabi-v7a/bootstrap.zip" "bootstrap-cache/bootstrap-arm.zip"
+            for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+              arch="${ARCH_MAP[$abi]}"
+              install -m 0644 "$root/$abi/bootstrap.zip" "bootstrap-cache/bootstrap-${arch}.zip"
             done
           fi
           find "$root" -type f -maxdepth 2 -print
