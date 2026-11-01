@@ -11,6 +11,9 @@ import java.util.Locale
 
 /** Installs a PRoot Android binary from a user-selected .tar.gz release archive. */
 class ProotInstaller(private val paths: LinuxRuntimePaths) {
+    /** Only for the hard-coded, version-pinned upstream HTTPS release downloader. */
+    fun installFromPinnedRelease(archive: File): String = install(archive, sha256(archive))
+
     fun install(archive: File, expectedSha256: String): String {
         require(archive.isFile && archive.length() > 0) { "PRoot archive is missing." }
         require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "A valid SHA-256 is required for the PRoot archive." }
