@@ -31,7 +31,7 @@ env:
 
 jobs:
   build-bootstrap:
-    name: Build and verify bootstrap for all Android ABIs
+    name: Build and verify arm32 bootstrap only
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -240,10 +240,10 @@ jobs:
           # force-clean path can expand an unset per-architecture cache path to /*.
           # A clean runner already guarantees that no stale package cache is reused.
           ./scripts/run-docker.sh ./scripts/build-bootstraps.sh \
-            --architectures "arm aarch64 i686 x86_64" 2>&1 | tee ../bootstrap-build.log
+            --architectures "arm" 2>&1 | tee ../bootstrap-build.log
           # Archive output is redirected to writable container /tmp above;
           # never depend on the mounted checkout being writable by builder.
-          for arch in arm aarch64 i686 x86_64; do
+          for arch in arm; do
             docker cp "termux-package-builder:/tmp/bootstrap-${arch}.zip" \
               "$GITHUB_WORKSPACE/bootstrap-${arch}.zip"
             test -s "$GITHUB_WORKSPACE/bootstrap-${arch}.zip"
@@ -266,11 +266,11 @@ jobs:
           fi
           declare -A ARCH_MAP=(
             [armeabi-v7a]=arm
-            [arm64-v8a]=aarch64
-            [x86]=i686
-            [x86_64]=x86_64
+            # [arm64-v8a]=aarch64
+            # [x86]=i686
+            # [x86_64]=x86_64
           )
-          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+          for abi in armeabi-v7a; do
             upstream_arch="${ARCH_MAP[$abi]}"
             if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" == "true" ]]; then
               source="bootstrap-cache/bootstrap-${upstream_arch}.zip"
@@ -322,7 +322,7 @@ jobs:
           done
           if [[ "${{ steps.bootstrap-cache.outputs.cache-hit }}" != "true" ]]; then
             mkdir -p bootstrap-cache
-            for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            for abi in armeabi-v7a; do
               arch="${ARCH_MAP[$abi]}"
               install -m 0644 "$root/$abi/bootstrap.zip" "bootstrap-cache/bootstrap-${arch}.zip"
             done
@@ -344,27 +344,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload arm64-v8a bootstrap
-        uses: actions/upload-artifact@v4
-        with:
-          name: bootstrap-arm64-v8a
-          path: bootstrap-artifacts/arm64-v8a/
-          if-no-files-found: error
-          retention-days: 7
+      # - name: Upload arm64-v8a bootstrap
+      # uses: actions/upload-artifact@v4
+      # with:
+      # name: bootstrap-arm64-v8a
+      # path: bootstrap-artifacts/arm64-v8a/
+      # if-no-files-found: error
+      # retention-days: 7
 
-      - name: Upload x86 bootstrap
-        uses: actions/upload-artifact@v4
-        with:
-          name: bootstrap-x86
-          path: bootstrap-artifacts/x86/
-          if-no-files-found: error
-          retention-days: 7
+      # - name: Upload x86 bootstrap
+      # uses: actions/upload-artifact@v4
+      # with:
+      # name: bootstrap-x86
+      # path: bootstrap-artifacts/x86/
+      # if-no-files-found: error
+      # retention-days: 7
 
-      - name: Upload x86_64 bootstrap
-        uses: actions/upload-artifact@v4
-        with:
-          name: bootstrap-x86_64
-          path: bootstrap-artifacts/x86_64/
-          if-no-files-found: error
-          retention-days: 7
+      # - name: Upload x86_64 bootstrap
+      # uses: actions/upload-artifact@v4
+      # with:
+      # name: bootstrap-x86_64
+      # path: bootstrap-artifacts/x86_64/
+      # if-no-files-found: error
+      # retention-days: 7
 
