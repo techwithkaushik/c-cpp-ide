@@ -102,7 +102,7 @@ dependencies {
     implementation(project(":feature:explorer"))
     implementation(project(":services:daemon"))
     implementation(project(":integrations:toolchain"))
-    implementation(project(":integrations:termux-runtime"))
+    implementation(project(":integrations:linux-runtime"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.concurrent.futures)
