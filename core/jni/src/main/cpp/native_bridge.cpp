@@ -214,7 +214,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
 
         std::vector<std::string> arguments = {
             linker, proot, "-r", rootfs, "-w", "/root",
-            "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys", shell, "-i"
+            "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys", "--", shell, "-i"
         };
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
