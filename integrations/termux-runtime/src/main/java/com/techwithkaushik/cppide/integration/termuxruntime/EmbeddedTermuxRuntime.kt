@@ -39,11 +39,15 @@ data class RuntimeLayout private constructor(
         extraPathEntries: List<File> = emptyList(),
     ): Map<String, String> {
         val pathEntries = (listOf(bin) + extraPathEntries).map { it.absolutePath }
+        val libraryPath = File(prefix, "lib").absolutePath
         return inherited.toMutableMap().apply {
             put("PREFIX", prefix.absolutePath)
             put("TERMUX_PREFIX", prefix.absolutePath)
             put("HOME", home.absolutePath)
             put("TMPDIR", temporaryDirectory.absolutePath)
+            put("SHELL", inherited["SHELL"] ?: shell.absolutePath)
+            put("LD_LIBRARY_PATH", listOf(libraryPath, inherited["LD_LIBRARY_PATH"])
+                .filterNotNull().filter { it.isNotBlank() }.distinct().joinToString(File.pathSeparator))
             put("PATH", (pathEntries + inherited["PATH"].orEmpty().split(File.pathSeparator)
                 .filter { it.isNotBlank() }).distinct().joinToString(File.pathSeparator))
             put("LANG", inherited["LANG"] ?: "C.UTF-8")
