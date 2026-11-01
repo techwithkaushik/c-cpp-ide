@@ -7,7 +7,16 @@ import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
@@ -16,12 +25,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -129,7 +140,6 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
     }
 
     val home = remember(layout) { layout.home.apply { mkdirs() } }
-    val terminalClient = remember(appContext) { IdeTermuxSessionClient(appContext) }
     val environment = remember(layout, shell) {
         layout.environment(
             inherited = mapOf("TERM" to "xterm-256color", "COLORTERM" to "truecolor"),
@@ -137,61 +147,186 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
         ).map { (key, value) -> "$key=$value" }.toTypedArray()
     }
     val linker = remember { AndroidRuntimeLauncher.systemLinker }
-    // TerminalSession passes this array directly as argv[] to execvp().
-    // Since the executable is the Android linker, argv[0] must be the linker,
-    // argv[1] the Termux shell ELF, and only then shell flags such as --login.
-    val sessionArguments = remember(linker, shell, shellArguments) {
-        arrayOf(linker.absolutePath, shell.absolutePath, *shellArguments)
-    }
-    val session = remember(shell, home, environment.contentHashCode()) {
-        TerminalSession(
-            linker.absolutePath,
-            home.absolutePath,
-            sessionArguments,
-            environment,
-            2_000,
-            terminalClient
-        )
+    val shellArguments = remember(shell) {
+        if (shell.name == "bash") arrayOf("--login") else emptyArray()
     }
 
-    DisposableEffect(session, terminalClient) {
-        onDispose {
-            terminalClient.attach(null)
-            session.finishIfRunning()
+    // This registry lives for the app process, not for the bottom-panel
+    // composition. Hiding/reopening the panel only detaches the view; sessions
+    // keep running with their scrollback, cwd, environment and foreground job.
+    val tabs = TerminalSessionRegistry.tabs
+    val selectedTabId = TerminalSessionRegistry.selectedTabId
+    androidx.compose.runtime.LaunchedEffect(runtimeStatus.ready, shell.absolutePath, home.absolutePath, environment.contentHashCode()) {
+        if (runtimeStatus.ready && tabs.isEmpty()) {
+            TerminalSessionRegistry.createTab(
+                appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+            )
         }
     }
 
-    AndroidView(
+    Column(
         modifier = modifier.fillMaxSize().background(Color(0xFF0D1117)),
-        factory = { viewContext ->
-            TerminalView(viewContext, null).apply {
-                setTextSize(terminalFontSize)
-                setTypeface(Typeface.MONOSPACE)
-                setTerminalViewClient(IdeTermuxViewClient(viewContext))
-                terminalClient.attach(this)
-                attachSession(session)
-                isFocusable = true
-                isFocusableInTouchMode = true
-                post {
-                    requestFocus()
-                    if (autoShowKeyboard) {
-                        postDelayed({
-                            (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
-                                android.view.inputmethod.InputMethodManager)
-                                ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-                        }, 180L)
-                    }
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            tabs.forEach { tab ->
+                Row(
+                    modifier = Modifier
+                        .background(
+                            if (tab.id == selectedTabId) Color(0xFF173D5C) else Color(0xFF151B23),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { TerminalSessionRegistry.select(tab.id) }
+                        .padding(start = 10.dp, end = 7.dp, top = 7.dp, bottom = 7.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text(
+                        tab.title,
+                        color = if (tab.id == selectedTabId) Color(0xFFE8EDF5) else Color(0xFF9AA8BA),
+                        fontWeight = if (tab.id == selectedTabId) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        "×",
+                        color = Color(0xFF9AA8BA),
+                        modifier = Modifier.clickable { TerminalSessionRegistry.closeTab(tab.id) }
+                    )
                 }
             }
-        },
-        update = { view ->
-            // Settings can change while this composable is absent; reapply live values on return.
-            if (view.mTermSession !== session) view.attachSession(session)
-            view.setTextSize(terminalFontSize)
+            Text(
+                "+",
+                color = Color(0xFF9CBEFF),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .background(Color(0xFF151B23), RoundedCornerShape(8.dp))
+                    .clickable {
+                        TerminalSessionRegistry.createTab(
+                            appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                        )
+                    }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
         }
-    )
+
+        val activeTab = tabs.firstOrNull { it.id == selectedTabId }
+        if (activeTab == null) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("No terminal sessions", color = Color(0xFFE8EDF5))
+                Button(onClick = {
+                    TerminalSessionRegistry.createTab(
+                        appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                    )
+                }) { Text("New terminal") }
+            }
+        } else {
+            DisposableEffect(activeTab.id, activeTab.client) {
+                onDispose {
+                    // Detach only. Do NOT finish the process when the panel is
+                    // hidden or the user switches to Editor/another panel.
+                    activeTab.client.attach(null)
+                }
+            }
+            AndroidView(
+                modifier = Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0D1117)),
+                factory = { viewContext ->
+                    TerminalView(viewContext, null).apply {
+                        setTextSize(terminalFontSize)
+                        setTypeface(Typeface.MONOSPACE)
+                        setTerminalViewClient(IdeTermuxViewClient(viewContext))
+                        activeTab.client.attach(this)
+                        attachSession(activeTab.session)
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        post {
+                            requestFocus()
+                            if (autoShowKeyboard) {
+                                postDelayed({
+                                    (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                                        android.view.inputmethod.InputMethodManager)
+                                        ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                                }, 180L)
+                            }
+                        }
+                    }
+                },
+                update = { view ->
+                    activeTab.client.attach(view)
+                    if (view.mTermSession !== activeTab.session) view.attachSession(activeTab.session)
+                    view.setTextSize(terminalFontSize)
+                }
+            )
+        }
+    }
 }
 
+
+private data class TerminalTab(
+    val id: Int,
+    val title: String,
+    val session: TerminalSession,
+    val client: IdeTermuxSessionClient,
+)
+
+/**
+ * Process-scoped terminal sessions. A panel composable is disposable; a shell
+ * session is not. Sessions are intentionally finished only when the user closes
+ * their tab or Android kills the app process.
+ */
+private object TerminalSessionRegistry {
+    val tabs = mutableStateListOf<TerminalTab>()
+    var selectedTabId by mutableIntStateOf(0)
+        private set
+    private var nextId = 1
+
+    fun select(id: Int) {
+        if (tabs.any { it.id == id }) selectedTabId = id
+    }
+
+    fun createTab(
+        context: Context,
+        linker: File,
+        shell: File,
+        shellArguments: Array<String>,
+        home: File,
+        environment: Array<String>,
+        terminalFontSize: Int,
+    ) {
+        val id = nextId++
+        val client = IdeTermuxSessionClient(context.applicationContext)
+        // TerminalSession passes argv[] directly to execvp. argv[0] is the
+        // linker, followed by the embedded shell ELF and its optional flags.
+        val args = arrayOf(linker.absolutePath, shell.absolutePath, *shellArguments)
+        val session = TerminalSession(
+            linker.absolutePath,
+            home.absolutePath,
+            args,
+            environment.copyOf(),
+            2_000,
+            client
+        )
+        tabs.add(TerminalTab(id, "Terminal $id", session, client))
+        selectedTabId = id
+    }
+
+    fun closeTab(id: Int) {
+        val index = tabs.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val removed = tabs.removeAt(index)
+        removed.client.attach(null)
+        removed.session.finishIfRunning()
+        if (selectedTabId == id) {
+            selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
+                ?: tabs.lastOrNull()?.id
+                ?: 0
+        }
+    }
+}
 
 private class IdeTermuxSessionClient(
     private val context: Context
