@@ -1799,6 +1799,10 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
 
 @Composable
 private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit, onClose: () -> Unit, onOpenSettings: () -> Unit) {
+    // The terminal view can hold focus and consume Android Back as Escape.
+    // Give the open tool panel an explicit Back handler so it always dismisses.
+    BackHandler(onBack = onClose)
+
     val title = when (selected) {
         ToolPanel.Terminal -> "Terminal"
         ToolPanel.Build -> "Build"
