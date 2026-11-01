@@ -81,8 +81,7 @@ internal fun IdeSettingsScreen(
         ) {
             TextButton(onClick = onBack) { Text("‹ Back", color = SettingsAccent) }
             Column(Modifier.weight(1f)) {
-                Text("Settings", color = SettingsText, fontSize = 20.sp)
-                Text("Configure the entire coding environment", color = SettingsMuted, fontSize = 11.sp)
+                Text("Settings", color = SettingsText, fontSize = 22.sp)
             }
             TextButton(onClick = { category = "Overview" }) {
                 Text("Overview", color = SettingsMuted)
