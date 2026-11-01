@@ -129,7 +129,7 @@ class BootstrapInstaller(
 
             setExecutableBits(staging, prefixDirectory)
             validateBootstrapLayout(staging)
-            if (requireSymlinkManifest) validateTermuxSymlinkLayout(staging, symlinkCount)
+            if (requireSymlinkManifest) validateTermuxSymlinkLayout(staging, prefixDirectory, symlinkCount)
 
             // Keep the previous prefix until the staged tree is ready. Renames
             // are within the same parent filesystem, so promotion is atomic per rename.
@@ -322,7 +322,7 @@ class BootstrapInstaller(
      * Validate canonical Termux command aliases after replaying SYMLINKS.txt.
      * Termux bootstrap normally exposes bin/sh as a symlink to dash.
      */
-    private fun validateTermuxSymlinkLayout(root: File, symlinkCount: Int) {
+    private fun validateTermuxSymlinkLayout(root: File, finalPrefixDirectory: File, symlinkCount: Int) {
         if (symlinkCount == 0) {
             throw IOException("SYMLINKS.txt contained no symlinks; bootstrap extraction is incomplete")
         }
@@ -331,7 +331,7 @@ class BootstrapInstaller(
             throw IOException("Termux bootstrap expected bin/sh symlink from SYMLINKS.txt, but it was not created")
         }
         val rawTarget = java.nio.file.Files.readSymbolicLink(shell.toPath())
-        val finalPrefix = File(root.parentFile, root.name).toPath().toAbsolutePath().normalize()
+        val finalPrefix = finalPrefixDirectory.toPath().toAbsolutePath().normalize()
         val targetPath = if (rawTarget.isAbsolute) rawTarget.toAbsolutePath().normalize()
             else shell.toPath().parent.resolve(rawTarget).toAbsolutePath().normalize()
         val stagedTarget = if (targetPath.startsWith(finalPrefix)) {
