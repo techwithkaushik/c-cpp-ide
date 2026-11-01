@@ -239,7 +239,9 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                     TerminalView(viewContext, null).apply {
                         setTextSize(terminalFontSize)
                         setTypeface(Typeface.MONOSPACE)
-                        setTerminalViewClient(IdeTermuxViewClient(viewContext))
+                        val terminalViewClient = IdeTermuxViewClient(viewContext)
+                        setTerminalViewClient(terminalViewClient)
+                        terminalViewClient.attachView(this)
                         activeTab.client.attach(this)
                         attachSession(activeTab.session)
                         isFocusable = true
@@ -380,8 +382,28 @@ private class IdeTermuxSessionClient(
 private class IdeTermuxViewClient(
     private val context: Context
 ) : TerminalViewClient {
+    @Volatile private var terminalView: TerminalView? = null
+
+    fun attachView(view: TerminalView?) {
+        terminalView = view
+    }
+
     override fun onScale(scale: Float): Float = scale
-    override fun onSingleTapUp(e: MotionEvent) = Unit
+
+    // Match Termux: tapping the terminal focuses the emulator and opens the
+    // Android IME again after it has been dismissed with Back.
+    override fun onSingleTapUp(e: MotionEvent) {
+        val view = terminalView ?: return
+        view.post {
+            view.requestFocus()
+            val inputMethodManager = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+                as? android.view.inputmethod.InputMethodManager
+            inputMethodManager?.showSoftInput(
+                view,
+                android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
+            )
+        }
+    }
     // Android Back is handled by the IDE panel, not injected as Escape into
     // the shell. Escape here can leave readline/completion prompts in a bad state.
     override fun shouldBackButtonBeMappedToEscape(): Boolean = false
