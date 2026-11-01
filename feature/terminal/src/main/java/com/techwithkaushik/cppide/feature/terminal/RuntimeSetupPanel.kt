@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotInstaller
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
 import com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader
@@ -87,10 +88,16 @@ fun RuntimeSetupPanel(
     ) { prootUri = it }
 
     LaunchedEffect(context) {
-        status = if (paths.ready()) {
-            "Ubuntu rootfs and PRoot are present. Runtime verification is performed when a local shell starts."
-        } else {
-            "Ubuntu setup is incomplete. Import an Ubuntu rootfs archive and a SHA-256-verified Android PRoot release archive."
+        status = withContext(Dispatchers.IO) {
+            when {
+                !paths.hasRootfs() -> "Ubuntu rootfs is not installed."
+                !paths.hasProot() -> "Ubuntu rootfs is present; PRoot is missing."
+                else -> {
+                    val smoke = LinuxRuntimeSmokeTest(paths).run()
+                    if (smoke.success) "Ubuntu shell smoke test passed."
+                    else "Ubuntu runtime validation failed: ${smoke.error ?: smoke.output}"
+                }
+            }
         }
     }
 
@@ -117,7 +124,15 @@ fun RuntimeSetupPanel(
                 }
                 status = result
                 busy = false
-                if (paths.ready()) onRuntimeReady()
+                if (paths.ready()) {
+                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
+                    if (smoke.success) {
+                        status = "Ubuntu shell smoke test passed."
+                        onRuntimeReady()
+                    } else {
+                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                    }
+                }
             }
         }) { Text("Download official Ubuntu Base 24.04.5") }
         Button(enabled = !busy, onClick = {
@@ -134,7 +149,15 @@ fun RuntimeSetupPanel(
                 }
                 status = result
                 busy = false
-                if (paths.ready()) onRuntimeReady()
+                if (paths.ready()) {
+                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
+                    if (smoke.success) {
+                        status = "Ubuntu shell smoke test passed."
+                        onRuntimeReady()
+                    } else {
+                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                    }
+                }
             }
         }) { Text("Download pinned Android PRoot") }
         Text("Ubuntu rootfs checksum is verified against Ubuntu's official SHA256SUMS. PRoot uses the fixed upstream proot-rs v0.1.0 Android release because that upstream release does not publish an asset digest.", color = Color(0xFF9AA7B5), fontSize = 11.sp)
@@ -210,7 +233,15 @@ fun RuntimeSetupPanel(
                 }
                 status = result
                 busy = false
-                if (paths.ready()) onRuntimeReady()
+                if (paths.ready()) {
+                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
+                    if (smoke.success) {
+                        status = "Ubuntu shell smoke test passed."
+                        onRuntimeReady()
+                    } else {
+                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                    }
+                }
             }
         }) { Text("Verify and install PRoot") }
 
