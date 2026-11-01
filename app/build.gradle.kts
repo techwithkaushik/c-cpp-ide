@@ -42,7 +42,6 @@ android {
         }
     }
 
-    // Keep Java and Kotlin output compatible across CI and local builds.
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
@@ -59,8 +58,11 @@ android {
                 ?: error("SIGNING_KEY_PASSWORD repository secret is required")
             val signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
                 ?: error("SIGNING_STORE_PASSWORD repository secret is required")
-            storeFile = file(signingStore)
-            require(storeFile.isFile) { "Release keystore does not exist: $signingStore" }
+            val keystoreFile = file(signingStore)
+            require(keystoreFile.isFile) {
+                "Release keystore does not exist: $signingStore"
+            }
+            storeFile = keystoreFile
             keyAlias = signingAlias
             keyPassword = signingKeyPassword
             storePassword = signingStorePassword
@@ -69,9 +71,7 @@ android {
 
     buildTypes {
         getByName("release") {
-            // Release artifacts must always use the repository-provided signing keystore.
             signingConfig = signingConfigs.getByName("release")
-            // Keep the distributed APK small; the bootstrap is installed separately by the user.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
@@ -90,8 +90,6 @@ kotlin {
     }
 }
 
-// Android's dependency checker sees this empty compatibility artifact as a duplicate
-// of the real ListenableFuture class already bundled in Guava. Exclude the stub.
 configurations.configureEach {
     exclude(group = "com.google.guava", module = "listenablefuture")
 }
@@ -107,7 +105,6 @@ dependencies {
     implementation(project(":integrations:termux-runtime"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
-    // ProfileInstaller requires this class at runtime on API 29 as well as newer Android.
     implementation(libs.androidx.concurrent.futures)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
