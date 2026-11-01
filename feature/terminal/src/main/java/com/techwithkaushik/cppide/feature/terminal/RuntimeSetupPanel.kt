@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotInstaller
+import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
+import com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader
 import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -101,6 +103,42 @@ fun RuntimeSetupPanel(
             "This branch does not use Termux or its app-private prefix. Rootfs and PRoot are stored under this app's files/linux-runtime directory. Import an Ubuntu .tar, .tar.gz or .tar.xz rootfs and a PRoot Android .tar.gz archive. The PRoot archive must be verified with its SHA-256 before installation.",
             color = Color(0xFFE8EDF5), fontSize = 12.sp
         )
+        Button(enabled = !busy, onClick = {
+            busy = true
+            status = "Downloading official Ubuntu Base and verifying SHA256SUMS…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        val installed = UbuntuBaseDownloader(paths).downloadAndInstall()
+                        "Ubuntu Base installed and SHA-256 verified (${installed.bytes / (1024 * 1024)} MiB). Install PRoot to launch a local shell."
+                    } catch (e: Exception) {
+                        "Ubuntu download failed: ${e.message ?: e.javaClass.simpleName}"
+                    }
+                }
+                status = result
+                busy = false
+                if (paths.ready()) onRuntimeReady()
+            }
+        }) { Text("Download official Ubuntu Base 24.04.5") }
+        Button(enabled = !busy, onClick = {
+            busy = true
+            status = "Downloading pinned upstream Android PRoot…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        val installed = ProotDownloader(paths).downloadAndInstall()
+                        "${installed.release} installed (SHA-256 ${installed.sha256.take(16)}…). The upstream asset currently publishes no SHA-256 digest; the release URL and version are pinned."
+                    } catch (e: Exception) {
+                        "PRoot download failed: ${e.message ?: e.javaClass.simpleName}"
+                    }
+                }
+                status = result
+                busy = false
+                if (paths.ready()) onRuntimeReady()
+            }
+        }) { Text("Download pinned Android PRoot") }
+        Text("Ubuntu rootfs checksum is verified against Ubuntu's official SHA256SUMS. PRoot uses the fixed upstream proot-rs v0.1.0 Android release because that upstream release does not publish an asset digest.", color = Color(0xFF9AA7B5), fontSize = 11.sp)
+
         Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
             Text(if (rootfsUri == null) "1 · Select Ubuntu rootfs archive" else "Change Ubuntu rootfs")
         }
