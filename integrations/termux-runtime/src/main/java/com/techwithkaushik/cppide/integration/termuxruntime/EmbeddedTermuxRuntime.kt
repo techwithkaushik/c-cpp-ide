@@ -46,11 +46,16 @@ data class RuntimeLayout private constructor(
             put("TMPDIR", temporaryDirectory.absolutePath)
             put("SHELL", inherited["SHELL"] ?: shell.absolutePath)
 
-            // Match Termux's Android execution environment: do not export
-            // PREFIX/lib through LD_LIBRARY_PATH on Android 7+, because it can
-            // make the system linker load incompatible libraries. Termux ELF
-            // binaries use their packaged RUNPATH for their shared libraries.
-            remove("LD_LIBRARY_PATH")
+            // App-specific bootstrap binaries use their own RUNPATH. Stock
+            // Termux ZIPs contain ELF RUNPATHs pointing at com.termux, so add
+            // this app's lib directory only for that imported bootstrap type.
+            // This keeps the default app bootstrap on Termux's normal path.
+            val sourceMarker = File(prefix, ".ide-bootstrap-source")
+            if (sourceMarker.isFile && sourceMarker.readText(Charsets.UTF_8).trim() == "stock-termux") {
+                put("LD_LIBRARY_PATH", File(prefix, "lib").absolutePath)
+            } else {
+                remove("LD_LIBRARY_PATH")
+            }
 
             // Android 10+ blocks direct execve() of writable app-data files for
             // targetSdk >= 29. The initial shell must use the system linker;
