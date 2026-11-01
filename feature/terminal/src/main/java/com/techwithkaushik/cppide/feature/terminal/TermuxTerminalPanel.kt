@@ -82,7 +82,7 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
                         if (installFailure == null) RuntimeStatus(true, "")
                         else RuntimeStatus(
                             ready = false,
-                            message = smokeTest.failureReason ?: installFailure
+                            message = installFailure
                         )
                     }
                 }
@@ -190,6 +190,7 @@ private fun installBundledBootstrap(
     runtime: EmbeddedTermuxRuntime
 ): String? {
     val stagedArchive = File(context.cacheDir, "bundled-termux-bootstrap.zip")
+    var smokeResult: BootstrapSmokeTest.Result? = null
     return try {
         val metadata = context.assets.open("bootstrap/bootstrap.json")
             .bufferedReader().use { JSONObject(it.readText()) }
@@ -207,11 +208,18 @@ private fun installBundledBootstrap(
         }
         runtime.installBootstrap(stagedArchive, sha256) {
             runtime.layout.ensurePrivateDirectories()
-            BootstrapSmokeTest(runtime).run().success
+            smokeResult = BootstrapSmokeTest(runtime).run()
+            smokeResult?.success == true
         }
         null
     } catch (error: Exception) {
-        "Embedded runtime setup failed: ${error.message ?: error.javaClass.simpleName}. Rebuild/install the APK with its matching bootstrap assets."
+        val smokeFailure = smokeResult?.takeIf { !it.success }?.let { result ->
+            listOfNotNull(
+                result.failureReason,
+                result.stderr.trim().takeIf { it.isNotBlank() }?.let { "stderr: ${it.take(240)}" }
+            ).joinToString(" — ")
+        }
+        smokeFailure ?: "Embedded runtime setup failed: ${error.message ?: error.javaClass.simpleName}. Rebuild/install the APK with its matching bootstrap assets."
     } finally {
         stagedArchive.delete()
     }
