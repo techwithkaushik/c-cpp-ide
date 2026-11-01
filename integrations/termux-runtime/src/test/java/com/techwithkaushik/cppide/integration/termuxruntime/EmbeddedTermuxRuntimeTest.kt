@@ -32,7 +32,7 @@ class EmbeddedTermuxRuntimeTest {
         val files = File(temp.root, "app-files")
         assertTrue(files.mkdirs())
         val layout = RuntimeLayout.fromAppFilesDirectory(files)
-        val env = layout.environment(mapOf("LANG" to "en_US.UTF-8", "PATH" to "/system/bin"))
+        val env = layout.environment(mapOf("LANG" to "en_US.UTF-8", "PATH" to "/system/bin", "LD_LIBRARY_PATH" to "/incompatible/lib"))
 
         assertEquals(layout.prefix.absolutePath, env["PREFIX"])
         assertEquals(layout.prefix.absolutePath, env["TERMUX_PREFIX"])
@@ -41,5 +41,6 @@ class EmbeddedTermuxRuntimeTest {
         assertTrue(env["PATH"]!!.startsWith(File(layout.prefix, "bin").absolutePath))
         assertTrue(env["PATH"]!!.contains("/system/bin"))
         assertEquals("en_US.UTF-8", env["LANG"])
+        assertFalse("Android Termux runtime must not export PREFIX/lib through LD_LIBRARY_PATH", env.containsKey("LD_LIBRARY_PATH"))
     }
 }
