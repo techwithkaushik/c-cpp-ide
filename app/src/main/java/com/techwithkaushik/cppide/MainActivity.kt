@@ -195,9 +195,9 @@ private fun IdeUiPrototype() {
     var commandQuery by rememberSaveable { mutableStateOf("") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchInProject by rememberSaveable { mutableStateOf(false) }
-    var editorFontSize by rememberSaveable { mutableStateOf(14f) }
-    var editorWordWrap by rememberSaveable { mutableStateOf(false) }
-    var editorTheme by rememberSaveable { mutableStateOf("Dark+ (VS Code)") }
+    var editorFontSize by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getFloat("editor_font_size", 14f)) }
+    var editorWordWrap by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getBoolean("editor_word_wrap", false)) }
+    var editorTheme by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences("ide_settings", 0).getString("editor_theme", "Dark+ (VS Code)") ?: "Dark+ (VS Code)") }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     val projects = remember(projectStorage) {
@@ -1495,7 +1495,12 @@ private fun WorkspaceScreen(
                 ToolPanelContent(
                     selected = selectedPanel,
                     onSelect = onPanel,
-                    onClose = onCloseToolPanel
+                    onClose = onCloseToolPanel,
+                    onOpenSettings = {
+                        settingsReturnScreen = screen
+                        screen = IdeScreen.Settings
+                        onCloseToolPanel()
+                    }
                 )
             }
         }
@@ -1762,7 +1767,7 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
 }
 
 @Composable
-private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit, onClose: () -> Unit) {
+private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit, onClose: () -> Unit, onOpenSettings: () -> Unit) {
     val title = when (selected) {
         ToolPanel.Terminal -> "Terminal"
         ToolPanel.Build -> "Build"
@@ -1797,7 +1802,7 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         }
         when (selected) {
             ToolPanel.Terminal -> {
-                TermuxTerminalPanel(Modifier.weight(1f).fillMaxWidth())
+                TermuxTerminalPanel(Modifier.weight(1f).fillMaxWidth(), onOpenSettings = onOpenSettings)
             }
             ToolPanel.Build -> {
                 ToolStatusCard("BUILD STATUS", "Waiting for runtime", "Build tools are resolved from the active file and workspace.", "Language toolchain · Not active", IdeAccent)
