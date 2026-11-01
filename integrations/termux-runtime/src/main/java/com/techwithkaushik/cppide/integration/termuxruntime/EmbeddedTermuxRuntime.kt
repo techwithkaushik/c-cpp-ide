@@ -95,7 +95,7 @@ data class RuntimeLayout private constructor(
  */
 class EmbeddedTermuxRuntime(
     appFilesDirectory: File,
-    private val installer: BootstrapInstaller = BootstrapInstaller(),
+    private val installer: BootstrapInstaller = BootstrapInstaller(requireSymlinkManifest = true),
 ) {
     val layout: RuntimeLayout = RuntimeLayout.fromAppFilesDirectory(appFilesDirectory)
 
