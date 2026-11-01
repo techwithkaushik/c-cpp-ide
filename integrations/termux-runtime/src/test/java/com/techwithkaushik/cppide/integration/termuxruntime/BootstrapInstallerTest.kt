@@ -55,6 +55,26 @@ class BootstrapInstallerTest {
     }
 
     @Test
+    fun preservesPreviousRuntimeWhenStagedArchiveIsInvalid() {
+        val prefix = File(temp.root, "runtime/usr")
+        assertTrue(prefix.mkdirs())
+        File(prefix, "existing-runtime.txt").writeText("known-good")
+        val archive = createArchive(
+            "bin/sh" to "new shell",
+            "etc/profile" to "profile",
+            // Missing lib/ and share/: validation must fail before promotion.
+        )
+
+        assertThrows(java.io.IOException::class.java) {
+            BootstrapInstaller().install(archive, sha256(archive), prefix)
+        }
+
+        assertEquals("known-good", File(prefix, "existing-runtime.txt").readText())
+        assertFalse(File(prefix, "bin/sh").exists())
+        assertTrue(temp.root.walkTopDown().none { it.name.startsWith(".usr.staging-") })
+    }
+
+    @Test
     fun remapsAppSpecificAbsoluteSymlinkIntoPrivatePrefix() {
         val archive = createArchive(
             "bin/sh" to "shell",
