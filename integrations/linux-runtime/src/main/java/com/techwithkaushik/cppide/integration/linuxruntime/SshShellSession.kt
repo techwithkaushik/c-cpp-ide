@@ -80,7 +80,12 @@ class SshShellSession private constructor(private val session: Session, private 
                 session.connect(15_000)
             } catch (error: Exception) {
                 session.disconnect()
-                repository.presentedFingerprint?.let { throw HostKeyConfirmationRequired(it) }
+                repository.presentedFingerprint?.let { presented ->
+                    if (host.expectedSha256Fingerprint == null) throw HostKeyConfirmationRequired(presented)
+                    if (!MessageDigest.isEqual(host.expectedSha256Fingerprint.toByteArray(), presented.toByteArray())) {
+                        throw SecurityException("SSH host key changed. Expected ${host.expectedSha256Fingerprint}, received $presented.")
+                    }
+                }
                 throw error
             }
             val channel = session.openChannel("shell") as ChannelShell
@@ -99,8 +104,11 @@ private class PinningHostKeyRepository(private val expected: String?) : HostKeyR
         val fingerprint = "SHA256:" + Base64.getEncoder().withoutPadding()
             .encodeToString(MessageDigest.getInstance("SHA-256").digest(key))
         presentedFingerprint = fingerprint
-        return if (expected != null && MessageDigest.isEqual(expected.toByteArray(), fingerprint.toByteArray()))
-            HostKeyRepository.OK else HostKeyRepository.NOT_INCLUDED
+        return when {
+            expected == null -> HostKeyRepository.NOT_INCLUDED
+            MessageDigest.isEqual(expected.toByteArray(), fingerprint.toByteArray()) -> HostKeyRepository.OK
+            else -> HostKeyRepository.CHANGED
+        }
     }
     override fun add(hostkey: HostKey, userinfo: com.jcraft.jsch.UserInfo?) = Unit
     override fun remove(host: String, type: String) = Unit
