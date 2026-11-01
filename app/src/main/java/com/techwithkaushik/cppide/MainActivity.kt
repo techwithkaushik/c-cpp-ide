@@ -99,7 +99,7 @@ private val IdeAccent = Color(0xFF659AD2)
 private val IdeMuted = Color(0xFF9AA8BA)
 private val IdeGreen = Color(0xFF7DDBB0)
 
-private enum class IdeScreen { Welcome, Projects, Workspace }
+private enum class IdeScreen { Welcome, Projects, Workspace, Settings }
 private enum class ToolPanel { Terminal, Build, Problems, Output }
 
 private data class IdeProject(val name: String, val language: String, val path: String, val updated: String)
@@ -186,7 +186,7 @@ private fun IdeUiPrototype() {
             code = fileContents[next] ?: sampleCode(next).also { fileContents[next] = it }
         }
     }
-    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var settingsReturnScreen by rememberSaveable { mutableStateOf(IdeScreen.Projects) }
     var showSourceControl by rememberSaveable { mutableStateOf(false) }
     var showExtensions by rememberSaveable { mutableStateOf(false) }
     var extensionQuery by rememberSaveable { mutableStateOf("") }
@@ -220,6 +220,7 @@ private fun IdeUiPrototype() {
             when (screen) {
                 IdeScreen.Workspace -> screen = IdeScreen.Projects
                 IdeScreen.Projects -> screen = IdeScreen.Welcome
+                IdeScreen.Settings -> screen = settingsReturnScreen
                 IdeScreen.Welcome -> Unit
             }
         }
@@ -274,6 +275,17 @@ private fun IdeUiPrototype() {
             IdeScreen.Welcome -> WelcomeScreen(
                 onNext = { screen = IdeScreen.Projects }
             )
+            IdeScreen.Settings -> IdeSettingsScreen(
+                editorFontSize = editorFontSize,
+                onEditorFontSizeChange = { editorFontSize = it },
+                editorWordWrap = editorWordWrap,
+                onEditorWordWrapChange = { editorWordWrap = it },
+                editorTheme = editorTheme,
+                onEditorThemeChange = { editorTheme = it },
+                projectName = selectedProject,
+                onBack = { screen = settingsReturnScreen },
+                onRuntimeReady = { }
+            )
             IdeScreen.Projects -> ProjectListScreen(
                 projects = projects,
                 onOpen = { project ->
@@ -298,7 +310,7 @@ private fun IdeUiPrototype() {
                     screen = IdeScreen.Workspace
                 },
                 onNew = { newProjectDialog = true },
-                onSettings = { showSettings = true }
+                onSettings = { settingsReturnScreen = screen; screen = IdeScreen.Settings }
             )
             else -> Unit
         }
@@ -379,7 +391,7 @@ private fun IdeUiPrototype() {
                                         OutlinedButton(onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Run / Output") }
                                     }
                                     "Extensions" -> Text("Extension installation is not available yet.", color = IdeMuted, fontSize = 12.sp)
-                                    "Settings" -> Button(onClick = { showSettings = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Open settings") }
+                                    "Settings" -> Button(onClick = { settingsReturnScreen = screen; screen = IdeScreen.Settings; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Open settings") }
                                 }
                             }
                         }
@@ -419,7 +431,7 @@ private fun IdeUiPrototype() {
                                 fileContents[activeFile] = code
                                 dirtyFiles.toList().forEach { file -> runCatching { projectStorage.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
                             }
-                            "Settings" -> showSettings = true
+                            "Settings" -> settingsReturnScreen = screen; screen = IdeScreen.Settings
                             "File Explorer" -> { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } }
                             "Sync Project" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                             "Cancel Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
@@ -650,164 +662,6 @@ private fun IdeUiPrototype() {
                     }
                 },
                 confirmButton = { TextButton(onClick = { showExtensions = false }) { Text("Done", color = IdeAccent) } }
-            )
-        }
-        if (showSettings) {
-            var settingsCategory by rememberSaveable { mutableStateOf("Editor") }
-            var pathLanguage by rememberSaveable { mutableStateOf("python") }
-            var pathRole by rememberSaveable { mutableStateOf(LanguageToolingCatalog.Role.LanguageServer.name) }
-            var toolPathValue by rememberSaveable { mutableStateOf("") }
-            var toolPathStatus by rememberSaveable { mutableStateOf("") }
-            val toolPathPreferences = remember(appContext) { ToolPathPreferences(appContext) }
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { showSettings = false },
-                containerColor = IdeSurface,
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Settings", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold)
-                        Text("Configure your coding workspace", color = IdeMuted, fontSize = 12.sp)
-                    }
-                },
-                text = {
-                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("Editor", "Languages", "Build", "Appearance").forEach { category ->
-                                if (settingsCategory == category) {
-                                    Button(onClick = { settingsCategory = category }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 7.dp)) { Text(category, fontSize = 11.sp) }
-                                } else {
-                                    OutlinedButton(onClick = { settingsCategory = category }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 7.dp)) { Text(category, fontSize = 11.sp) }
-                                }
-                            }
-                        }
-                        Divider(color = IdeSurfaceRaised)
-                        when (settingsCategory) {
-                            "Editor" -> {
-                                Text("EDITOR", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Text("Font size: ${editorFontSize.toInt()} sp", color = Color(0xFFE8EDF5))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { editorFontSize = (editorFontSize - 1f).coerceAtLeast(10f) }) { Text("A− Smaller") }
-                                    OutlinedButton(onClick = { editorFontSize = (editorFontSize + 1f).coerceAtMost(24f) }) { Text("A+ Larger") }
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text("Word wrap", color = Color(0xFFE8EDF5))
-                                        Text("Wrap long source lines", color = IdeMuted, fontSize = 12.sp)
-                                    }
-                                    androidx.compose.material3.Switch(checked = editorWordWrap, onCheckedChange = { editorWordWrap = it })
-                                }
-                                Text("Color theme", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Medium)
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
-                                        Row(
-                                            Modifier.fillMaxWidth()
-                                                .background(if (editorTheme == theme) IdeSurfaceRaised else Color.Transparent, RoundedCornerShape(8.dp))
-                                                .clickable { editorTheme = theme }
-                                                .padding(horizontal = 10.dp, vertical = 9.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Box(Modifier.size(18.dp).background(
-                                                when (theme) {
-                                                    "Light+ (VS Code)" -> Color(0xFFF3F3F3)
-                                                    "Monokai" -> Color(0xFF272822)
-                                                    "Solarized Dark" -> Color(0xFF002B36)
-                                                    else -> Color(0xFF1E1E1E)
-                                                }, CircleShape
-                                            ))
-                                            Spacer(Modifier.width(10.dp))
-                                            Text(theme, color = Color(0xFFE8EDF5), fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                            if (editorTheme == theme) IdeIcon("check", IdeAccent, 17.dp)
-                                        }
-                                    }
-                                }
-                                SettingsInfoRow("Editor font", "Monospace · fixed-width characters")
-                                SettingsInfoRow("Editor engine", "Sora code editor")
-                            }
-                            "Languages" -> {
-                                Text("LANGUAGE SUPPORT", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                SettingsInfoRow("Editor scope", "Multi-language code and text editor")
-                                SettingsInfoRow("File types", "C/C++, Python, Java, Kotlin, JS/TS, HTML/CSS, JSON, Markdown, and more")
-                                SettingsInfoRow("Language services", "Completion, diagnostics, formatting and linting use language-specific tools")
-                                Text("EXTERNAL TOOL PATHS", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Text("Select a language and tool role, then enter an absolute executable path for a tool you already downloaded.", color = IdeMuted, fontSize = 11.sp)
-                                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    LanguageToolingCatalog.all().forEach { spec ->
-                                        if (pathLanguage == spec.id) Button(onClick = {
-                                            pathLanguage = spec.id
-                                            toolPathValue = toolPathPreferences.get(pathLanguage, LanguageToolingCatalog.Role.valueOf(pathRole)).orEmpty()
-                                            toolPathStatus = ""
-                                        }) { Text(spec.displayName, fontSize = 10.sp) }
-                                        else OutlinedButton(onClick = {
-                                            pathLanguage = spec.id
-                                            toolPathValue = toolPathPreferences.get(pathLanguage, LanguageToolingCatalog.Role.valueOf(pathRole)).orEmpty()
-                                            toolPathStatus = ""
-                                        }) { Text(spec.displayName, fontSize = 10.sp) }
-                                    }
-                                }
-                                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    LanguageToolingCatalog.Role.entries.forEach { role ->
-                                        if (pathRole == role.name) Button(onClick = {
-                                            pathRole = role.name
-                                            toolPathValue = toolPathPreferences.get(pathLanguage, role).orEmpty()
-                                            toolPathStatus = ""
-                                        }) { Text(role.name, fontSize = 10.sp) }
-                                        else OutlinedButton(onClick = {
-                                            pathRole = role.name
-                                            toolPathValue = toolPathPreferences.get(pathLanguage, role).orEmpty()
-                                            toolPathStatus = ""
-                                        }) { Text(role.name, fontSize = 10.sp) }
-                                    }
-                                }
-                                OutlinedTextField(
-                                    value = toolPathValue,
-                                    onValueChange = { toolPathValue = it },
-                                    label = { Text("Absolute Android or Linux path") },
-                                    placeholder = { Text("/usr/bin/clang") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = {
-                                        val role = LanguageToolingCatalog.Role.valueOf(pathRole)
-                                        runCatching {
-                                            toolPathPreferences.set(pathLanguage, role, toolPathValue)
-                                            val resolved = toolPathPreferences.resolvePath(pathLanguage, role, null)
-                                            toolPathStatus = when {
-                                                resolved == null -> "Saved, but no executable exists at this path in Android or the installed Linux rootfs."
-                                                resolved.guestPath != null -> "Linux executable found: ${resolved.guestPath}. Runtime execution still needs validation."
-                                                else -> "Host executable found: ${resolved.hostExecutable?.absolutePath}. Runtime compatibility still needs validation."
-                                            }
-                                        }.onFailure { toolPathStatus = it.message ?: "Invalid path." }
-                                    }) { Text("Save & validate") }
-                                    OutlinedButton(onClick = {
-                                        val role = LanguageToolingCatalog.Role.valueOf(pathRole)
-                                        toolPathPreferences.set(pathLanguage, role, null)
-                                        toolPathValue = ""
-                                        toolPathStatus = "Custom path cleared."
-                                    }) { Text("Clear") }
-                                }
-                                if (toolPathStatus.isNotBlank()) Text(toolPathStatus, color = IdeMuted, fontSize = 11.sp)
-                                Text("Configured paths are stored per language and role. They become active only when the runtime process launcher resolves and uses them.", color = IdeMuted, fontSize = 11.sp)
-                            }
-                            "Build" -> {
-                                Text("BUILD TOOLCHAIN", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                SettingsInfoRow("Toolchain", "Selected from the active file and workspace configuration")
-                                SettingsInfoRow("Build system", "Detected from workspace files when supported")
-                                SettingsInfoRow("Execution target", "Linux environment")
-                                Text("Configure executable paths under Languages. Runtime execution is validated separately.", color = Color(0xFFE5B978), fontSize = 11.sp)
-                            }
-                            else -> {
-                                Text("WORKSPACE", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                SettingsInfoRow("Theme", "Dark IDE")
-                                Text("EDITOR THEME", color = IdeAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Text("Selected: $editorTheme", color = Color(0xFFE8EDF5), fontSize = 13.sp)
-                                Text("Theme changes apply immediately to the editor. Font size and word wrap are available under Editor.", color = IdeMuted, fontSize = 12.sp)
-                                SettingsInfoRow("Accent", "Blue")
-                                SettingsInfoRow("Project", selectedProject)
-                            }
-                        }
-                    }
-                },
-                confirmButton = { Button(onClick = { showSettings = false }) { Text("Done") } }
             )
         }
         if (showProjectOverview) {
