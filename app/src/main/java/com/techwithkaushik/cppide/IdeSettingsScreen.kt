@@ -38,13 +38,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.feature.terminal.RuntimeSetupPanel
 
-private val SettingsBg = Color(0xFF101820)
-private val SettingsCard = Color(0xFF192733)
-private val SettingsAccent = Color(0xFF659AD2)
-private val SettingsMuted = Color(0xFF9AA8BA)
-private val SettingsText = Color(0xFFE8EDF5)
+private val SettingsBg = IdeDesignTokens.Color.Background
+private val SettingsCard = IdeDesignTokens.Color.Surface
+private val SettingsAccent = IdeDesignTokens.Color.Accent
+private val SettingsMuted = IdeDesignTokens.Color.TextSecondary
+private val SettingsText = IdeDesignTokens.Color.TextPrimary
+private val SettingsPreference = IdeDesignTokens.Preference
 
 @Composable
 internal fun IdeSettingsScreen(
@@ -61,10 +63,10 @@ internal fun IdeSettingsScreen(
     onRuntimeReady: () -> Unit
 ) {
     val context = LocalContext.current.applicationContext
-    val prefs = remember(context) { context.getSharedPreferences("ide_settings", Context.MODE_PRIVATE) }
+    val prefs = remember(context) { context.getSharedPreferences(SettingsPreference.FILE, Context.MODE_PRIVATE) }
     var category by rememberSaveable { mutableStateOf("Overview") }
-    var terminalFontSize by remember { mutableStateOf(prefs.getInt("terminal_font_size", 13).toFloat()) }
-    var autoKeyboard by remember { mutableStateOf(prefs.getBoolean("terminal_auto_keyboard", true)) }
+    var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
+    var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     val categories = listOf("Overview", "UI", "Editor", "Terminal", "Runtime & Bootstrap", "Languages", "Build & Run", "Keyboard", "About")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -91,7 +93,7 @@ internal fun IdeSettingsScreen(
                 else OutlinedButton(onClick = { category = item }) { Text(item, fontSize = 11.sp) }
             }
         }
-        Divider(color = Color(0xFF243D52))
+        Divider(color = IdeDesignTokens.Color.Divider)
         if (category == "Runtime & Bootstrap") {
             Column(Modifier.fillMaxSize().padding(10.dp)) {
                 Text("RUNTIME & BOOTSTRAP", color = SettingsAccent, fontSize = 12.sp)
@@ -127,14 +129,14 @@ internal fun IdeSettingsScreen(
                     "Editor" -> {
                         SettingsHeading("EDITOR", "Tune reading and editing comfort.")
                         SettingsCard("Editor font size", "Current size", "${editorFontSize.toInt()} sp")
-                        Slider(value = editorFontSize, onValueChange = { onEditorFontSizeChange(it); prefs.edit().putFloat("editor_font_size", it).apply() }, valueRange = 10f..24f)
+                        Slider(value = editorFontSize, onValueChange = { onEditorFontSizeChange(it); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, it).apply() }, valueRange = 10f..24f)
                         SettingsSwitch("Word wrap", "Wrap long lines in the editor", editorWordWrap) {
-                            onEditorWordWrapChange(it); prefs.edit().putBoolean("editor_word_wrap", it).apply()
+                            onEditorWordWrapChange(it); prefs.edit().putBoolean(SettingsPreference.EDITOR_WORD_WRAP, it).apply()
                         }
                         SettingsHeading("EDITOR COLOR THEME", "Choose an editor palette.")
                         listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
                             SettingsChoice(theme, editorTheme == theme) {
-                                onEditorThemeChange(theme); prefs.edit().putString("editor_theme", theme).apply()
+                                onEditorThemeChange(theme); prefs.edit().putString(SettingsPreference.EDITOR_THEME, theme).apply()
                             }
                         }
                         SettingsCard("Editor engine", "Implementation", "Sora code editor")
@@ -144,10 +146,10 @@ internal fun IdeSettingsScreen(
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
-                            prefs.edit().putInt("terminal_font_size", it.toInt()).apply()
+                            prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, it.toInt()).apply()
                         }, valueRange = 10f..22f, steps = 11)
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
-                            autoKeyboard = it; prefs.edit().putBoolean("terminal_auto_keyboard", it).apply()
+                            autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
                         SettingsCard("Input", "Shell session", "Interactive PTY with command input and terminal output")
                         SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
