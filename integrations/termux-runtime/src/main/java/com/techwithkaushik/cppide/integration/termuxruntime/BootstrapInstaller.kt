@@ -138,6 +138,13 @@ class BootstrapInstaller(
             val manifestText = if (symlinkManifest.isFile) symlinkManifest.readText(Charsets.UTF_8) else ""
             val usesStockTermuxPrefix = manifestText.contains("/data/data/com.termux/files/usr") ||
                 manifestText.contains("/data/user/0/com.termux/files/usr")
+            if (usesStockTermuxPrefix) {
+                // Stock Termux bootstrap shell startup files can contain absolute
+                // paths to the separate Termux app. Rewrite only UTF-8 text files;
+                // never patch ELF binaries. All paths remain inside this app's
+                // private files directory.
+                rewriteStockTermuxTextPaths(installRoot)
+            }
             val symlinkCount = if (processSymlinks && symlinkManifest.isFile) {
                 createSymlinks(symlinkManifest, installRoot, installRoot)
             } else {
@@ -169,6 +176,47 @@ class BootstrapInstaller(
                     throw IOException("Runtime validation failed and previous runtime could not be restored")
                 }
                 if (backup.exists()) backup.deleteRecursively()
+            }
+        }
+    }
+
+    private fun rewriteStockTermuxTextPaths(prefix: File) {
+        val filesDirectory = prefix.parentFile
+            ?: throw IOException("Bootstrap prefix has no files directory")
+        val appDataDirectory = filesDirectory.parentFile
+            ?: throw IOException("Bootstrap files directory has no app-data parent")
+        val replacements = linkedMapOf(
+            "/data/data/com.termux/files/usr" to prefix.absolutePath,
+            "/data/user/0/com.termux/files/usr" to prefix.absolutePath,
+            "/data/data/com.termux/files/home" to File(filesDirectory, "home").absolutePath,
+            "/data/user/0/com.termux/files/home" to File(filesDirectory, "home").absolutePath,
+            "/data/data/com.termux" to appDataDirectory.absolutePath,
+            "/data/user/0/com.termux" to appDataDirectory.absolutePath,
+        )
+        val textRoots = listOf("bin", "etc", "libexec", "share")
+            .map { File(prefix, it) }
+            .filter { it.isDirectory }
+        textRoots.forEach { root ->
+            root.walkTopDown().forEach fileLoop@{ file ->
+                if (!file.isFile || java.nio.file.Files.isSymbolicLink(file.toPath()) ||
+                    file.length() > MAX_REWRITABLE_TEXT_BYTES
+                ) return@fileLoop
+                val bytes = try { file.readBytes() } catch (_: Exception) { return@fileLoop }
+                if (bytes.any { it == 0.toByte() }) return@fileLoop
+                val original = try {
+                    Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+                } catch (_: Exception) {
+                    return@fileLoop
+                }
+                var updated = original
+                replacements.forEach { (source, target) -> updated = updated.replace(source, target) }
+                if (updated != original) {
+                    try {
+                        file.writeText(updated, Charsets.UTF_8)
+                    } catch (error: Exception) {
+                        throw IOException("Unable to relocate Termux text path in ${file.relativeTo(prefix)}", error)
+                    }
+                }
             }
         }
     }
@@ -374,6 +422,7 @@ class BootstrapInstaller(
         const val DEFAULT_MAX_ARCHIVE_BYTES = 512L * 1024 * 1024
         const val DEFAULT_MAX_EXPANDED_BYTES = 2L * 1024 * 1024 * 1024
         const val DEFAULT_MAX_ENTRIES = 100_000
+        private const val MAX_REWRITABLE_TEXT_BYTES = 2L * 1024 * 1024
         const val DEFAULT_BOOTSTRAP_PREFIX = "/data/data/com.techwithkaushik.cppide/files/usr"
     }
 }
