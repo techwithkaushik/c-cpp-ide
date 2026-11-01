@@ -68,12 +68,18 @@ class BootstrapSmokeTest(
                     "Shell smoke test failed (exit=$exitCode); inspect stderr for ABI/linker/W^X errors",
             )
         } catch (e: IOException) {
+            val resolvedShell = try { shell.canonicalFile } catch (_: Exception) { shell }
+            val shellParent = shell.parentFile
+            val diagnostic = "path=$shell, resolved=$resolvedShell, isFile=${shell.isFile}, " +
+                "isSymlink=${java.nio.file.Files.isSymbolicLink(shell.toPath())}, " +
+                "executable=${shell.canExecute()}, resolvedExecutable=${resolvedShell.canExecute()}, " +
+                "parentExecutable=${shellParent?.canExecute()}"
             Result(
                 success = false,
                 exitCode = null,
                 stdout = "",
                 stderr = "",
-                failureReason = "Android could not start the bootstrap shell: ${e.message}",
+                failureReason = "Android could not start the bootstrap shell: ${e.message}; $diagnostic",
             )
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
