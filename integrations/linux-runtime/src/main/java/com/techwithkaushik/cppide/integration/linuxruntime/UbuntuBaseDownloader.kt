@@ -37,19 +37,35 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
     }
 
     private fun download(url: URL, destination: File, maxBytes: Long, progress: ((Long, Long) -> Unit)?) {
-        require(url.protocol == "https" && url.host == "cdimage.ubuntu.com") { "Refusing an untrusted Ubuntu download URL." }
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            connectTimeout = 20_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-            requestMethod = "GET"
+        val allowedHosts = setOf("cdimage.ubuntu.com", "releases.cdimage.ubuntu.com")
+        var current = url
+        var redirects = 0
+        var connection: HttpURLConnection
+        while (true) {
+            if (current.protocol != "https" || current.host !in allowedHosts) {
+                throw SecurityException("Ubuntu download attempted an untrusted host.")
+            }
+            connection = (current.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 20_000
+                readTimeout = 30_000
+                instanceFollowRedirects = false
+                requestMethod = "GET"
+            }
+            val code = connection.responseCode
+            if (code in 300..399) {
+                val location = connection.getHeaderField("Location")
+                connection.disconnect()
+                if (location.isNullOrBlank() || ++redirects > 3) throw IllegalStateException("Ubuntu download redirect chain is invalid.")
+                current = URL(current, location)
+                continue
+            }
+            if (code !in 200..299) {
+                connection.disconnect()
+                throw IllegalStateException("Ubuntu download failed with HTTP $code.")
+            }
+            break
         }
         try {
-            val code = connection.responseCode
-            if (code !in 200..299) throw IllegalStateException("Ubuntu download failed with HTTP $code.")
-            if (connection.url.protocol != "https" || connection.url.host !in setOf("cdimage.ubuntu.com", "releases.cdimage.ubuntu.com")) {
-                throw SecurityException("Ubuntu download redirected to an untrusted host.")
-            }
             val length = connection.contentLengthLong
             if (length > maxBytes) throw IllegalStateException("Ubuntu download exceeds the size limit.")
             destination.parentFile?.mkdirs()
