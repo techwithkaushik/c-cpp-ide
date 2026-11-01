@@ -326,7 +326,11 @@ jobs:
                   checked += 1
                   if any(prefix in data for prefix in stock_prefixes):
                       raise SystemExit(f"{archive}: {name} embeds the stock Termux prefix")
-              if not any(b"/data/data/" + package.encode() + b"/files/usr" in zf.read(info)
+              expected_prefixes = (
+                  b"/data/data/" + package.encode() + b"/files/usr",
+                  b"/data/user/0/" + package.encode() + b"/files/usr",
+              )
+              if not any(any(prefix in zf.read(info) for prefix in expected_prefixes)
                          for info in zf.infolist()
                          if not info.is_dir() and info.filename.startswith(("bin/", "lib/", "libexec/", "etc/"))):
                   raise SystemExit(f"{archive}: runtime ELF/config files do not contain the expected app prefix {package}")
