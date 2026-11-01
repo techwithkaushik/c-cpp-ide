@@ -89,16 +89,16 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             val resolver = File(stage, "etc/resolv.conf")
             if (Files.isSymbolicLink(resolver.toPath()) || !resolver.isFile || resolver.length() == 0L) {
                 if (Files.isSymbolicLink(resolver.toPath())) Files.delete(resolver.toPath())
-                resolver.writeText("nameserver 1.1.1.1\\nnameserver 8.8.8.8\\noptions timeout:2 attempts:2\\n")
+                resolver.writeText("nameserver 1.1.1.1\nnameserver 8.8.8.8\noptions timeout:2 attempts:2\n")
             }
             val aptSourcesDir = File(stage, "etc/apt/sources.list.d")
             if (!aptSourcesDir.exists() && !aptSourcesDir.mkdirs()) throw IOException("Cannot create Ubuntu APT sources directory.")
             File(aptSourcesDir, "ubuntu.sources").writeText(
-                "Types: deb\\n" +
-                    "URIs: http://ports.ubuntu.com/ubuntu-ports\\n" +
-                    "Suites: noble noble-updates noble-backports noble-security\\n" +
-                    "Components: main universe restricted multiverse\\n" +
-                    "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\\n"
+                "Types: deb\n" +
+                    "URIs: http://ports.ubuntu.com/ubuntu-ports\n" +
+                    "Suites: noble noble-updates noble-backports noble-security\n" +
+                    "Components: main universe restricted multiverse\n" +
+                    "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n"
             )
             val old = File(paths.staging, "ubuntu-previous")
             if (old.exists()) old.deleteRecursively()
