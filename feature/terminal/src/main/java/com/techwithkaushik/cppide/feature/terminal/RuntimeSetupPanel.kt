@@ -181,6 +181,11 @@ fun RuntimeSetupPanel(
             color = Color(0xFF9AA7B5),
             fontSize = 11.sp
         )
+        Text(
+            "Install location: ${File(context.filesDir, "usr").absolutePath}",
+            color = Color(0xFF9AA7B5),
+            fontSize = 11.sp
+        )
         Button(
             enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
             onClick = { installBootstrap(withSymlinks = true) }
