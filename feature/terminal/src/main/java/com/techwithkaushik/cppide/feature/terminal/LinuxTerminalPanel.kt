@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -255,13 +256,17 @@ fun LinuxTerminalPanel(
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
             }
         } else {
+            val outputScrollState = rememberScrollState()
+            LaunchedEffect(active.output.value) {
+                outputScrollState.scrollTo(outputScrollState.maxValue)
+            }
             Column(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF080B10), RoundedCornerShape(8.dp)).padding(8.dp)) {
                 Text(
                     active.output.value,
                     color = Color(0xFFE6EDF3),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
-                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(outputScrollState)
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedTextField(
