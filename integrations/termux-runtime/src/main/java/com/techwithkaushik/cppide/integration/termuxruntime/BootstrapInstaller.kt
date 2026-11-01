@@ -231,7 +231,7 @@ class BootstrapInstaller(
                     throw IOException("Unable to create symlink parent")
                 }
                 try {
-                    java.nio.file.Files.createSymbolicLink(linkInStage.toPath(), targetFile.toPath())
+                    Os.symlink(targetFile.absolutePath, linkInStage.absolutePath)
                 } catch (e: Exception) {
                     throw IOException("Unable to create bootstrap symlink: $linkRelative", e)
                 }
@@ -268,7 +268,7 @@ class BootstrapInstaller(
         executableRoots.filter { it.exists() }.forEach { executableRoot ->
             executableRoot.walkTopDown().forEach { file ->
                 if (java.nio.file.Files.isSymbolicLink(file.toPath()) || !file.isFile) return@forEach
-                try { Os.chmod(file.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod bootstrap executable ${file.relativeTo(root)}: ${error.message}", error) }
+                try { Os.chmod(file.absolutePath, 0x1C0) } catch (error: Exception) { throw IOException("Unable to chmod bootstrap executable ${file.relativeTo(root)}: ${error.message}", error) }
                 if (!file.canExecute()) throw IOException("Bootstrap executable bit is missing after chmod: ${file.relativeTo(root)}")
             }
         }
@@ -297,7 +297,7 @@ class BootstrapInstaller(
                 if (!resolvedExecutable.isFile) {
                     throw IOException("Bootstrap shell target is missing: ${link.relativeTo(root)} -> $resolvedExecutable")
                 }
-                try { Os.chmod(resolvedExecutable.absolutePath, 0x1ED) } catch (error: Exception) { throw IOException("Unable to chmod shell target ${link.relativeTo(root)} -> $resolvedExecutable: ${error.message}", error) }
+                try { Os.chmod(resolvedExecutable.absolutePath, 0x1C0) } catch (error: Exception) { throw IOException("Unable to chmod shell target ${link.relativeTo(root)} -> $resolvedExecutable: ${error.message}", error) }
                 if (!resolvedExecutable.canExecute()) throw IOException("Shell target is not executable after chmod: ${link.relativeTo(root)} -> $resolvedExecutable")
             }
         listOf("bin/sh", "bin/bash").forEach { shell ->
