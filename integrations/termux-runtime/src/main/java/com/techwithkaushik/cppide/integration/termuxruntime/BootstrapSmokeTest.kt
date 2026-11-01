@@ -34,12 +34,27 @@ class BootstrapSmokeTest(
 
         val layout = runtime.layout
         val shell = layout.shell
+        val linker = AndroidRuntimeLauncher.systemLinker
+        val termuxExec = java.io.File(layout.prefix, "lib/libtermux-exec.so")
+        if (!linker.isFile || !linker.canExecute()) {
+            return Result(false, null, "", "", "Android system linker is unavailable: $linker")
+        }
+        if (!termuxExec.isFile) {
+            return Result(false, null, "", "", "Bootstrap is missing lib/libtermux-exec.so. Android 10+ blocks direct execution from app-private files; rebuild the bootstrap with the Termux termux-exec package.")
+        }
         if (!shell.isFile) {
             return Result(false, null, "", "", "Bootstrap shell is missing: $shell")
         }
 
         return try {
-            val process = ProcessBuilder(shell.absolutePath, "-c", "printf 'CPPIDE_BOOTSTRAP_OK\\n'")
+            // Android 10+ denies direct execve() of extracted app-data binaries,
+            // even when chmod/canExecute report success. Start the system linker instead.
+            val process = ProcessBuilder(
+                linker.absolutePath,
+                shell.absolutePath,
+                "-c",
+                "printf 'CPPIDE_BOOTSTRAP_OK\\n'"
+            )
                 .directory(layout.home)
                 .redirectErrorStream(false)
                 .apply {
@@ -70,7 +85,8 @@ class BootstrapSmokeTest(
         } catch (e: IOException) {
             val resolvedShell = try { shell.canonicalFile } catch (_: Exception) { shell }
             val shellParent = shell.parentFile
-            val diagnostic = "path=$shell, resolved=$resolvedShell, isFile=${shell.isFile}, " +
+            val diagnostic = "linker=${AndroidRuntimeLauncher.systemLinker}, termuxExec=${java.io.File(layout.prefix, "lib/libtermux-exec.so").isFile}, " +
+                "path=$shell, resolved=$resolvedShell, isFile=${shell.isFile}, " +
                 "isSymlink=${java.nio.file.Files.isSymbolicLink(shell.toPath())}, " +
                 "executable=${shell.canExecute()}, resolvedExecutable=${resolvedShell.canExecute()}, " +
                 "parentExecutable=${shellParent?.canExecute()}"
