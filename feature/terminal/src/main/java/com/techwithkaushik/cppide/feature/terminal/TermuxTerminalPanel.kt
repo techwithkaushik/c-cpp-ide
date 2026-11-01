@@ -147,9 +147,6 @@ fun TermuxTerminalPanel(modifier: Modifier = Modifier, onOpenSettings: () -> Uni
         ).map { (key, value) -> "$key=$value" }.toTypedArray()
     }
     val linker = remember { AndroidRuntimeLauncher.systemLinker }
-    val shellArguments = remember(shell) {
-        if (shell.name == "bash") arrayOf("--login") else emptyArray()
-    }
 
     // This registry lives for the app process, not for the bottom-panel
     // composition. Hiding/reopening the panel only detaches the view; sessions
