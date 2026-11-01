@@ -119,6 +119,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativeEditorEngine_nativeDetectLanguage
 #include <atomic>
 #include <cerrno>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -252,7 +253,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeRead(
     std::vector<jbyte> bytes(static_cast<size_t>(length));
     ssize_t count;
     do { count = read(fd, bytes.data(), bytes.size()); } while (count < 0 && errno == EINTR);
-    if (count < 0 && (errno == EIO || errno == EBADF || errno == EIO)) return 0;
+    if (count < 0 && (errno == EIO || errno == EBADF)) return 0;
     if (count < 0) return -errno;
     if (count > 0) env->SetByteArrayRegion(buffer, 0, static_cast<jsize>(count), bytes.data());
     return static_cast<jint>(count);
