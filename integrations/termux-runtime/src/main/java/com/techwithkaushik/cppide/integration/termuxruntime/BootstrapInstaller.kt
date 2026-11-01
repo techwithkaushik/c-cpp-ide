@@ -135,12 +135,19 @@ class BootstrapInstaller(
             // The no-symlinks path intentionally does not parse or replay
             // SYMLINKS.txt. This makes it possible to test the archive's actual
             // extracted files independently from the app's symlink handling.
+            val manifestText = if (symlinkManifest.isFile) symlinkManifest.readText(Charsets.UTF_8) else ""
+            val usesStockTermuxPrefix = manifestText.contains("/data/data/com.termux/files/usr") ||
+                manifestText.contains("/data/user/0/com.termux/files/usr")
             val symlinkCount = if (processSymlinks && symlinkManifest.isFile) {
                 createSymlinks(symlinkManifest, installRoot, installRoot)
             } else {
                 0
             }
             symlinkManifest.delete()
+            File(installRoot, ".ide-bootstrap-source").writeText(
+                if (usesStockTermuxPrefix) "stock-termux" else "app-prefix",
+                Charsets.UTF_8
+            )
 
             setExecutableBits(installRoot, installRoot)
             validateBootstrapLayout(installRoot, requireShell = processSymlinks)
