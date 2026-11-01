@@ -1,56 +1,48 @@
-# Linux runtime activation on Android
+# Ubuntu runtime activation on Android
 
-## Decision
+## Runtime boundary
 
-Use a private, app-owned Linux userspace and a native Android-compatible PRoot runtime. Do not require a separate Termux installation, root, a localhost TCP server, or a VM.
+The IDE owns its Linux userspace inside its private app directory. It must never read or write another application's private data. A rootfs archive is only filesystem data; extraction alone does not make it executable. A compatible Android PRoot binary and a successful shell smoke test are required.
 
-A rootfs archive is only filesystem data. Extraction must never mark Linux as active by itself. Activation requires a compatible PRoot executable, valid distro rootfs, a successful non-interactive shell smoke test, and a working terminal process/session.
+## Current implementation
 
-## Runtime architecture
+- Ubuntu Base 24.04.5 download is architecture-selected from the current app process (armhf for 32-bit ARM, arm64 for a 64-bit app process).
+- The rootfs download is checked against Ubuntu's official `SHA256SUMS` before extraction.
+- The importer accepts `.tar`, `.tar.gz`, and `.tar.xz`, limits entries and expanded size, rejects archive path traversal and escaping symlinks, stages the new rootfs, and keeps the prior rootfs until promotion succeeds.
+- The PRoot downloader uses a fixed upstream Android release URL and checks ELF architecture. That upstream release does not publish a SHA-256 digest; this is a documented supply-chain limitation. A production release should publish and pin a project-controlled digest for a current PRoot build.
+- The local shell uses the native PTY bridge in `:core:jni`, the Android system linker, and the app-owned PRoot/rootfs paths.
+- The runtime setup screen runs a real shell smoke test before reporting the runtime as ready.
+- SSH opens a shell channel directly from the terminal panel. First-use host keys require explicit SHA-256 fingerprint confirmation; changed pinned keys are rejected.
 
-1. Select a distro and Android-compatible architecture.
-2. Download the distro-specific archive to an app-private `linux/downloads/<distro>/` directory.
-3. Verify the archive against a trusted SHA-256 manifest (and a signature where the upstream publishes one). Keep downloads in `.part` files until verification passes.
-4. Safely extract to `linux/rootfs/<distro>-staging/`; validate `etc/os-release`, required paths, and archive contents; atomically replace only that distro's rootfs.
-5. Build and bundle an Android-compatible PRoot executable for each supported ABI under `app/src/main/jniLibs/<abi>/libproot.so`, with every required shared library in the same ABI directory. Android 10+ may block execution from ordinary app data directories, so the launcher resolves the bundled executable from `ApplicationInfo.nativeLibraryDir`. Do not use a generic GNU/Linux release binary: Android uses Bionic and has different linker/runtime requirements.
-6. Launch the distro shell with a controlled environment and required Android filesystem bindings. The exact PRoot arguments must be tested against the bundled PRoot build and Android API level; never assume `chroot` works without root.
-7. Run an activation smoke test through the same process launcher the terminal will use, e.g. execute the distro's `/bin/sh -c 'printf ...; test -x /usr/bin/env'`. Capture exit code, stdout, stderr, and timeout.
-8. Mark the distro Active only after the smoke test succeeds. Otherwise preserve the extracted rootfs and show a repairable runtime error.
+## Storage
 
-## Terminal integration
+```text
+files/linux-runtime/
+  distributions/ubuntu/   # active Ubuntu rootfs
+  bin/proot               # Android PRoot executable
+  staging/                # extraction/install staging and rollback
+  tmp/                    # PRoot host-side temporary files
+  runtime.properties      # installed runtime metadata
+```
 
-The terminal panel should own a long-lived process/session, not just display sample output. Start PRoot with the selected rootfs, set HOME and working directory to app-private paths inside that rootfs, connect stdin/stdout/stderr to the terminal UI, support resize/interrupt/exit, and terminate child processes when the session is closed. Commands entered in the terminal and Compile & Run must use the same selected distro/runtime.
+All paths are derived from the current app's private files directory. The runtime does not rely on a shared external directory.
 
-The initial smoke test should run before the UI reports success. The launcher now contains a real shell smoke-test path and an interactive process entry point. The PRoot binary and ABI-specific native dependencies still need to be bundled and validated; until then setup must remain inactive. The next phase is runtime artifact packaging and device validation, then terminal stream/PTY integration and file-aware language tool installation.
+## Terminal lifecycle
 
-## Distribution support policy
+- A shell is a long-lived PTY-backed process, not a command-per-process mock.
+- Hiding the terminal panel detaches the UI but does not recreate a live shell.
+- Multiple tabs own separate local or SSH sessions.
+- Shell exit removes only that tab; the previously selected tab becomes active, and the terminal panel closes when the final session exits.
+- Local PTY input supports Ctrl-C through the controlling terminal. The current Compose renderer is text-oriented and is not yet a complete VT/xterm emulator; full cursor addressing, colors, alternate screen, and resize-aware rendering remain future work.
 
-- Ubuntu is the default and remains supported only when its official archive and SHA-256 manifest match the selected Android architecture.
-- Debian must use a pinned, architecture-specific rootfs source with verifiable SHA-256 and an extractor that supports that archive's compression format.
-- Arch Linux ARM must use the correct generic ARMv7/AArch64 rootfs and verify the upstream signature using a pinned/trusted public key. A published MD5 alone is not sufficient integrity protection.
-- Never let selecting one distro download or install another distro's archive. Store each distro under its own named directory and isolate its downloads, staging, backups, metadata, and installed-state checks.
-- A distro whose download source, checksum/signature verification, architecture mapping, and runtime smoke test are not implemented must be shown as unavailable/not yet supported, not as a working download option.
+## Remaining release gates
 
-## Validation matrix
+1. Replace the old upstream PRoot binary with a current, reproducibly built Android artifact and a published SHA-256 digest.
+2. Run the complete download/install/rollback flow on physical Android 10+ devices.
+3. Verify the PRoot shell smoke test and apt operation on ARM32.
+4. Add C17 and C++20 compile-and-run tests inside Ubuntu.
+5. Implement full terminal escape-sequence rendering and remote workspace/build integration.
+6. Add private-key import tests, credential-vault design, and SSH reconnect tests.
+7. Verify corrupted archives, low storage, interruption, and recovery.
 
-Test on physical Android devices for each supported ABI/API level:
-- interrupted download and retry;
-- checksum mismatch and malformed archive;
-- archive traversal and unsafe symlink rejection;
-- existing rootfs preservation after failed upgrade;
-- PRoot executable starts on Android/Bionic;
-- `/bin/sh` smoke test passes inside each distro;
-- terminal input/output, Ctrl-C, exit status, process cleanup;
-- compile and execute a small C17 and C++20 program;
-- low storage, app restart, and Android background process restrictions.
-
-## Research references
-
-- Termux execution environment and Android Bionic differences: https://github.com/termux/termux-packages/wiki/Termux-execution-environment
-- Termux PRoot-Distro design and rootless userspace: https://github.com/termux/proot-distro
-- Termux PRoot package recipe and Android-specific build/dependencies: https://github.com/termux/termux-packages/tree/master/packages/proot
-- Andronix's open installer, architecture checks, rootfs downloads and SHA-256 validation: https://github.com/AndronixApp/andronix
-- Arch Linux ARM official rootfs downloads and signatures: https://archlinuxarm.org/about/downloads
-
-- Current upstream PRoot release and source: https://github.com/proot-me/proot/releases/tag/v5.5.0 and https://github.com/proot-me/proot
-- Android executable packaging constraint: native payloads should be packaged in ABI-specific jniLibs and resolved from nativeLibraryDir, not executed from a writable app data directory.
+A green Gradle build is necessary but not sufficient for release; the PRoot execution path must pass on a real device.
