@@ -26,16 +26,37 @@ class ProotDownloader(private val paths: LinuxRuntimePaths) {
         val url = URL("https://github.com/proot-me/proot-rs/releases/download/v0.1.0/$asset")
         val archive = File(paths.base, asset)
         try {
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 20_000
-                readTimeout = 30_000
-                instanceFollowRedirects = true
+            val allowedHosts = setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
+            var current = url
+            var redirects = 0
+            var connection: HttpURLConnection
+            while (true) {
+                if (current.protocol != "https" || current.host !in allowedHosts) {
+                    throw SecurityException("PRoot download attempted an untrusted host.")
+                }
+                connection = (current.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 20_000
+                    readTimeout = 30_000
+                    instanceFollowRedirects = false
+                    requestMethod = "GET"
+                }
+                val code = connection.responseCode
+                if (code in 300..399) {
+                    val location = connection.getHeaderField("Location")
+                    connection.disconnect()
+                    if (location.isNullOrBlank() || ++redirects > 5) {
+                        throw IllegalStateException("PRoot download redirect chain is invalid.")
+                    }
+                    current = URL(current, location)
+                    continue
+                }
+                if (code !in 200..299) {
+                    connection.disconnect()
+                    throw IllegalStateException("PRoot download failed with HTTP $code.")
+                }
+                break
             }
             try {
-                if (connection.responseCode !in 200..299) throw IllegalStateException("PRoot download failed with HTTP ${connection.responseCode}.")
-                if (connection.url.protocol != "https" || connection.url.host !in setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")) {
-                    throw SecurityException("PRoot download redirected to an untrusted host.")
-                }
                 if (connection.contentLengthLong > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
                 FileOutputStream(archive).use { out ->
                     connection.inputStream.use { input ->
