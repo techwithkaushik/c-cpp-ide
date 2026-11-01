@@ -1224,7 +1224,6 @@ private fun ProjectListScreen(
             (selectedFilter == "All" || category(project.language) == selectedFilter)
     }
 
-    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = IdeBackground,
         topBar = {
