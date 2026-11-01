@@ -57,7 +57,6 @@ private data class LinuxTerminalTab(
     val title: String,
     val output: MutableState<String>,
     val send: (String) -> Unit,
-    val close: () -> Unit,
     val session: AutoCloseable,
 )
 
@@ -76,7 +75,6 @@ private object LinuxTerminalSessions {
             title = title,
             output = mutableStateOf(initialOutput),
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
-            close = { closeTab(nextId - 1) },
             session = session
         )
         tabs.add(tab)
@@ -120,6 +118,7 @@ fun LinuxTerminalPanel(
 ) {
     val context = LocalContext.current.applicationContext
     val paths = remember(context) { LinuxRuntimePaths(context.filesDir) }
+    val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
     var command by remember { mutableStateOf("") }
@@ -142,7 +141,7 @@ fun LinuxTerminalPanel(
 
     fun connectSsh(expected: String?) {
         val sshHost = try {
-            SshHost(host.trim(), port.toIntOrNull() ?: 22, username.trim(), password = password, expectedSha256Fingerprint = expected)
+            SshHost(host.trim(), port.toIntOrNull() ?: 22, username.trim(), password = password, expectedSha256Fingerprint = expected ?: sshHostKeyPrefs.getString("${host.trim()}:${port.toIntOrNull() ?: 22}", null))
         } catch (e: Exception) {
             error = e.message ?: "Invalid SSH settings."
             return
@@ -261,8 +260,8 @@ fun LinuxTerminalPanel(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("SSH opens a remote shell directly; local Ubuntu setup is not required.", fontSize = 12.sp)
-                    OutlinedTextField(host, { host = it }, label = { Text("Host / IP") }, singleLine = true)
-                    OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5) }, label = { Text("Port") }, singleLine = true)
+                    OutlinedTextField(host, { host = it; expectedFingerprint = "" }, label = { Text("Host / IP") }, singleLine = true)
+                    OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5); expectedFingerprint = "" }, label = { Text("Port") }, singleLine = true)
                     OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true)
                     OutlinedTextField(password, { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
                     expectedFingerprint.takeIf { it.isNotBlank() }?.let {
@@ -286,6 +285,8 @@ fun LinuxTerminalPanel(
             confirmButton = {
                 Button(onClick = {
                     fingerprintConfirmation = null
+                    sshHostKeyPrefs.edit().putString("${host.trim()}:${port.toIntOrNull() ?: 22}", fingerprint).apply()
+                    expectedFingerprint = fingerprint
                     connectSsh(fingerprint)
                 }) { Text("Trust fingerprint and connect") }
             },
