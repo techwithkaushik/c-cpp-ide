@@ -54,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.OutputStream
+import java.io.ByteArrayOutputStream
 
 private data class LinuxTerminalTab(
     val id: Int,
@@ -148,9 +149,20 @@ fun LinuxTerminalPanel(
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
-                        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            ?: throw IllegalStateException("Could not read the selected private key.")
-                        if (bytes.size !in 1..128 * 1024) throw IllegalStateException("Private key file must be at most 128 KiB.")
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                            val output = ByteArrayOutputStream()
+                            val buffer = ByteArray(8 * 1024)
+                            var total = 0
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                if (total > 128 * 1024) throw IllegalStateException("Private key file must be at most 128 KiB.")
+                                output.write(buffer, 0, count)
+                            }
+                            output.toByteArray()
+                        } ?: throw IllegalStateException("Could not read the selected private key.")
+                        if (bytes.isEmpty()) throw IllegalStateException("The selected private key file is empty.")
                         Result.success(bytes)
                     } catch (e: Exception) { Result.failure<ByteArray>(e) }
                 }
