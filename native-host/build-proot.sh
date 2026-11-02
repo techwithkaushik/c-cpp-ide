@@ -21,6 +21,20 @@ PROOT_VERSION=v5.5.0
 PROOT_COMMIT=25dc6a3134891f98a79f57ce1c2c1b23ff15cad1
 PROOT_SRC="$WORK/src/proot"
 rm -rf "$PROOT_SRC"
+# Android's seccomp policy and upstream PRoot's acceleration filter can conflict:
+# the guest may be killed with SIGSYS (signal 31) before Bash starts. Compile the
+# seccomp module as a no-op on Android; ptrace remains the syscall translation path.
+python3 - "$PROOT_SRC/src/syscall/seccomp.c" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+source = p.read_text()
+needle = '#include "build.h"'
+replacement = '#include "build.h"\n\n/* Android app processes may SIGSYS-kill guest tasks using PRoot seccomp. */\n#undef HAVE_SECCOMP_FILTER'
+if source.count(needle) != 1:
+    raise SystemExit("Could not safely disable PRoot seccomp acceleration")
+p.write_text(source.replace(needle, replacement, 1))
+PY
 git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \
   https://github.com/proot-me/proot.git "$PROOT_SRC"
 git -C "$PROOT_SRC" fetch --depth 1 origin "$PROOT_COMMIT"
