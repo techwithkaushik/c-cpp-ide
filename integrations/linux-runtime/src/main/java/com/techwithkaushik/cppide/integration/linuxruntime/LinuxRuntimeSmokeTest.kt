@@ -37,6 +37,9 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.base).apply {
                 environment()["HOME"] = "/root"
+                environment()["USER"] = "root"
+                environment()["LOGNAME"] = "root"
+                environment()["SHELL"] = "/bin/bash"
                 // Do not leak Android/Termux preload libraries into Ubuntu's dynamic linker.
                 environment()["LD_PRELOAD"] = ""
                 environment().remove("LD_LIBRARY_PATH")
@@ -44,7 +47,9 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["TMPDIR"] = hostTemp.absolutePath
                 environment()["TMP"] = hostTemp.absolutePath
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-                environment()["TERM"] = "xterm"
+                environment()["TERM"] = "xterm-256color"
+                environment()["COLORTERM"] = "truecolor"
+                environment()["LANG"] = "C.UTF-8"
                 environment()["PROOT_TMP_DIR"] = hostTemp.absolutePath
                 // Android kernels can kill guest syscalls with SIGSYS under PRoot seccomp acceleration.
                 environment()["PROOT_NO_SECCOMP"] = "1"
