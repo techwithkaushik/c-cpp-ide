@@ -306,7 +306,23 @@ fun LinuxTerminalPanel(
                         }
                         command = updated
                     },
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFF151B23), RoundedCornerShape(6.dp)).padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFF151B23), RoundedCornerShape(6.dp)).padding(12.dp)
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                androidx.compose.ui.input.key.Key.Enter -> {
+                                    try { active.send("\\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                                    command = ""
+                                    true
+                                }
+                                androidx.compose.ui.input.key.Key.DirectionUp -> { active.send("\\u001b[A"); true }
+                                androidx.compose.ui.input.key.Key.DirectionDown -> { active.send("\\u001b[B"); true }
+                                androidx.compose.ui.input.key.Key.DirectionRight -> { active.send("\\u001b[C"); true }
+                                androidx.compose.ui.input.key.Key.DirectionLeft -> { active.send("\\u001b[D"); true }
+                                androidx.compose.ui.input.key.Key.Tab -> { active.send("\\t"); true }
+                                else -> false
+                            }
+                        },
                     singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFFE6EDF3), fontFamily = FontFamily.Monospace, fontSize = 13.sp),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF6EA8E0)),
@@ -315,13 +331,7 @@ fun LinuxTerminalPanel(
                         inner()
                     }
                 )
-                androidx.compose.foundation.text.BasicTextField(
-                    value = "",
-                    onValueChange = {},
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = active.exited.value == null,
-                    onTextLayout = {}
-                )
+
             }
             error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
         }
