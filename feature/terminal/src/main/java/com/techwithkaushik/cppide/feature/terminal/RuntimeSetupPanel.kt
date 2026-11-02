@@ -104,10 +104,6 @@ fun RuntimeSetupPanel(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Ubuntu Linux runtime", color = Color(0xFF8CC8FF), fontSize = 18.sp)
-        Text(
-            "This branch does not use Termux or its app-private prefix. Rootfs is stored under this app's files/linux-runtime directory. PRoot v5.5.0 and its Android loader are bundled in the APK to satisfy Android 10+ executable-file restrictions.",
-            color = Color(0xFFE8EDF5), fontSize = 12.sp
-        )
         Button(enabled = !busy, onClick = {
             busy = true
             status = "Downloading official Ubuntu Base and verifying SHA256SUMS…"
@@ -158,8 +154,6 @@ fun RuntimeSetupPanel(
                 }
             }
         }) { Text("Verify bundled Android PRoot v5.5.0") }
-        Text("Ubuntu rootfs checksum is verified against Ubuntu's official SHA256SUMS. PRoot v5.5.0 is built from upstream source for Android by CI and bundled in the APK.", color = Color(0xFF9AA7B5), fontSize = 11.sp)
-
         Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
             Text(if (rootfsUri == null) "1 · Select Ubuntu rootfs archive" else "Change Ubuntu rootfs")
         }
@@ -214,13 +208,7 @@ fun RuntimeSetupPanel(
             }
         }) { Text("Install Ubuntu rootfs") }
 
-        Text(
-            "PRoot v5.5.0 is bundled with the APK as an Android-native executable and loader. Android 10+ blocks running downloaded executables from writable app storage, so a user-selected PRoot archive is no longer supported. Tap the button above to verify the bundled binaries.",
-            color = Color(0xFF9AA7B5), fontSize = 11.sp
-        )
-
         if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
-        Text("Install location: ${paths.base.absolutePath}", color = Color(0xFF9AA7B5), fontSize = 11.sp)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
