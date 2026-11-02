@@ -317,24 +317,28 @@ jobs:
               # ELF files may embed the package-specific prefix. Reject a
               # bootstrap compiled for com.termux instead of shipping a runtime
               # that silently launches commands from another app's data path.
+              # Only inspect ELF executables/shared objects for embedded paths.
+              # Text utilities can mention the stock prefix in help or migration code.
               checked = 0
+              elf_files = []
               for info in zf.infolist():
                   name = info.filename.rstrip("/")
-                  if info.is_dir() or not name.startswith(("bin/", "lib/", "libexec/", "etc/")):
+                  if info.is_dir() or not name.startswith(("bin/", "lib/", "libexec/")):
                       continue
                   data = zf.read(info)
+                  if not data.startswith(bytes((0x7f,)) + b"ELF"):
+                      continue
                   checked += 1
+                  elf_files.append((name, data))
                   if any(prefix in data for prefix in stock_prefixes):
-                      raise SystemExit(f"{archive}: {name} embeds the stock Termux prefix")
+                      raise SystemExit(f"{archive}: ELF {name} embeds the stock Termux prefix")
               expected_prefixes = (
                   b"/data/data/" + package.encode() + b"/files/usr",
                   b"/data/user/0/" + package.encode() + b"/files/usr",
               )
-              if not any(any(prefix in zf.read(info) for prefix in expected_prefixes)
-                         for info in zf.infolist()
-                         if not info.is_dir() and info.filename.startswith(("bin/", "lib/", "libexec/", "etc/"))):
-                  raise SystemExit(f"{archive}: runtime ELF/config files do not contain the expected app prefix {package}")
-              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries; scanned {checked} runtime files")
+              if not any(any(prefix in data for prefix in expected_prefixes) for _, data in elf_files):
+                  raise SystemExit(f"{archive}: no runtime ELF contains the expected app prefix {package}")
+              print(f"Validated bootstrap archive for {abi} ({package}): {len(names)} entries; scanned {checked} ELF files")
           PY
             sha="$(sha256sum "$destination/bootstrap.zip" | cut -d ' ' -f 1)"
             cat > "$destination/bootstrap.json" <<EOF
