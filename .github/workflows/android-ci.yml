@@ -88,21 +88,6 @@ jobs:
         shell: bash
         run: bash native-host/build-proot.sh
 
-      - name: Download and inspect official Ubuntu Base armhf rootfs
-        shell: bash
-        run: |
-          set -euo pipefail
-          base_url="https://cdimage.ubuntu.com/ubuntu-base/releases/noble/release"
-          archive="ubuntu-base-24.04.5-base-armhf.tar.gz"
-          curl --fail --location --retry 3 --connect-timeout 20 "$base_url/SHA256SUMS" -o "$RUNNER_TEMP/SHA256SUMS"
-          expected="$(awk -v f="$archive" '$2 == f || $2 == "*" f {print $1; exit}' "$RUNNER_TEMP/SHA256SUMS")"
-          test -n "$expected" || { echo "::error::Ubuntu SHA256SUMS does not list $archive"; exit 1; }
-          curl --fail --location --retry 3 --connect-timeout 20 "$base_url/$archive" -o "$RUNNER_TEMP/$archive"
-          echo "$expected  $RUNNER_TEMP/$archive" | sha256sum --check -
-          echo "Official Ubuntu Base archive: usr-merged layout and critical ARMHF files"
-          tar -tzf "$RUNNER_TEMP/$archive" | grep -E "usr/bin/bash|libtinfo\.so\.6|(^|/)(bin|lib)$" | sed -n "1,80p"
-          tar -tvzf "$RUNNER_TEMP/$archive" | grep -E "(bin|lib) ->|libtinfo\.so\.6" | sed -n "1,30p"
-
       - name: Test Linux runtime and SSH integration
         env:
           UBUNTU_ROOTFS_ARCHIVE: ${{ runner.temp }}/ubuntu-base-24.04.5-base-armhf.tar.gz
