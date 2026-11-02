@@ -61,7 +61,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["TERM"] = "xterm-256color"
                 environment()["COLORTERM"] = "truecolor"
                 environment()["LANG"] = "C.UTF-8"
-                environment()["PROOT_TMP_DIR"] = File(paths.ubuntuRoot, "etc").absolutePath
+                environment()["PROOT_TMP_DIR"] = paths.usrTmp.absolutePath
                 // Android kernels can kill guest syscalls with SIGSYS under PRoot seccomp acceleration.
                 environment()["PROOT_NO_SECCOMP"] = "1"
                 environment()["PROOT_LOADER"] = paths.prootLoader.absolutePath
