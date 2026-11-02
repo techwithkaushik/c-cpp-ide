@@ -20,11 +20,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1524,22 +1527,30 @@ private fun WorkspaceScreen(
         }
     }
     if (showToolPanel) {
-        ModalBottomSheet(
-            onDismissRequest = onCloseToolPanel,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Color(0xFF10151C),
-            contentWindowInsets = { WindowInsets.navigationBars }
-        ) {
+        var sheetFraction by rememberSaveable { mutableStateOf(0.72f) }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val maxHeightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
+            val minFraction = with(density) { 280.dp.toPx() } / maxHeightPx
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f)).clickable(onClick = onCloseToolPanel))
             Column(
-                Modifier.fillMaxWidth().fillMaxHeight(0.92f).heightIn(min = 280.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .fillMaxHeight(sheetFraction.coerceIn(minFraction.coerceAtMost(0.95f), 1f))
+                    .background(Color(0xFF10151C), RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                    .pointerInput(maxHeightPx) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                sheetFraction = (sheetFraction - dragAmount / maxHeightPx)
+                                    .coerceIn(minFraction.coerceAtMost(0.95f), 1f)
+                            }
+                        )
+                    }
             ) {
-                ToolPanelContent(
-                    selected = selectedPanel,
-                    onSelect = onPanel,
-                    onClose = onCloseToolPanel,
-                    onOpenSettings = onOpenSettings
-                )
+                Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(36.dp).height(4.dp).background(Color(0xFF718096), RoundedCornerShape(2.dp)))
+                }
+                ToolPanelContent(selected = selectedPanel, onSelect = onPanel, onClose = onCloseToolPanel, onOpenSettings = onOpenSettings)
             }
         }
     }
