@@ -44,7 +44,6 @@ import java.io.IOException
 
 @Composable
 fun RuntimeSetupPanel(
-    message: String,
     onRuntimeReady: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,7 +53,7 @@ fun RuntimeSetupPanel(
     var rootfsUri by remember { mutableStateOf<Uri?>(null) }
     var rootfsSha by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember(message) { mutableStateOf(message) }
+    var status by remember { mutableStateOf("Checking Ubuntu runtime…") }
 
     fun displayName(uri: Uri): String = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
