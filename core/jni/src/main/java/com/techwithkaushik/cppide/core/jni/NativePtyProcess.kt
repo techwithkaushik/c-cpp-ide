@@ -45,13 +45,13 @@ class NativePtyProcess private constructor(private var handle: Long) : Closeable
     companion object {
         init { System.loadLibrary("cppide_native") }
 
-        fun launch(linker: String, proot: String, rootfs: String, shell: String, tempDirectory: String): NativePtyProcess {
+        fun launch(proot: String, rootfs: String, shell: String, tempDirectory: String): NativePtyProcess {
             val holder = NativePtyProcess(0L)
-            val handle = holder.nativeStart(linker, proot, rootfs, shell, tempDirectory)
+            val handle = holder.nativeStart(proot, rootfs, shell, tempDirectory)
             if (handle == 0L) throw IllegalStateException("Native PTY could not be created.")
             return NativePtyProcess(handle)
         }
     }
 
-    private external fun nativeStart(linker: String, proot: String, rootfs: String, shell: String, tempDirectory: String): Long
+    private external fun nativeStart(proot: String, rootfs: String, shell: String, tempDirectory: String): Long
 }
