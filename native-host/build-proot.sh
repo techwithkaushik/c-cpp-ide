@@ -139,7 +139,7 @@ PC
   CPPFLAGS="-I$WORK -I$PREFIX/include -DARG_MAX=131072" \
   LDFLAGS="-L$PREFIX/lib -Wl,-z,max-page-size=16384" \
     make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
-      CC="$CC" LD="$CC" STRIP="$TC/llvm-strip" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
+      CC="$CC" LD="$CC" STRIP="$TC/llvm-strip" OBJCOPY="$TC/llvm-objcopy" OBJDUMP="$TC/llvm-objdump" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
   DEST="$OUT/$ABI"
   mkdir -p "$DEST"
   "$TC/llvm-strip" -o "$DEST/libproot.so" "$PROOT_SRC/src/proot"
