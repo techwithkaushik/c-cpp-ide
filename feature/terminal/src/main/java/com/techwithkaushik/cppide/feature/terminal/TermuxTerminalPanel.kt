@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Typeface
 import android.view.KeyEvent
+import android.view.inputmethod.InputMethodManager
 import android.view.MotionEvent
 import android.os.Handler
 import android.os.Looper
@@ -272,11 +273,8 @@ fun TermuxTerminalPanel(
                         post {
                             requestFocus()
                             if (autoShowKeyboard) {
-                                postDelayed({
-                                    (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
-                                        android.view.inputmethod.InputMethodManager)
-                                        ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-                                }, 180L)
+                                (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+                                    ?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
                             }
                         }
                     }
@@ -483,12 +481,8 @@ private class IdeTermuxViewClient(
         val view = terminalView ?: return
         view.post {
             view.requestFocus()
-            val inputMethodManager = context.getSystemService(Context.INPUT_METHOD_SERVICE)
-                as? android.view.inputmethod.InputMethodManager
-            inputMethodManager?.showSoftInput(
-                view,
-                android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
-            )
+            val inputMethodManager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            inputMethodManager?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
         }
     }
     // Android Back is handled by the IDE panel, not injected as Escape into
