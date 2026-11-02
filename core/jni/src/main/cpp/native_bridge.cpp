@@ -166,7 +166,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
     const std::string rootfs = to_utf8(env, rootfs_value);
     const std::string shell = to_utf8(env, shell_value);
     const std::string temp = to_utf8(env, temp_value);
-    if (linker.empty() || proot.empty() || rootfs.empty() || shell.empty() || temp.empty()) {
+    if (proot.empty() || rootfs.empty() || shell.empty() || temp.empty()) {
         throw_state(env, "PTY launch arguments must not be empty.");
         return 0;
     }
@@ -235,17 +235,20 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
             setenv("PROOT_LOADER", loader.c_str(), 1);
         }
 
+        // libproot.so is an executable ELF in Android's APK nativeLibraryDir.
+        // Execute it directly: wrapping it with /system/bin/linker changes the
+        // launch path from the known-working bundled PRoot invocation.
         std::vector<std::string> arguments = {
-            linker, proot, "-r", rootfs, "-w", "/root",
+            proot, "-0", "-r", rootfs, "-w", "/root",
             "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys", shell, "-i"
         };
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
         for (auto& argument : arguments) argv.push_back(argument.data());
         argv.push_back(nullptr);
-        execv(linker.c_str(), argv.data());
+        execv(proot.c_str(), argv.data());
         const char* error = std::strerror(errno);
-        dprintf(STDERR_FILENO, "Could not execute Android linker: %s\r\n", error);
+        dprintf(STDERR_FILENO, "Could not execute bundled PRoot: %s\r\n", error);
         _exit(127);
     }
 
