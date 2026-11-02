@@ -184,11 +184,13 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         // Use lexical paths here as well as in safeTarget(). canonicalFile follows
         // usr-merged links such as /bin -> /usr/bin and can make a valid rootfs
         // link appear to escape the staging root.
-        // Use the same canonical root representation as safeTarget(). On Android,
-        // app-private paths may contain symlinked ancestors (for example /data/data
-        // versus /data/user/0); mixing absolute and canonical paths falsely rejects
-        // valid in-root links such as bin -> usr/bin.
-        val rootPath = root.canonicalFile.toPath().normalize()
+        // Keep both paths in the same lexical namespace. root/stage and link are
+        // created from the same app-private path, which may be spelled /data/data
+        // even though canonicalFile reports /data/user/0. Mixing canonical root
+        // with absolute link paths makes a valid bin -> usr/bin look out-of-root.
+        // Security comes from lexical normalization and rejecting .. escapes here;
+        // safeTarget separately checks canonical parents for archive-entry writes.
+        val rootPath = root.absoluteFile.toPath().normalize()
         val linkPath = link.absoluteFile.toPath().normalize()
         val resolved = if (rawTarget.startsWith("/")) {
             rootPath.resolve(rawTarget.removePrefix("/")).normalize()
@@ -221,7 +223,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     }
 
     companion object {
-        private const val INSTALLER_VERSION = 2
+        private const val INSTALLER_VERSION = 3
         private const val MAX_ENTRIES = 500_000
         private const val MAX_EXPANDED_BYTES = 4L * 1024 * 1024 * 1024
     }
