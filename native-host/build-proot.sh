@@ -20,10 +20,9 @@ mkdir -p "$WORK/src" "$WORK/talloc"
 PROOT_VERSION=v5.5.0
 PROOT_COMMIT=25dc6a3134891f98a79f57ce1c2c1b23ff15cad1
 PROOT_SRC="$WORK/src/proot"
-if [[ ! -d "$PROOT_SRC/.git" ]]; then
-  git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \\
-    https://github.com/proot-me/proot.git "$PROOT_SRC"
-fi
+rm -rf "$PROOT_SRC"
+git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \
+  https://github.com/proot-me/proot.git "$PROOT_SRC"
 git -C "$PROOT_SRC" fetch --depth 1 origin "$PROOT_COMMIT"
 git -C "$PROOT_SRC" checkout --detach "$PROOT_COMMIT"
 ACTUAL_COMMIT="$(git -C "$PROOT_SRC" rev-parse HEAD)"
