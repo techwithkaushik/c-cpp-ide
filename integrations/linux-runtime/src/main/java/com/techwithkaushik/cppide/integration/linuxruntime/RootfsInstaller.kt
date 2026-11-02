@@ -154,11 +154,22 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
 
     private fun createSafeSymlink(root: File, link: File, rawTarget: String) {
         if (rawTarget.isBlank()) throw IOException("Empty symlink target in rootfs.")
-        val rootPath = root.canonicalFile.toPath()
+        // Use lexical paths here as well as in safeTarget(). canonicalFile follows
+        // usr-merged links such as /bin -> /usr/bin and can make a valid rootfs
+        // link appear to escape the staging root.
+        val rootPath = root.absoluteFile.toPath().normalize()
         val linkPath = link.absoluteFile.toPath().normalize()
-        val resolved = if (rawTarget.startsWith("/")) rootPath.resolve(rawTarget.removePrefix("/")).normalize()
-            else linkPath.parent.resolve(rawTarget).normalize()
-        if (!resolved.startsWith(rootPath)) throw IOException("Symlink escapes rootfs: ${link.relativeTo(root)} -> $rawTarget")
+        val resolved = if (rawTarget.startsWith("/")) {
+            rootPath.resolve(rawTarget.removePrefix("/")).normalize()
+        } else {
+            linkPath.parent.resolve(rawTarget).normalize()
+        }
+        if (!resolved.startsWith(rootPath)) {
+            throw IOException("Symlink escapes rootfs: ${link.relativeTo(root)} -> $rawTarget")
+        }
+        // Keep absolute in-root targets relative to the staging root so the
+        // installed link remains confined to this rootfs; preserve relative
+        // targets such as bin -> usr/bin without canonicalizing them.
         val relativeTarget: Path = linkPath.parent.relativize(resolved)
         link.parentFile?.let { if (!it.exists() && !it.mkdirs()) throw IOException("Cannot create symlink parent.") }
         if (link.exists() || Files.isSymbolicLink(link.toPath())) link.delete()
