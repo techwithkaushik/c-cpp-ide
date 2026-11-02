@@ -31,6 +31,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                 environment()["TERM"] = "xterm"
                 environment()["PROOT_TMP_DIR"] = hostTemp.absolutePath
+                environment()["PROOT_LOADER"] = paths.prootLoader.absolutePath
             }.start()
         } catch (e: Exception) {
             return Result(false, null, "", "Could not launch PRoot: ${e.message ?: e.javaClass.simpleName}")
