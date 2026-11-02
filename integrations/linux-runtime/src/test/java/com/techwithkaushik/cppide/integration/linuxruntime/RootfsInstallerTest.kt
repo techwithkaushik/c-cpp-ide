@@ -132,6 +132,10 @@ class RootfsInstallerTest {
         }
         assertTrue("Expected /bin -> usr/bin usr-merged layout", Files.isSymbolicLink(File(root, "bin").toPath()))
         assertTrue("Expected /lib -> usr/lib usr-merged layout", Files.isSymbolicLink(File(root, "lib").toPath()))
+        val libtinfo = File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6")
+        assertTrue("Official archive's libtinfo.so.6 must remain a symlink", Files.isSymbolicLink(libtinfo.toPath()))
+        assertEquals("libtinfo.so.6.4", Files.readSymbolicLink(libtinfo.toPath()).toString())
+        assertEquals("libtinfo.so.6.4", File(root, "lib/arm-linux-gnueabihf/libtinfo.so.6").canonicalFile.name)
     }
 
 }
