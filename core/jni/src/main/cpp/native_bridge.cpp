@@ -218,13 +218,14 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // PRoot uses TMPDIR/PROOT_TMP_DIR for host-side temporary files and
         // some builds also consult TMP. Keep all three on the same existing,
         // app-private writable directory (never Android's missing /tmp).
-        setenv("TMPDIR", temp.c_str(), 1);
-        setenv("TMP", temp.c_str(), 1);
+        const std::string guest_tmp = rootfs + "/etc";
+        setenv("TMPDIR", guest_tmp.c_str(), 1);
+        setenv("TMP", guest_tmp.c_str(), 1);
         setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
         setenv("TERM", "xterm-256color", 1);
         setenv("COLORTERM", "truecolor", 1);
         setenv("LANG", "C.UTF-8", 1);
-        setenv("PROOT_TMP_DIR", temp.c_str(), 1);
+        setenv("PROOT_TMP_DIR", guest_tmp.c_str(), 1);
         // Android 10 / vendor kernels may deliver SIGSYS with PRoot seccomp acceleration.
         // Disable the accelerator for reliable guest execution; correctness takes priority over speed.
         setenv("PROOT_NO_SECCOMP", "1", 1);
@@ -246,10 +247,17 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // visible inside Ubuntu. The Kotlin launcher prepares this file in temp;
         // bind it only for this process without rewriting Ubuntu's rootfs resolver.
         const std::string resolver = temp + "/resolv.conf";
+        // Match the simple shell launch: start from the rootfs directory and
+        // expose the usr-merged paths explicitly. PRoot still owns the guest cwd.
+        if (chdir(rootfs.c_str()) != 0) {
+            dprintf(STDERR_FILENO, "Could not enter distro directory: %s\\r\\n", std::strerror(errno));
+            _exit(126);
+        }
         std::vector<std::string> arguments = {
-            proot, "-0", "-r", rootfs, "-w", "/root",
+            proot, "-0", "-v", "0", "-r", rootfs, "-w", "/root",
             "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
-            "-b", resolver + ":/etc/resolv.conf", shell, "-i"
+            "-b", rootfs + "/usr:/usr", "-b", rootfs + "/lib:/lib",
+            "-b", resolver + ":/etc/resolv.conf", shell, "--login"
         };
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
