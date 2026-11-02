@@ -6,8 +6,9 @@ import java.nio.file.Files
 /** Simple app-private paths for the extracted distro and bundled Android PRoot. */
 class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) {
     val base = File(filesDir, "linux-runtime")
-    val distributions = File(base, "distributions")
-    val ubuntuRoot = File(distributions, "ubuntu")
+    val distro = File(filesDir, "distro")
+    /** Backward-compatible name for the currently downloaded Ubuntu distro. */
+    val ubuntuRoot: File get() = distro
     val usrBin = File(filesDir, "usr/bin")
     val proot = File(usrBin, "proot")
     val prootLoader = File(usrBin, "libproot-loader.so")
@@ -28,7 +29,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     }
 
     fun ensureDirectories() {
-        listOf(base, distributions, usrBin, staging).forEach {
+        listOf(base, distro, usrBin, staging).forEach {
             if (!it.exists() && !it.mkdirs()) throw IllegalStateException("Cannot create runtime directory: $it")
             if (!it.isDirectory) throw IllegalStateException("Runtime path is not a directory: $it")
         }
