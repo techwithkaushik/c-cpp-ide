@@ -56,6 +56,20 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK for bundled PRoot v5.5.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Build upstream PRoot v5.5.0 for Android ABIs
+        shell: bash
+        run: bash native-host/build-proot.sh
+
       - name: Set up Gradle with dependency and build cache
         uses: gradle/actions/setup-gradle@v4
         with:
