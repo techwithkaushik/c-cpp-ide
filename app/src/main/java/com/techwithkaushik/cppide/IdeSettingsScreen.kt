@@ -26,6 +26,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +68,10 @@ internal fun IdeSettingsScreen(
     var category by rememberSaveable { mutableStateOf("Interface") }
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
+    var connectionMode by remember { mutableStateOf(prefs.getString("terminal_connection_mode", "local") ?: "local") }
+    var sshHost by remember { mutableStateOf(prefs.getString("terminal_ssh_host", "") ?: "") }
+    var sshPort by remember { mutableStateOf(prefs.getInt("terminal_ssh_port", 22).toString()) }
+    var sshUser by remember { mutableStateOf(prefs.getString("terminal_ssh_user", "") ?: "") }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -141,12 +146,22 @@ internal fun IdeSettingsScreen(
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
-                        Button(
-                            onClick = { category = "Runtime & Bootstrap" },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Runtime setup")
+                        SettingsHeading("CONNECTION")
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (connectionMode == "local") Button(onClick = { connectionMode = "local"; prefs.edit().putString("terminal_connection_mode", "local").apply() }, modifier = Modifier.weight(1f)) { Text("Local Ubuntu") }
+                            else OutlinedButton(onClick = { connectionMode = "local"; prefs.edit().putString("terminal_connection_mode", "local").apply() }, modifier = Modifier.weight(1f)) { Text("Local Ubuntu") }
+                            if (connectionMode == "ssh") Button(onClick = { connectionMode = "ssh"; prefs.edit().putString("terminal_connection_mode", "ssh").apply() }, modifier = Modifier.weight(1f)) { Text("SSH") }
+                            else OutlinedButton(onClick = { connectionMode = "ssh"; prefs.edit().putString("terminal_connection_mode", "ssh").apply() }, modifier = Modifier.weight(1f)) { Text("SSH") }
                         }
+                        if (connectionMode == "ssh") {
+                            OutlinedTextField(value = sshHost, onValueChange = { sshHost = it; prefs.edit().putString("terminal_ssh_host", it).apply() }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Host / IP") })
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(value = sshUser, onValueChange = { sshUser = it; prefs.edit().putString("terminal_ssh_user", it).apply() }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("Username") })
+                                OutlinedTextField(value = sshPort, onValueChange = { value -> if (value.all { it.isDigit() } && value.length <= 5) { sshPort = value; value.toIntOrNull()?.takeIf { it in 1..65535 }?.let { prefs.edit().putInt("terminal_ssh_port", it).apply() } } }, modifier = Modifier.weight(0.6f), singleLine = true, label = { Text("Port") })
+                            }
+                            Text("SSH starts in the terminal; authenticate there with your key or password.", color = SettingsMuted, fontSize = 11.sp)
+                        }
+                        Button(onClick = { category = "Runtime & Bootstrap" }, modifier = Modifier.fillMaxWidth()) { Text("Runtime & Bootstrap") }
                     }
                 }
                 Spacer(Modifier.height(18.dp))
