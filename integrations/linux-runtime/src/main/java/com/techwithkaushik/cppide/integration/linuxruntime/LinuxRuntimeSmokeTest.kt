@@ -36,6 +36,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["HOME"] = "/root"
                 // PRoot runs on Android: its loader temp files must use an existing host path.
                 environment()["TMPDIR"] = hostTemp.absolutePath
+                environment()["TMP"] = hostTemp.absolutePath
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                 environment()["TERM"] = "xterm"
                 environment()["PROOT_TMP_DIR"] = hostTemp.absolutePath
