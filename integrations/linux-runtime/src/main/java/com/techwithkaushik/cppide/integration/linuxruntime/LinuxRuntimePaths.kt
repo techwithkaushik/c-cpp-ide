@@ -30,7 +30,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     }
 
     fun ensureDirectories() {
-        listOf(base, distro, usrBin, staging).forEach {
+        listOf(base, distro, usrTmp, usrBin, staging).forEach {
             if (!it.exists() && !it.mkdirs()) throw IllegalStateException("Cannot create runtime directory: $it")
             if (!it.isDirectory) throw IllegalStateException("Runtime path is not a directory: $it")
         }
