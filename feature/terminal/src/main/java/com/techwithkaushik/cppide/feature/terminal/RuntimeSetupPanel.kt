@@ -34,7 +34,6 @@ import java.io.IOException
 
 @Composable
 fun RuntimeSetupPanel(
-    message: String,
     onRuntimeReady: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -43,28 +42,28 @@ fun RuntimeSetupPanel(
     var selectedArchive by remember { mutableStateOf<Uri?>(null) }
     var busy by remember { mutableStateOf(false) }
     var checkingInstalledRuntime by remember { mutableStateOf(false) }
-    var status by remember(message) { mutableStateOf(message) }
+    var status by remember { mutableStateOf("Checking runtime…") }
 
     val verifyInstalledRuntime: () -> Unit = {
         if (!busy && !checkingInstalledRuntime) {
             checkingInstalledRuntime = true
-            status = "Checking the installed runtime and executing a fixed shell smoke test…"
+            status = "Checking runtime…"
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
                         val runtime = EmbeddedTermuxRuntime(context.filesDir)
                         if (!runtime.hasBootstrapLayout()) {
-                            "No complete bootstrap is installed. Select the matching bootstrap.zip below."
+                            "No bootstrap installed."
                         } else {
                             val smoke = BootstrapSmokeTest(runtime).run()
                             if (smoke.success) {
-                                "Runtime verified. Shell execution passed."
+                                "Runtime verified."
                             } else {
                                 val detail = listOfNotNull(
                                     smoke.failureReason,
                                     smoke.stderr.trim().takeIf { it.isNotBlank() }?.let { "stderr: ${it.take(400)}" }
                                 ).joinToString(" — ")
-                                "Runtime verification failed: $detail. Select the matching bootstrap files below to repair it."
+                                "Runtime verification failed: $detail"
                             }
                         }
                     } catch (error: Exception) {
@@ -83,7 +82,7 @@ fun RuntimeSetupPanel(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
             selectedArchive = uri
-            if (uri != null) status = "Bootstrap ZIP selected. The installer will detect IDE or stock Termux prefix and configure symlinks."
+            if (uri != null) status = "Bootstrap ZIP selected."
         }
     )
 
@@ -92,7 +91,7 @@ fun RuntimeSetupPanel(
         val uri = selectedArchive
         if (uri != null && !busy && !checkingInstalledRuntime) {
             busy = true
-            status = "Installing bootstrap and creating Termux symlinks…"
+            status = "Installing bootstrap…"
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     val stagedArchive = File(context.cacheDir, "selected-code-studio-bootstrap.zip")
@@ -154,12 +153,7 @@ fun RuntimeSetupPanel(
         modifier = modifier.fillMaxWidth().background(Color(0xFF0D1117), RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Main terminal setup", color = Color(0xFF8CC8FF), fontSize = 18.sp)
-        Text(
-            "Select either the IDE-specific bootstrap or a stock Termux bootstrap ZIP for this device ABI. Stock Termux symlinks are remapped into this app's private prefix; the shell is tested before the install is accepted. If the test fails, the previous runtime is restored.",
-            color = Color(0xFFE8EDF5),
-            fontSize = 12.sp
-        )
+        Text("Runtime & Bootstrap", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Button(enabled = !busy && !checkingInstalledRuntime, onClick = verifyInstalledRuntime) {
             Text(if (checkingInstalledRuntime) "Checking runtime…" else "Check terminal runtime")
         }
@@ -174,16 +168,11 @@ fun RuntimeSetupPanel(
             color = Color(0xFF9AA7B5),
             fontSize = 11.sp
         )
-        Text(
-            "Install location: ${File(context.filesDir, "usr").absolutePath}",
-            color = Color(0xFF9AA7B5),
-            fontSize = 11.sp
-        )
-        Button(
+         Button(
             enabled = !busy && !checkingInstalledRuntime && selectedArchive != null,
             onClick = { installBootstrap() }
         ) {
-            Text(if (busy) "Setting up terminal…" else "2 · Install bootstrap WITH symlinks")
+            Text(if (busy) "Setting up terminal…" else "Install bootstrap")
         }
         if (busy || checkingInstalledRuntime) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text(
