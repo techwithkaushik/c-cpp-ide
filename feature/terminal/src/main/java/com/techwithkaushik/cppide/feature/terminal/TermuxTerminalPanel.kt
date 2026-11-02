@@ -262,7 +262,7 @@ fun TermuxTerminalPanel(
                 Text("No terminal sessions", color = Color(0xFFE8EDF5))
                 Button(onClick = {
                     TerminalSessionRegistry.createTab(
-                        appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                        appContext, linker, shell, shellArguments, home, environment, terminalFontSize, scrollbackLines
                     )
                 }) { Text("New terminal") }
             }
