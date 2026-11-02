@@ -34,12 +34,12 @@ class ProotDownloader(private val paths: LinuxRuntimePaths) {
         require(header.size == 20 && header.take(4).map { it.toInt() and 0xff } ==
             listOf(0x7f, 0x45, 0x4c, 0x46)) { "Bundled ${file.name} is not a valid ELF executable." }
         val machine = (header[18].toInt() and 0xff) or ((header[19].toInt() and 0xff) shl 8)
-        val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
+        val x86Device = android.os.Build.SUPPORTED_ABIS.any { it.startsWith("x86") }
         val expected = when {
-            abi.contains("arm64") -> 183
-            abi.contains("armeabi") -> 40
-            abi.contains("x86_64") -> 62
-            else -> 3
+            android.os.Process.is64Bit() && x86Device -> 62
+            android.os.Process.is64Bit() -> 183
+            x86Device -> 3
+            else -> 40
         }
         require(machine == expected) { "PRoot ABI mismatch: ELF machine=$machine, expected=$expected." }
     }
