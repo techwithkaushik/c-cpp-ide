@@ -1,6 +1,9 @@
 package com.techwithkaushik.cppide.feature.terminal
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.net.Uri
+import android.widget.Toast
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -216,7 +220,24 @@ fun RuntimeSetupPanel(
 
         if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text("Install location: ${paths.base.absolutePath}", color = Color(0xFF9AA7B5), fontSize = 11.sp)
-        Text(status, color = if (paths.ready()) Color(0xFF7DDBB0) else Color(0xFF9AA7B5), fontSize = 12.sp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                status,
+                color = if (paths.ready()) Color(0xFF7DDBB0) else Color(0xFF9AA7B5),
+                fontSize = 12.sp,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedButton(onClick = {
+                val clipboard = context.getSystemService(ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(ClipData.newPlainText("CPPIDE runtime log", status))
+                Toast.makeText(context, "Runtime log copied", Toast.LENGTH_SHORT).show()
+            }) {
+                Text("Copy log", fontSize = 11.sp)
+            }
+        }
     }
 }
 
