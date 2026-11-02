@@ -245,6 +245,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         std::vector<std::string> arguments = {
             proot, "-0", "-r", rootfs, "-w", "/root",
             "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
+            "-b", rootfs + "/usr:/usr", "-b", rootfs + "/lib:/lib",
             "-b", temp + "/resolv.conf:/etc/resolv.conf", shell, "-i"
         };
         std::vector<char*> argv;
