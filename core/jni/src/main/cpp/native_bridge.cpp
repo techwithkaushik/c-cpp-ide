@@ -221,7 +221,10 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         const size_t proot_slash = proot.find_last_of('/');
         if (proot_slash != std::string::npos) {
             const std::string loader = proot.substr(0, proot_slash + 1) + "libproot-loader.so";
-            if (access(loader.c_str(), X_OK) == 0) setenv("PROOT_LOADER", loader.c_str(), 1);
+            // Match LinuxRuntimeSmokeTest: always tell PRoot the bundled loader path.
+            // access(X_OK) can return false for APK-extracted native libraries on some
+            // Android filesystems even though the system linker can load the file.
+            setenv("PROOT_LOADER", loader.c_str(), 1);
         }
 
         std::vector<std::string> arguments = {
