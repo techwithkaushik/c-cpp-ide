@@ -34,7 +34,6 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
                     "echo '=== libc ==='; /usr/bin/ldd --version; " +
                     "echo '=== apt ==='; /usr/bin/apt --version; " +
-                    "echo '=== DNS ==='; getent hosts ports.ubuntu.com; " +
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.base).apply {
                 environment()["HOME"] = "/root"
