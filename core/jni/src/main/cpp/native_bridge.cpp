@@ -213,6 +213,9 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setenv("COLORTERM", "truecolor", 1);
         setenv("LANG", "C.UTF-8", 1);
         setenv("PROOT_TMP_DIR", temp.c_str(), 1);
+        // Android 10 / vendor kernels may deliver SIGSYS with PRoot seccomp acceleration.
+        // Disable the accelerator for reliable guest execution; correctness takes priority over speed.
+        setenv("PROOT_NO_SECCOMP", "1", 1);
         // Android 10+ blocks execve from writable app data. PRoot's loader is
         // packaged beside the host executable in the APK native library directory.
         const size_t proot_slash = proot.find_last_of('/');
