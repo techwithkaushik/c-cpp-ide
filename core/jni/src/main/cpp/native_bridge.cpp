@@ -211,6 +211,8 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // guest. They can override Ubuntu's libc/ncurses dependency resolution.
         unsetenv("LD_PRELOAD");
         unsetenv("LD_LIBRARY_PATH");
+        unsetenv("PREFIX");
+        unsetenv("BOOTSTRAP_ROOT");
         // PRoot prepares loader files on the Android host before entering the rootfs.
         // /tmp may not exist for an unrooted Android app, so use the app-private host temp path.
         // PRoot uses TMPDIR/PROOT_TMP_DIR for host-side temporary files and
