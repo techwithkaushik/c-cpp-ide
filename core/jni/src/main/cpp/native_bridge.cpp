@@ -242,9 +242,14 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // libproot.so is an executable ELF in Android's APK nativeLibraryDir.
         // Execute it directly: wrapping it with /system/bin/linker changes the
         // launch path from the known-working bundled PRoot invocation.
+        // Android DNS configuration is network-scoped and isn't automatically
+        // visible inside Ubuntu. The Kotlin launcher prepares this file in temp;
+        // bind it only for this process without rewriting Ubuntu's rootfs resolver.
+        const std::string resolver = temp + "/resolv.conf";
         std::vector<std::string> arguments = {
             proot, "-0", "-r", rootfs, "-w", "/root",
-            "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys", shell, "-i"
+            "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
+            "-b", resolver + ":/etc/resolv.conf", shell, "-i"
         };
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
