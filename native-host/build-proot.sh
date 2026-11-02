@@ -118,7 +118,7 @@ for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
   mkdir -p "$PREFIX/include" "$PREFIX/lib/pkgconfig" "$B/talloc"
   echo "== Building PRoot v5.5.0 for $ABI"
   "$CC" -O2 -fPIC -D_GNU_SOURCE -include "$WORK/config.h" \
-    -I"$TALLOC_SRC" -I"$TALLOC_SRC/lib/replace" -c "$TALLOC_SRC/talloc.c" -o "$B/talloc/talloc.o"
+    -I"$WORK" -I"$TALLOC_SRC" -I"$TALLOC_SRC/lib/replace" -c "$TALLOC_SRC/talloc.c" -o "$B/talloc/talloc.o"
   "$CC" -O2 -fPIC -c "$WORK/replace_min.c" -o "$B/talloc/replace_min.o"
   "$TC/llvm-ar" rcs "$PREFIX/lib/libtalloc.a" "$B/talloc/talloc.o" "$B/talloc/replace_min.o"
   cp "$TALLOC_SRC/talloc.h" "$PREFIX/include/"
@@ -136,7 +136,7 @@ PC
   export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
   export PKG_CONFIG_SYSROOT_DIR=
   make -C "$PROOT_SRC/src" clean >/dev/null 2>&1 || true
-  CPPFLAGS="-I$PREFIX/include -DARG_MAX=131072" \
+  CPPFLAGS="-I$WORK -I$PREFIX/include -DARG_MAX=131072" \
   LDFLAGS="-L$PREFIX/lib -Wl,-z,max-page-size=16384" \
     make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
       CC="$CC" LD="$CC" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
