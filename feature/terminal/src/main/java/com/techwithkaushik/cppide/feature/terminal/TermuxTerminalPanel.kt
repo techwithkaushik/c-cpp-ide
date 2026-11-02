@@ -267,6 +267,33 @@ fun TermuxTerminalPanel(
                 }) { Text("New terminal") }
             }
         } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                listOf(
+                    "CTRL+C" to "\\u0003",
+                    "CTRL+D" to "\\u0004",
+                    "CTRL+Z" to "\\u001A",
+                    "ESC" to "\\u001B",
+                    "TAB" to "\\t",
+                    "↑" to "\\u001B[A",
+                    "↓" to "\\u001B[B",
+                    "←" to "\\u001B[D",
+                    "→" to "\\u001B[C"
+                ).forEach { (label, sequence) ->
+                    Text(
+                        label,
+                        color = Color(0xFFD7E2F0),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .background(Color(0xFF202A36), RoundedCornerShape(6.dp))
+                            .clickable { activeTab.session.write(sequence) }
+                            .padding(horizontal = 9.dp, vertical = 6.dp)
+                    )
+                }
+            }
             DisposableEffect(activeTab.id, activeTab.client) {
                 onDispose {
                     // Detach only. Do NOT finish the process when the panel is
