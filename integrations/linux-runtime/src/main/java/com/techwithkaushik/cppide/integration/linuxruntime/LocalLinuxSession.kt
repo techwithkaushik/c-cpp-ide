@@ -46,12 +46,9 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
 
     companion object {
         fun start(paths: LinuxRuntimePaths): LocalLinuxSession {
+            paths.ensureDirectories()
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed.")
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
-            listOf("root", "tmp").forEach {
-                val dir = java.io.File(paths.ubuntuRoot, it)
-                if (!dir.exists() && !dir.mkdirs()) throw IllegalStateException("Cannot create Ubuntu $it directory.")
-            }
             val shell = if (java.io.File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
             val temp = java.io.File(paths.base, "tmp").apply {
                 if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.")
