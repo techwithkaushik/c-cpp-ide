@@ -16,9 +16,6 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             if (!exists() && !mkdirs()) return Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath")
             if (!isDirectory || !canWrite()) return Result(false, null, "", "PRoot host temporary directory is not writable: $absolutePath")
         }
-        val resolver = runCatching { HostResolverConfig.prepare(hostTemp) }.getOrElse {
-            return Result(false, null, "", "Cannot prepare Android DNS configuration for Ubuntu: ${it.message}")
-        }
         // Validate the same interactive shell the terminal will launch. A /bin/sh-only
         // smoke test can pass even when /bin/bash has incompatible libc/libtinfo libraries.
         val shell = when {
@@ -33,7 +30,6 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 "-0", "-v", "2",
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
-                "-b", "${resolver.absolutePath}:/etc/resolv.conf",
                 shell, "--noprofile", "--norc", "-c",
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
                     "echo '=== libc ==='; /usr/bin/ldd --version; " +
