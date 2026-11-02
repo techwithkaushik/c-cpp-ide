@@ -68,7 +68,7 @@ internal fun IdeSettingsScreen(
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     var resetMessage by rememberSaveable { mutableStateOf("") }
-    val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap", "Languages", "Build & Run", "Keyboard", "About")
+    val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
         Row(
@@ -110,7 +110,7 @@ internal fun IdeSettingsScreen(
         ) {
                 when (category) {
                     "Runtime & Bootstrap" -> {
-                        SettingsHeading("RUNTIME & BOOTSTRAP", "Install terminal runtime.")
+                        SettingsHeading("RUNTIME & BOOTSTRAP", "")
                         RuntimeSetupPanel(
                             message = "Install an Ubuntu rootfs and a SHA-256-verified Android PRoot runtime into this app-private Linux runtime directory.",
                             onRuntimeReady = onRuntimeReady,
@@ -118,27 +118,26 @@ internal fun IdeSettingsScreen(
                         )
                     }
                     "Interface" -> {
-                        SettingsHeading("INTERFACE", "Adjust text size.")
+                        SettingsHeading("INTERFACE", "")
                         SettingsCard("Text size", "Interface", "${(uiFontScale * 100).toInt()}%")
                         Slider(value = uiFontScale, onValueChange = { onUiFontScaleChange(it); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, it).apply() }, valueRange = 0.85f..1.25f, steps = 7)
                     }
                     "Editor" -> {
-                        SettingsHeading("EDITOR", "Text and appearance.")
+                        SettingsHeading("EDITOR", "")
                         SettingsCard("Editor font size", "Current size", "${editorFontSize.toInt()} sp")
                         Slider(value = editorFontSize, onValueChange = { onEditorFontSizeChange(it); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, it).apply() }, valueRange = 10f..24f)
                         SettingsSwitch("Word wrap", "Wrap long lines in the editor", editorWordWrap) {
                             onEditorWordWrapChange(it); prefs.edit().putBoolean(SettingsPreference.EDITOR_WORD_WRAP, it).apply()
                         }
-                        SettingsHeading("COLOR THEME", "Choose a theme.")
+                        SettingsHeading("COLOR THEME", "")
                         listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
                             SettingsChoice(theme, editorTheme == theme) {
                                 onEditorThemeChange(theme); prefs.edit().putString(SettingsPreference.EDITOR_THEME, theme).apply()
                             }
                         }
-                        SettingsCard("Editor engine", "Implementation", "Sora code editor")
-                    }
+                                    }
                     "Terminal" -> {
-                        SettingsHeading("TERMINAL", "Font and keyboard.")
+                        SettingsHeading("TERMINAL", "")
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
@@ -147,8 +146,7 @@ internal fun IdeSettingsScreen(
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
-                        SettingsCard("Main terminal", "Ubuntu / SSH", "Open a local Ubuntu shell or connect directly to an SSH host. No external terminal app is required.")
-                        Button(
+                                        Button(
                             onClick = { category = "Runtime & Bootstrap" },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -156,33 +154,6 @@ internal fun IdeSettingsScreen(
                         }
                         SettingsCard("Input", "Shell session", "Commands run inside the app-private Linux environment, not Android's fallback shell.")
                         SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
-                    }
-                    "Languages" -> {
-                        SettingsHeading("LANGUAGES & TOOLS", "Available language tools.")
-                        listOf("C / C++ — clangd, clang, clang++", "Python — pyright, python", "JavaScript / TypeScript — typescript-language-server, prettier", "Lua — lua-language-server", "Rust — rust-analyzer, rustc", "Text, JSON, TOML, YAML, HTML and CSS").forEach {
-                            SettingsCard(it.substringBefore(" — "), "Tooling", it.substringAfter(" — ", it))
-                        }
-                        SettingsCard("Custom executable paths", "Advanced", "Use the Languages tab in the existing tooling configuration to save and validate custom paths.")
-                    }
-                    "Build & Run" -> {
-                        SettingsHeading("BUILD & RUN", "Build options.")
-                        SettingsCard("Target environment", "Ubuntu + SSH", "App-owned Ubuntu rootfs or direct SSH session; no Termux prefix or data is used.")
-                        SettingsCard("Linux runtime", "App-private", "Ubuntu rootfs and Android PRoot must match the device ABI and pass runtime validation.")
-                        SettingsCard("Compiler", "C / C++", "Compiler availability depends on the selected bootstrap and installed packages")
-                        SettingsCard("Run output", "Output panel", "Program output appears in the IDE output panel when the runner is connected")
-                    }
-                    "Keyboard" -> {
-                        SettingsHeading("KEYBOARD & SHORTCUTS", "Common shortcuts.")
-                        SettingsCard("Terminal", "Show keyboard", if (autoKeyboard) "Automatically on terminal open" else "Tap terminal to show keyboard")
-                        SettingsCard("Common actions", "Editor", "Ctrl+S Save · Ctrl+F Find · Ctrl+Z Undo · Ctrl+Shift+P Command Palette")
-                        SettingsCard("Terminal controls", "Interactive", "Enter runs commands; Ctrl+C interrupts foreground processes when supported")
-                    }
-                    else -> {
-                        SettingsHeading("ABOUT", "App information.")
-                        SettingsCard("Application", "Code Studio", "Android-native coding workspace")
-                        SettingsCard("Architecture", "Current device APK", "Bootstrap ABI must match this device and APK")
-                        SettingsCard("Privacy", "Runtime files", "Runtime and projects are stored in app-private storage")
-                        SettingsCard("Troubleshooting", "Terminal", "Open Runtime & Bootstrap to import a validated Ubuntu rootfs and PRoot runtime.")
                     }
                 }
                 Spacer(Modifier.height(18.dp))
@@ -194,7 +165,6 @@ internal fun IdeSettingsScreen(
 private fun SettingsHeading(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(title, color = SettingsAccent, fontSize = 11.sp)
-        Text(subtitle, color = SettingsMuted, fontSize = IdeDesignTokens.Typography.caption)
     }
 }
 
@@ -202,7 +172,6 @@ private fun SettingsHeading(title: String, subtitle: String) {
 private fun SettingsCard(title: String, eyebrow: String, detail: String) {
     Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
         Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(eyebrow.uppercase(), color = SettingsAccent, fontSize = 9.sp)
             Text(title, color = SettingsText, fontSize = IdeDesignTokens.Typography.body)
             Text(detail, color = SettingsMuted, fontSize = 11.sp)
         }
