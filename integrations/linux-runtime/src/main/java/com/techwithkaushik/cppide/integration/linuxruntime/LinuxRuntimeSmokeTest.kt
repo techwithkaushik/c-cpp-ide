@@ -21,7 +21,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val process = try {
             ProcessBuilder(
                 paths.systemLinker.absolutePath, paths.proot.absolutePath,
-                "-v", "9",
+                // Level 2 preserves useful errors without flooding stderr with ptrace traces.
+                "-v", "2",
                 "-r", root, "-w", "/",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
                 shell, "-c", "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'; test -x /bin/sh"
@@ -70,10 +71,10 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val failure = listOf(
             "Ubuntu shell exited with code $exit.",
             androidExecBlocker,
-            "PRoot command: ${paths.systemLinker.absolutePath} ${paths.proot.absolutePath} -v 9 -r $root -w / -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell -c <smoke-test>",
-            err.takeIf { it.isNotBlank() }?.let { "PRoot stderr: ${it.take(3000)}" }
+            "PRoot command: ${paths.systemLinker.absolutePath} ${paths.proot.absolutePath} -v 2 -r $root -w / -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell -c <smoke-test>",
+            err.takeIf { it.isNotBlank() }?.let { "PRoot stderr (tail): ${it.takeLast(6000)}" }
                 ?: "PRoot stderr was empty.",
-            out.takeIf { it.isNotBlank() }?.let { "PRoot stdout: ${it.take(1500)}" }
+            out.takeIf { it.isNotBlank() }?.let { "PRoot stdout (tail): ${it.takeLast(2000)}" }
                 ?: "PRoot stdout was empty.",
             "Loader: ${paths.prootLoader.absolutePath} (exists=${paths.prootLoader.isFile}); rootfs=$root; shell=$shell"
         ).filterNotNull().joinToString(" ")
