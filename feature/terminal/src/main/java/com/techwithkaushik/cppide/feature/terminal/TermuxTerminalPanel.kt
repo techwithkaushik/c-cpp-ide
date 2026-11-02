@@ -132,6 +132,7 @@ fun TermuxTerminalPanel(
         appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE)
     }
     val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE)
+    val scrollbackLines = terminalPreferences.getInt("terminal_scrollback_lines", 5000).coerceIn(1000, 10000)
     val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
     val connectionMode = terminalPreferences.getString("terminal_connection_mode", "local") ?: "local"
     val sshHost = terminalPreferences.getString("terminal_ssh_host", "").orEmpty().trim()
@@ -199,7 +200,7 @@ fun TermuxTerminalPanel(
             TerminalSessionRegistry.initialSessionCreated = true
             if (tabs.isEmpty()) {
                 TerminalSessionRegistry.createTab(
-                    appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                    appContext, linker, shell, shellArguments, home, environment, terminalFontSize, scrollbackLines
                 )
             }
         }
@@ -395,6 +396,7 @@ private object TerminalSessionRegistry {
         home: File,
         environment: Array<String>,
         terminalFontSize: Int,
+        scrollbackLines: Int,
     ) {
         val id = nextId++
         val client = IdeTermuxSessionClient(context.applicationContext)
@@ -406,7 +408,7 @@ private object TerminalSessionRegistry {
             home.absolutePath,
             args,
             environment.copyOf(),
-            2_000,
+            scrollbackLines,
             client
         )
         tabs.add(TerminalTab(id, "Terminal $id", session, client))
