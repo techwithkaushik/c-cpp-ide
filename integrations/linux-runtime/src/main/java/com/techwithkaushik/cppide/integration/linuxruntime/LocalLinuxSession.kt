@@ -56,6 +56,9 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
             val temp = java.io.File(paths.base, "tmp").apply {
                 if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.")
             }
+            // Android DNS is network-scoped and is not inherited by the guest.
+            // Generate a host-side resolver file and bind it into Ubuntu at launch.
+            HostResolverConfig.prepare(temp)
             val pty = NativePtyProcess.launch(
                 proot = paths.proot.absolutePath,
                 rootfs = paths.ubuntuRoot.absolutePath,
