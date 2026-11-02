@@ -218,9 +218,9 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // PRoot uses TMPDIR/PROOT_TMP_DIR for host-side temporary files and
         // some builds also consult TMP. Keep all three on the same existing,
         // app-private writable directory (never Android's missing /tmp).
-        const std::string guest_tmp = rootfs + "/etc";
-        setenv("TMPDIR", guest_tmp.c_str(), 1);
-        setenv("TMP", guest_tmp.c_str(), 1);
+        const std::string host_tmp = temp;
+        setenv("TMPDIR", host_tmp.c_str(), 1);
+        setenv("TMP", host_tmp.c_str(), 1);
         setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
         setenv("TERM", "xterm-256color", 1);
         setenv("COLORTERM", "truecolor", 1);
