@@ -38,7 +38,6 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 "-0", "-v", "0",
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
-                "-b", "$root/usr:/usr", "-b", "$root/lib:/lib",
                 "-b", "${resolver.absolutePath}:/etc/resolv.conf",
                 shell, "--login", "-c",
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
