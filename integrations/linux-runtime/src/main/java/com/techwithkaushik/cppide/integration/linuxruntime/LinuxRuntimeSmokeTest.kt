@@ -9,6 +9,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
     data class Result(val success: Boolean, val exitCode: Int?, val output: String, val error: String?)
 
     fun run(timeoutSeconds: Long = 20): Result {
+        paths.ensureDirectories()
         if (!paths.hasRootfs()) return Result(false, null, "", "Ubuntu rootfs is missing or incomplete.")
         if (!paths.hasProot()) return Result(false, null, "", "Bundled Android PRoot v5.5.0 binary/loader is missing from the APK native library directory.")
         val root = paths.ubuntuRoot.absolutePath
