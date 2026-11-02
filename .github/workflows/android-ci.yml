@@ -146,8 +146,8 @@ jobs:
           path: app/build/outputs/apk/arm32/release/*.apk
           if-no-files-found: error
           retention-days: 14
- | head -n 80
-          tar -tvzf "$RUNNER_TEMP/$archive" | grep -E ' (\./)?(bin|lib)$|libtinfo\.so\.6( ->|\.4$)' | head -n 30
+ | sed -n '1,80p'
+          tar -tvzf "$RUNNER_TEMP/$archive" | grep -E ' (\./)?(bin|lib)$|libtinfo\.so\.6( ->|\.4$)' | sed -n '1,30p'
 
       - name: Test Linux runtime and SSH integration
         env:
