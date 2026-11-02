@@ -87,7 +87,7 @@ fun TermuxTerminalPanel(
                 if (!runtime.hasBootstrapLayout()) {
                     RuntimeStatus(
                         ready = false,
-                        message = "No runtime is installed. Open Settings → Runtime & Bootstrap and select a bootstrap ZIP."
+                        message = "No runtime installed."
                     )
                 } else {
                     // This potentially expensive repair scan and executable smoke
@@ -104,7 +104,7 @@ fun TermuxTerminalPanel(
                         ).joinToString(" — ")
                         RuntimeStatus(
                             ready = false,
-                            message = "Runtime validation failed${if (detail.isBlank()) "." else ": $detail"} Open Settings → Runtime & Bootstrap to reinstall or repair it."
+                            message = "Runtime validation failed${if (detail.isBlank()) "." else ": $detail"}"
                         )
                     }
                 }
@@ -135,7 +135,7 @@ fun TermuxTerminalPanel(
 
     if (!runtimeStatus.ready || shell == null) {
         val message = if (runtimeStatus.ready) {
-            "Runtime smoke test passed, but no executable shell entry point was found."
+            "No executable shell found."
         } else {
             runtimeStatus.message
         }
@@ -145,11 +145,7 @@ fun TermuxTerminalPanel(
         ) {
             Text("Terminal runtime unavailable", color = IdeDesignTokens.Color.TextPrimary)
             Text(message, color = IdeDesignTokens.Color.TextSecondary)
-            Text(
-                "Open Settings → Runtime & Bootstrap to select the correct bootstrap ZIP and verify its SHA-256 checksum.",
-                color = Color(0xFF9AA8BA)
-            )
-            Button(onClick = onOpenSettings) { Text("Open Runtime Settings") }
+             Button(onClick = onOpenSettings) { Text("Open Runtime Settings") }
             Button(onClick = { runtimeRefreshToken++ }) { Text("Retry runtime check") }
         }
         return
