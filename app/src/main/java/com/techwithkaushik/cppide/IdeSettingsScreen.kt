@@ -67,7 +67,6 @@ internal fun IdeSettingsScreen(
     var category by rememberSaveable { mutableStateOf("Interface") }
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
-    var resetMessage by rememberSaveable { mutableStateOf("") }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -93,43 +92,39 @@ internal fun IdeSettingsScreen(
         Divider(color = IdeDesignTokens.Color.Divider)
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(category, color = SettingsAccent, modifier = Modifier.weight(1f))
-            TextButton(onClick = {
+            if (category != "Runtime & Bootstrap") TextButton(onClick = {
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
                     "Terminal" -> { terminalFontSize = 13f; autoKeyboard = true; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).apply() }
-                    else -> resetMessage = "This section has no saved preferences to reset yet."
                 }
-                if (category == "Interface" || category == "Editor" || category == "Terminal") resetMessage = category + " reset."
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
-        if (resetMessage.isNotBlank()) Text(resetMessage, color = SettingsMuted, modifier = Modifier.padding(horizontal = 14.dp))
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
         ) {
                 when (category) {
                     "Runtime & Bootstrap" -> {
-                        SettingsHeading("RUNTIME & BOOTSTRAP", "")
+                        SettingsHeading("RUNTIME & BOOTSTRAP")
                         RuntimeSetupPanel(
-                            message = "Install an Ubuntu rootfs and a SHA-256-verified Android PRoot runtime into this app-private Linux runtime directory.",
                             onRuntimeReady = onRuntimeReady,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     "Interface" -> {
-                        SettingsHeading("INTERFACE", "")
+                        SettingsHeading("INTERFACE")
                         SettingsCard("Text size", "Interface", "${(uiFontScale * 100).toInt()}%")
                         Slider(value = uiFontScale, onValueChange = { onUiFontScaleChange(it); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, it).apply() }, valueRange = 0.85f..1.25f, steps = 7)
                     }
                     "Editor" -> {
-                        SettingsHeading("EDITOR", "")
+                        SettingsHeading("EDITOR")
                         SettingsCard("Editor font size", "Current size", "${editorFontSize.toInt()} sp")
                         Slider(value = editorFontSize, onValueChange = { onEditorFontSizeChange(it); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, it).apply() }, valueRange = 10f..24f)
                         SettingsSwitch("Word wrap", "Wrap long lines in the editor", editorWordWrap) {
                             onEditorWordWrapChange(it); prefs.edit().putBoolean(SettingsPreference.EDITOR_WORD_WRAP, it).apply()
                         }
-                        SettingsHeading("COLOR THEME", "")
+                        SettingsHeading("COLOR THEME")
                         listOf("Dark+ (VS Code)", "Light+ (VS Code)", "Monokai", "Solarized Dark").forEach { theme ->
                             SettingsChoice(theme, editorTheme == theme) {
                                 onEditorThemeChange(theme); prefs.edit().putString(SettingsPreference.EDITOR_THEME, theme).apply()
@@ -137,7 +132,7 @@ internal fun IdeSettingsScreen(
                         }
                                     }
                     "Terminal" -> {
-                        SettingsHeading("TERMINAL", "")
+                        SettingsHeading("TERMINAL")
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
@@ -150,10 +145,8 @@ internal fun IdeSettingsScreen(
                             onClick = { category = "Runtime & Bootstrap" },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Set up main terminal")
+                            Text("Runtime setup")
                         }
-                        SettingsCard("Input", "Shell session", "Commands run inside the app-private Linux environment, not Android's fallback shell.")
-                        SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
                     }
                 }
                 Spacer(Modifier.height(18.dp))
@@ -162,7 +155,7 @@ internal fun IdeSettingsScreen(
 }
 
 @Composable
-private fun SettingsHeading(title: String, subtitle: String) {
+private fun SettingsHeading(title: String) {
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(title, color = SettingsAccent, fontSize = 11.sp)
     }
