@@ -46,14 +46,18 @@ class RootfsInstallerTest {
                 file("etc/os-release", "NAME=Ubuntu\\nID=ubuntu\\n")
                 file("etc/group", "root:x:0:\\n")
                 file("usr/bin/sh", "shell-placeholder")
-                file("usr/lib/libtinfo.so.6.4", "original-target")
-                val link = TarArchiveEntry("usr/lib/libtinfo.so.6", TarArchiveEntry.LF_SYMLINK)
+                val libAlias = TarArchiveEntry("lib", TarArchiveEntry.LF_SYMLINK)
+                    .apply { linkName = "usr/lib" }
+                tar.putArchiveEntry(libAlias)
+                tar.closeArchiveEntry()
+                file("usr/lib/arm-linux-gnueabihf/libtinfo.so.6.4", "original-target")
+                val link = TarArchiveEntry("lib/arm-linux-gnueabihf/libtinfo.so.6", TarArchiveEntry.LF_SYMLINK)
                     .apply { linkName = "libtinfo.so.6.4" }
                 tar.putArchiveEntry(link)
                 tar.closeArchiveEntry()
-                // An archive may replace an earlier link at the same path.
-                // Extraction must unlink it rather than write through it.
-                file("usr/lib/libtinfo.so.6", "replacement-file")
+                // A later entry via /usr/lib aliases /lib and must replace the
+                // symlink itself, not overwrite libtinfo.so.6.4 through it.
+                file("usr/lib/arm-linux-gnueabihf/libtinfo.so.6", "replacement-file")
             }
         }
 
@@ -61,8 +65,8 @@ class RootfsInstallerTest {
         installer.install(archive)
 
         val root = File(files, "linux-runtime/distributions/ubuntu")
-        assertEquals("original-target", File(root, "usr/lib/libtinfo.so.6.4").readText())
-        assertEquals("replacement-file", File(root, "usr/lib/libtinfo.so.6").readText())
+        assertEquals("original-target", File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6.4").readText())
+        assertEquals("replacement-file", File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6").readText())
         assertFalse(Files.isSymbolicLink(File(root, "usr/lib/libtinfo.so.6").toPath()))
     }
 
