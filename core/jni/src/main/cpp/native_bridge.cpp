@@ -210,7 +210,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setenv("SHELL", "/bin/bash", 1);
         // Never leak Android/Termux injected preload libraries into the Ubuntu
         // guest. They can override Ubuntu's libc/ncurses dependency resolution.
-        setenv("LD_PRELOAD", "", 1);
+        unsetenv("LD_PRELOAD");
         unsetenv("LD_LIBRARY_PATH");
         // PRoot prepares loader files on the Android host before entering the rootfs.
         // /tmp may not exist for an unrooted Android app, so use the app-private host temp path.
