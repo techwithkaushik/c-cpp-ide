@@ -49,7 +49,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["USER"] = "root"
                 environment()["LOGNAME"] = "root"
                 environment()["SHELL"] = "/bin/bash"
-                // Do not leak Android/Termux preload libraries into Ubuntu's dynamic linker.
+                // Do not leak Android host preload libraries into Ubuntu's dynamic linker.
                 environment().remove("LD_PRELOAD")
                 environment().remove("LD_LIBRARY_PATH")
                 environment().remove("PREFIX")
