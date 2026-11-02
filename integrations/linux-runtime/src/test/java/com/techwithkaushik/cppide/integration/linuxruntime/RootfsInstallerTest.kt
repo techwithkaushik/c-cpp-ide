@@ -44,6 +44,7 @@ class RootfsInstallerTest {
                     tar.closeArchiveEntry()
                 }
                 file("etc/os-release", "NAME=Ubuntu\\nID=ubuntu\\n")
+                file("etc/group", "root:x:0:\\n")
                 file("usr/bin/sh", "shell-placeholder")
                 file("usr/lib/libtinfo.so.6.4", "original-target")
                 val link = TarArchiveEntry("usr/lib/libtinfo.so.6", TarArchiveEntry.LF_SYMLINK)
