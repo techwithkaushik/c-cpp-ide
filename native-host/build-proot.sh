@@ -21,6 +21,16 @@ PROOT_VERSION=v5.5.0
 PROOT_COMMIT=25dc6a3134891f98a79f57ce1c2c1b23ff15cad1
 PROOT_SRC="$WORK/src/proot"
 rm -rf "$PROOT_SRC"
+git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \
+  https://github.com/proot-me/proot.git "$PROOT_SRC"
+git -C "$PROOT_SRC" fetch --depth 1 origin "$PROOT_COMMIT"
+git -C "$PROOT_SRC" checkout --detach "$PROOT_COMMIT"
+ACTUAL_COMMIT="$(git -C "$PROOT_SRC" rev-parse HEAD)"
+if [[ "$ACTUAL_COMMIT" != "$PROOT_COMMIT" ]]; then
+  echo "Expected upstream PRoot $PROOT_VERSION at $PROOT_COMMIT, got $ACTUAL_COMMIT" >&2
+  exit 1
+fi
+
 # Android's seccomp policy and upstream PRoot's acceleration filter can conflict:
 # the guest may be killed with SIGSYS (signal 31) before Bash starts. Compile the
 # seccomp module as a no-op on Android; ptrace remains the syscall translation path.
@@ -35,15 +45,6 @@ if source.count(needle) != 1:
     raise SystemExit("Could not safely disable PRoot seccomp acceleration")
 p.write_text(source.replace(needle, replacement, 1))
 PY
-git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \
-  https://github.com/proot-me/proot.git "$PROOT_SRC"
-git -C "$PROOT_SRC" fetch --depth 1 origin "$PROOT_COMMIT"
-git -C "$PROOT_SRC" checkout --detach "$PROOT_COMMIT"
-ACTUAL_COMMIT="$(git -C "$PROOT_SRC" rev-parse HEAD)"
-if [[ "$ACTUAL_COMMIT" != "$PROOT_COMMIT" ]]; then
-  echo "Expected upstream PRoot $PROOT_VERSION at $PROOT_COMMIT, got $ACTUAL_COMMIT" >&2
-  exit 1
-fi
 
 TALLOC_VERSION=2.5.0
 TALLOC_SHA=912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007
