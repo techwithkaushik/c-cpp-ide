@@ -92,7 +92,7 @@ internal fun IdeSettingsScreen(
         Divider(color = IdeDesignTokens.Color.Divider)
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(category, color = SettingsAccent, modifier = Modifier.weight(1f))
-            TextButton(onClick = {
+            if (category != "Runtime & Bootstrap") TextButton(onClick = {
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
@@ -162,12 +162,15 @@ private fun SettingsHeading(title: String) {
 @Composable
 private fun SettingsCard(title: String, eyebrow: String, detail: String) {
     Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
-        Text(
-            title,
-            color = SettingsText,
-            fontSize = IdeDesignTokens.Typography.body,
-            modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, color = SettingsText, fontSize = IdeDesignTokens.Typography.body, modifier = Modifier.weight(1f))
+            if (detail.endsWith("%") || detail.endsWith(" sp")) {
+                Text(detail, color = SettingsMuted, fontSize = IdeDesignTokens.Typography.body)
+            }
+        }
     }
 }
 
