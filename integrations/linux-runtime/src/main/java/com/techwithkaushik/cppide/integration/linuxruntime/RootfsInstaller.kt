@@ -137,10 +137,11 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             parent.resolve(rawTarget).normalize()
         }
         if (!resolved.startsWith(rootPath)) throw IOException("Symlink escapes extraction directory: $rawTarget")
-        val target = parent.relativize(resolved)
+        // Validate the link target, but preserve the archive's exact link text.
+        // PRoot interprets absolute symlinks relative to the guest rootfs.
         if (!parent.toFile().exists() && !parent.toFile().mkdirs()) throw IOException("Cannot create symlink parent.")
         if (Files.exists(linkPath) || Files.isSymbolicLink(linkPath)) Files.delete(linkPath)
-        Files.createSymbolicLink(linkPath, target)
+        Files.createSymbolicLink(linkPath, java.nio.file.Paths.get(rawTarget))
     }
 
     private fun sha256(file: File): String {
