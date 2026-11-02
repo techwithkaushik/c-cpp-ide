@@ -48,7 +48,10 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
         fun start(paths: LinuxRuntimePaths): LocalLinuxSession {
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed.")
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
-            if (!paths.proot.setExecutable(true, true)) throw IllegalStateException("Cannot mark PRoot executable.")
+            // PRoot lives in Android's APK-extracted nativeLibraryDir. Its permissions
+            // are managed by the package installer; attempting setExecutable() here
+            // fails on read-only library filesystems and is unnecessary. Launch it
+            // through the Android system linker in NativePtyProcess instead.
             if (!paths.systemLinker.isFile) throw IllegalStateException("Android system linker is unavailable.")
             listOf("root", "tmp").forEach {
                 val dir = java.io.File(paths.ubuntuRoot, it)
