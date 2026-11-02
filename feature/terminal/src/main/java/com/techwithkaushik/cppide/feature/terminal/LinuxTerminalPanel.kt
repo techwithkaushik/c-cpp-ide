@@ -64,6 +64,7 @@ private data class LinuxTerminalTab(
     val send: (String) -> Unit,
     val interrupt: () -> Unit,
     val session: AutoCloseable,
+    val exited: MutableState<Int?>,
 )
 
 private object LinuxTerminalSessions {
@@ -85,7 +86,8 @@ private object LinuxTerminalSessions {
             screen = screen,
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
             interrupt = interrupt,
-            session = session
+            session = session,
+            exited = mutableStateOf(null)
         )
         tabs.add(tab)
         selectedId = tab.id
@@ -238,7 +240,10 @@ fun LinuxTerminalPanel(
                         val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\n")
                         session.readOutput(
                             onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
-                            onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[Shell exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
+                            onExit = { code -> handler.post {
+                    tab.exited.value = code
+                    LinuxTerminalSessions.append(tab, "\r\n[Shell exited: $code — output preserved. Close this tab to dismiss.]\r\n")
+                } }
                         )
                     }.onFailure { error = it.message ?: "Could not start Ubuntu shell." }
                 }
@@ -283,23 +288,40 @@ fun LinuxTerminalPanel(
                     fontSize = 11.sp,
                     modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(outputScrollState)
                 )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
-                        value = command,
-                        onValueChange = { command = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        label = { Text("Command / input") },
-                    )
-                    Button(onClick = {
-                        val line = command
-                        command = ""
-                        try { active.send(line + "\n") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
-                    }) { Text("Send") }
-                    OutlinedButton(onClick = { runCatching { active.interrupt() }.onFailure { error = it.message } }) {
-                        Text("Ctrl-C")
-                    }
+                active.exited.value?.let { code ->
+                    Text("Process exited (code $code). Output is preserved; close this tab to dismiss.", color = Color(0xFFFFAB91), fontSize = 11.sp)
                 }
+                androidx.compose.foundation.text.BasicTextField(
+                    value = command,
+                    onValueChange = { updated ->
+                        val previous = command
+                        if (active.exited.value == null) {
+                            val commonPrefix = previous.commonPrefixWith(updated)
+                            val removed = previous.length - commonPrefix.length
+                            val added = updated.substring(commonPrefix.length)
+                            try {
+                                repeat(removed) { active.send("\u007f") }
+                                if (added.isNotEmpty()) active.send(added)
+                            } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                        }
+                        command = updated
+                    },
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFF151B23), RoundedCornerShape(6.dp)).padding(12.dp),
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFFE6EDF3), fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF6EA8E0)),
+                    decorationBox = { inner ->
+                        if (command.isEmpty()) Text(if (active.exited.value == null) "Type directly into terminal…" else "Shell has exited", color = Color(0xFF9AA7B5), fontSize = 12.sp)
+                        inner()
+                    }
+                )
+                androidx.compose.foundation.text.BasicTextField(
+                    value = "",
+                    onValueChange = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = active.exited.value == null,
+                    onTextLayout = {}
+                )
             }
             error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
         }
