@@ -90,7 +90,6 @@ jobs:
 
       - name: Test Linux runtime and SSH integration
         env:
-          UBUNTU_ROOTFS_ARCHIVE: ${{ runner.temp }}/ubuntu-base-24.04.5-base-armhf.tar.gz
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
