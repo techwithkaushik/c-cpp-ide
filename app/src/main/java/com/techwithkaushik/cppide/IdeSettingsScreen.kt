@@ -102,7 +102,7 @@ internal fun IdeSettingsScreen(
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
-                    "Terminal" -> { terminalFontSize = 13f; autoKeyboard = true; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).apply() }
+                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; connectionMode = "local"; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "local").apply() }
                 }
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
