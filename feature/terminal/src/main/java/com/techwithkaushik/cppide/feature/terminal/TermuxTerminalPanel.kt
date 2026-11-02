@@ -133,6 +133,10 @@ fun TermuxTerminalPanel(
     }
     val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE)
     val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
+    val connectionMode = terminalPreferences.getString("terminal_connection_mode", "local") ?: "local"
+    val sshHost = terminalPreferences.getString("terminal_ssh_host", "").orEmpty().trim()
+    val sshUser = terminalPreferences.getString("terminal_ssh_user", "").orEmpty().trim()
+    val sshPort = terminalPreferences.getInt("terminal_ssh_port", 22)
 
     if (!runtimeStatus.ready || shell == null) {
         val message = if (runtimeStatus.ready) {
@@ -166,6 +170,18 @@ fun TermuxTerminalPanel(
     // keep running with their scrollback, cwd, environment and foreground job.
     val tabs = TerminalSessionRegistry.tabs
     val selectedTabId = TerminalSessionRegistry.selectedTabId
+
+    androidx.compose.runtime.LaunchedEffect(selectedTabId, connectionMode, sshHost, sshUser, sshPort) {
+        val validHost = sshHost.isNotBlank() && sshHost.all { it.isLetterOrDigit() || it in ".:%_-" }
+        val validUser = sshUser.isNotBlank() && sshUser.all { it.isLetterOrDigit() || it in "._-" }
+        if (connectionMode == "ssh" && validHost && validUser) {
+            val active = tabs.firstOrNull { it.id == selectedTabId }
+            if (active != null && TerminalSessionRegistry.markSshStarted(active.id)) {
+                kotlinx.coroutines.delay(350)
+                active.session.write("ssh -p $sshPort $sshUser@$sshHost\r")
+            }
+        }
+    }
 
     DisposableEffect(onCloseTerminal) {
         TerminalSessionRegistry.onLastSessionExited = onCloseTerminal
@@ -337,6 +353,9 @@ private object TerminalSessionRegistry {
     var initialSessionCreated = false
     var onLastSessionExited: (() -> Unit)? = null
     private var nextId = 1
+    private val sshStartedTabs = mutableSetOf<Int>()
+
+    fun markSshStarted(id: Int): Boolean = synchronized(sshStartedTabs) { sshStartedTabs.add(id) }
 
     fun select(id: Int) {
         if (tabs.any { it.id == id }) selectedTabId = id
@@ -353,6 +372,7 @@ private object TerminalSessionRegistry {
         val wasSelected = tabs[index].id == selectedTabId
         val removed = tabs.removeAt(index)
         removed.client.attach(null)
+        synchronized(sshStartedTabs) { sshStartedTabs.remove(removed.id) }
 
         if (tabs.isEmpty()) {
             selectedTabId = 0
@@ -398,6 +418,7 @@ private object TerminalSessionRegistry {
         if (index < 0) return
         val removed = tabs.removeAt(index)
         removed.client.attach(null)
+        synchronized(sshStartedTabs) { sshStartedTabs.remove(removed.id) }
         removed.session.finishIfRunning()
         if (tabs.isEmpty()) {
             selectedTabId = 0
