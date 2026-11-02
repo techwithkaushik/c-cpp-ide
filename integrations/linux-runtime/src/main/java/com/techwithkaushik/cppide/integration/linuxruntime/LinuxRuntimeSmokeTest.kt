@@ -55,8 +55,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment().remove("PREFIX")
                 environment().remove("BOOTSTRAP_ROOT")
                 // PRoot runs on Android: its loader temp files must use an existing host path.
-                environment()["TMPDIR"] = File(paths.ubuntuRoot, "etc").absolutePath
-                environment()["TMP"] = File(paths.ubuntuRoot, "etc").absolutePath
+                environment()["TMPDIR"] = paths.usrTmp.absolutePath
+                environment()["TMP"] = paths.usrTmp.absolutePath
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                 environment()["TERM"] = "xterm-256color"
                 environment()["COLORTERM"] = "truecolor"
