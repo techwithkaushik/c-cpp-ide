@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
 import com.techwithkaushik.cppide.core.jni.NativePtyProcess
+import java.io.File
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -45,9 +46,46 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
     }
 
     companion object {
+        /**
+         * Android may expose supplementary host GIDs inside PRoot that Ubuntu's
+         * /etc/group does not name. Add names only for missing IDs, without
+         * changing any existing Ubuntu group or numeric GID.
+         */
+        private fun ensureSupplementaryGroupNames(rootfs: File) {
+            val root = runCatching { rootfs.canonicalFile }.getOrNull() ?: return
+            val groupFile = File(root, "etc/group")
+            val group = runCatching { groupFile.canonicalFile }.getOrNull() ?: return
+            if (!groupFile.isFile || !groupFile.canWrite()) return
+            if (!group.path.startsWith(root.path + File.separator)) return
+
+            val androidGroups = linkedMapOf(
+                3003 to "android_inet",
+                9997 to "android_everybody",
+                20490 to "android_shared",
+                50490 to "android_user"
+            )
+            val lines = runCatching { group.readLines(Charsets.UTF_8) }.getOrNull() ?: return
+            val existingGids = lines.mapNotNull { line ->
+                line.split(':').getOrNull(2)?.toIntOrNull()
+            }.toSet()
+            val missing = androidGroups.filterKeys { it !in existingGids }
+            if (missing.isEmpty()) return
+
+            runCatching {
+                group.appendText(
+                    missing.entries.joinToString(
+                        separator = "",
+                        prefix = if (lines.isEmpty()) "" else "\n"
+                    ) { (gid, name) -> "$name:x:$gid:\n" },
+                    Charsets.UTF_8
+                )
+            }
+        }
+
         fun start(paths: LinuxRuntimePaths): LocalLinuxSession {
             paths.ensureDirectories()
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed.")
+            ensureSupplementaryGroupNames(paths.ubuntuRoot)
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
             val shell = if (java.io.File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
             val temp = paths.usrTmp.apply {
