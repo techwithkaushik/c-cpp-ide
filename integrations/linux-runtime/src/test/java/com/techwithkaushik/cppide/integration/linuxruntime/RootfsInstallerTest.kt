@@ -66,7 +66,12 @@ class RootfsInstallerTest {
             }
         }
 
-        val installer = RootfsInstaller(LinuxRuntimePaths(files))
+        // Android may expose the same app-private directory through both
+        // /data/data/<package> and /data/user/0/<package>. Exercise installation
+        // through a symlinked alias so root and entry paths use the same namespace.
+        val filesAlias = File(temporaryFolder.root, "app-files-alias")
+        Files.createSymbolicLink(filesAlias.toPath(), files.toPath())
+        val installer = RootfsInstaller(LinuxRuntimePaths(filesAlias))
         installer.install(archive)
 
         val root = File(files, "linux-runtime/distributions/ubuntu")
