@@ -44,7 +44,7 @@ fun RuntimeSetupPanel(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
-    val paths = remember(context) { LinuxRuntimePaths(context.filesDir) }
+    val paths = remember(context) { LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir) }
     val scope = rememberCoroutineScope()
     var rootfsUri by remember { mutableStateOf<Uri?>(null) }
     var rootfsSha by remember { mutableStateOf("") }
