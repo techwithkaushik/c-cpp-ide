@@ -34,16 +34,17 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             ProcessBuilder(
                 paths.proot.absolutePath,
                 // Level 2 preserves useful errors without flooding stderr with ptrace traces.
-                "-0", "-v", "2",
+                "-0", "-v", "0",
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
+                "-b", "$root/usr:/usr", "-b", "$root/lib:/lib",
                 "-b", "${resolver.absolutePath}:/etc/resolv.conf",
-                shell, "--noprofile", "--norc", "-c",
+                shell, "--login", "-c",
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
                     "echo '=== libc ==='; /usr/bin/ldd --version; " +
                     "echo '=== apt ==='; /usr/bin/apt --version; " +
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
-            ).directory(paths.base).apply {
+            ).directory(paths.ubuntuRoot).apply {
                 environment()["HOME"] = "/root"
                 environment()["USER"] = "root"
                 environment()["LOGNAME"] = "root"
@@ -54,13 +55,13 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment().remove("PREFIX")
                 environment().remove("BOOTSTRAP_ROOT")
                 // PRoot runs on Android: its loader temp files must use an existing host path.
-                environment()["TMPDIR"] = hostTemp.absolutePath
-                environment()["TMP"] = hostTemp.absolutePath
+                environment()["TMPDIR"] = File(paths.ubuntuRoot, "etc").absolutePath
+                environment()["TMP"] = File(paths.ubuntuRoot, "etc").absolutePath
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                 environment()["TERM"] = "xterm-256color"
                 environment()["COLORTERM"] = "truecolor"
                 environment()["LANG"] = "C.UTF-8"
-                environment()["PROOT_TMP_DIR"] = hostTemp.absolutePath
+                environment()["PROOT_TMP_DIR"] = File(paths.ubuntuRoot, "etc").absolutePath
                 // Android kernels can kill guest syscalls with SIGSYS under PRoot seccomp acceleration.
                 environment()["PROOT_NO_SECCOMP"] = "1"
                 environment()["PROOT_LOADER"] = paths.prootLoader.absolutePath
