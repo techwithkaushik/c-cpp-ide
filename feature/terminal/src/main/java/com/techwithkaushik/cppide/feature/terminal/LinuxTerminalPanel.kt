@@ -284,6 +284,36 @@ fun LinuxTerminalPanel(
                 outputScrollState.scrollTo(outputScrollState.maxValue)
             }
             Column(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF080B10), RoundedCornerShape(8.dp)).padding(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    listOf(
+                        "CTRL+C" to "\u0003",
+                        "CTRL+D" to "\u0004",
+                        "CTRL+Z" to "\u001A",
+                        "ESC" to "\u001B",
+                        "TAB" to "\t",
+                        "↑" to "\u001B[A",
+                        "↓" to "\u001B[B",
+                        "←" to "\u001B[D",
+                        "→" to "\u001B[C"
+                    ).forEach { (label, sequence) ->
+                        Text(
+                            label,
+                            color = if (active.exited.value == null) Color(0xFFD7E2F0) else Color(0xFF657080),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .background(Color(0xFF202A36), RoundedCornerShape(6.dp))
+                                .clickable(enabled = active.exited.value == null) {
+                                    try { active.send(sequence) }
+                                    catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                                }
+                                .padding(horizontal = 9.dp, vertical = 6.dp)
+                        )
+                    }
+                }
                 Text(
                     active.output.value,
                     color = Color(0xFFE6EDF3),
