@@ -56,24 +56,37 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Set up Android SDK and NDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android NDK for bundled PRoot v5.5.0
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkmanager "ndk;27.2.12479018"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
-
-      - name: Build upstream PRoot v5.5.0 for Android ABIs
-        shell: bash
-        run: bash native-host/build-proot.sh
-
       - name: Set up Gradle with dependency and build cache
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Locate Android SDK and ensure NDK is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          if [[ ! -d "$SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin" ]]; then
+            SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+            if [[ -z "$SDKMANAGER" ]]; then
+              echo "::error::Android SDK command-line tools/sdkmanager not found under $SDK_ROOT"
+              exit 1
+            fi
+            yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" "ndk;27.2.12479018" || {
+              [[ -d "$SDK_ROOT/ndk" ]] || exit 1
+            }
+          fi
+          test -d "$SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin" || {
+            echo "::error::Required Android NDK is not available after SDK setup"
+            exit 1
+          }
+          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Build upstream PRoot v5.5.0 for Android ABIs
+        shell: bash
+        run: bash native-host/build-proot.sh
 
       - name: Test Linux runtime and SSH integration
         env:
@@ -101,9 +114,6 @@ jobs:
           fi
           declare -A APK_DIRS=(
             [arm32]="app/build/outputs/apk/arm32/release"
-            # [arm64]="app/build/outputs/apk/arm64/release"
-            # [x86]="app/build/outputs/apk/x86/release"
-            # [x64]="app/build/outputs/apk/x64/release"
           )
           for abi in arm32; do
             dir="${APK_DIRS[$abi]}"
@@ -126,27 +136,3 @@ jobs:
           path: app/build/outputs/apk/arm32/release/*.apk
           if-no-files-found: error
           retention-days: 14
-
-      # - name: Upload arm64 APK
-      # uses: actions/upload-artifact@v4
-      # with:
-      # name: code-studio-release-apk-arm64
-      # path: app/build/outputs/apk/arm64/release/*.apk
-      # if-no-files-found: error
-      # retention-days: 14
-
-      # - name: Upload x86 APK
-      # uses: actions/upload-artifact@v4
-      # with:
-      # name: code-studio-release-apk-x86
-      # path: app/build/outputs/apk/x86/release/*.apk
-      # if-no-files-found: error
-      # retention-days: 14
-
-      # - name: Upload x64 APK
-      # uses: actions/upload-artifact@v4
-      # with:
-      # name: code-studio-release-apk-x64
-      # path: app/build/outputs/apk/x64/release/*.apk
-      # if-no-files-found: error
-      # retention-days: 14
