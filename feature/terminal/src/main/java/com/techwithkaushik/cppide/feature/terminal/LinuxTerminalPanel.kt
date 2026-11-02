@@ -124,7 +124,10 @@ fun LinuxTerminalPanel(
     onCloseTerminal: () -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
-    val paths = remember(context) { LinuxRuntimePaths(context.filesDir) }
+    val paths = remember(context) {
+        // Use the same authoritative APK native-library path as Runtime Settings.
+        LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir)
+    }
     val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
