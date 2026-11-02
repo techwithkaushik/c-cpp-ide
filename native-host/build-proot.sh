@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build upstream PRoot v5.5.0 for Android/bionic and bundle it as APK native
+# Build the actively maintained Termux PRoot fork for Android/bionic and bundle it as APK native
 # executables. NativeLibraryDir is the supported executable location on API 29+.
 set -euo pipefail
 
@@ -16,9 +16,10 @@ API=26
 JOBS="$(nproc)"
 mkdir -p "$WORK/src" "$WORK/talloc"
 
-curl -fsSL "https://github.com/proot-me/proot/archive/refs/tags/v5.5.0.tar.gz" -o "$WORK/proot.tar.gz"
+PROOT_COMMIT=52d65a4dc140ca554d241a1438ddd4f6b00c9813
+curl -fsSL "https://github.com/termux/proot/archive/$PROOT_COMMIT.tar.gz" -o "$WORK/proot.tar.gz"
 tar -xzf "$WORK/proot.tar.gz" -C "$WORK/src"
-PROOT_SRC="$WORK/src/proot-5.5.0"
+PROOT_SRC="$WORK/src/proot-$PROOT_COMMIT"
 
 TALLOC_VERSION=2.5.0
 TALLOC_SHA=912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007
@@ -116,7 +117,7 @@ for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
   B="$WORK/$ABI"
   PREFIX="$B/prefix"
   mkdir -p "$PREFIX/include" "$PREFIX/lib/pkgconfig" "$B/talloc"
-  echo "== Building PRoot v5.5.0 for $ABI"
+  echo "== Building Termux PRoot $PROOT_COMMIT for $ABI"
   "$CC" -O2 -fPIC -D_GNU_SOURCE -D__STDC_WANT_LIB_EXT1__=1 -include "$WORK/config.h" \
     -I"$WORK" -I"$TALLOC_SRC" -I"$TALLOC_SRC/lib/replace" -c "$TALLOC_SRC/talloc.c" -o "$B/talloc/talloc.o"
   "$CC" -O2 -fPIC -c "$WORK/replace_min.c" -o "$B/talloc/replace_min.o"
