@@ -4,7 +4,7 @@ import android.os.Process
 import java.io.File
 
 /** App-private Linux rootfs paths and read-only APK-bundled Android host binaries. */
-class LinuxRuntimePaths(filesDir: File) {
+class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) {
     val base = File(filesDir, "linux-runtime")
     val distributions = File(base, "distributions")
     val ubuntuRoot = File(distributions, "ubuntu")
@@ -13,15 +13,19 @@ class LinuxRuntimePaths(filesDir: File) {
     val binProotLoader = File(bin, "loader")
 
     /** APK-extracted nativeLibraryDir is executable on Android 10+; app data is not. */
+    // Use Android's authoritative native-library directory. /proc/self/maps is
+    // not reliable here: the JNI library may not yet be loaded, and its filename
+    // can vary by build configuration.
     val nativeLibraryDir: File? by lazy {
-        runCatching {
-            File("/proc/self/maps").useLines { lines ->
-                lines.firstNotNullOfOrNull { line ->
-                    val path = line.substringAfterLast(' ', "")
-                    if (path.endsWith("/libcppide_native.so")) File(path).parentFile else null
+        bundledNativeLibraryDir?.takeIf { it.isNotBlank() }?.let(::File)
+            ?: runCatching {
+                File("/proc/self/maps").useLines { lines ->
+                    lines.firstNotNullOfOrNull { line ->
+                        val path = line.substringAfterLast(' ', "")
+                        if (path.endsWith(".so") && path.contains("/lib/")) File(path).parentFile else null
+                    }
                 }
-            }
-        }.getOrNull()
+            }.getOrNull()
     }
     val proot: File get() = nativeLibraryDir?.let { File(it, "libproot.so") } ?: binProot
     val prootLoader: File get() = nativeLibraryDir?.let { File(it, "libproot-loader.so") } ?: binProotLoader
