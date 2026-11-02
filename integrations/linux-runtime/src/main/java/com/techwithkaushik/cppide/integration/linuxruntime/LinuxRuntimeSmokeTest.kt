@@ -10,7 +10,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
 
     fun run(timeoutSeconds: Long = 20): Result {
         if (!paths.hasRootfs()) return Result(false, null, "", "Ubuntu rootfs is missing or incomplete.")
-        if (!paths.proot.isFile) return Result(false, null, "", "PRoot binary is missing.")
+        if (!paths.hasProot()) return Result(false, null, "", "Bundled Android PRoot v5.5.0 binary/loader is missing from the APK native library directory.")
         if (!paths.systemLinker.isFile) return Result(false, null, "", "Android system linker is missing.")
         val root = paths.ubuntuRoot.absolutePath
         val hostTemp = File(paths.base, "tmp").apply {
@@ -61,8 +61,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         ) {
             "Android denied execution of the Ubuntu shell from app-private storage. " +
                 "On Android 10+ with targetSdk 29 or higher, W^X execution restrictions can block this " +
-                "PRoot-RS launcher. The runtime must remain inactive until an Android-compatible PRoot " +
-                "execution/loader path is installed; chmod or disabling SELinux is not a valid fix."
+                "PRoot launcher. Verify the APK bundles libproot.so and libproot-loader.so in nativeLibraryDir; " +
+                "chmod or disabling SELinux is not a valid fix."
         } else {
             null
         }
