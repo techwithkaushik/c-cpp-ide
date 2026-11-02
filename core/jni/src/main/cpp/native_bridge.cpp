@@ -205,6 +205,9 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         close(master);
 
         setenv("HOME", "/root", 1);
+        setenv("USER", "root", 1);
+        setenv("LOGNAME", "root", 1);
+        setenv("SHELL", "/bin/bash", 1);
         // Never leak Android/Termux injected preload libraries into the Ubuntu
         // guest. They can override Ubuntu's libc/ncurses dependency resolution.
         setenv("LD_PRELOAD", "", 1);
