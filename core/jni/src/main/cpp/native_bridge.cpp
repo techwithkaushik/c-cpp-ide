@@ -256,8 +256,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         std::vector<std::string> arguments = {
             proot, "-0", "-v", "0", "-r", rootfs, "-w", "/root",
             "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
-            "-b", rootfs + "/usr:/usr", "-b", rootfs + "/lib:/lib",
-            "-b", resolver + ":/etc/resolv.conf", shell, "--login"
+            "-b", resolver + ":/etc/resolv.conf", shell, "--login
         };
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
