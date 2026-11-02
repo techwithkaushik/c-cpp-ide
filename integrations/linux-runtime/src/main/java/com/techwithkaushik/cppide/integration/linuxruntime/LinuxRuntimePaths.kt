@@ -69,7 +69,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
         // where /lib and /usr/lib alias one another. Require the current installer
         // marker so old rootfs images are reinstalled instead of silently reused.
         val currentInstaller = runCatching {
-            marker.readLines().any { it.trim() == "installerVersion=3" }
+            marker.readLines().any { it.trim() == "installerVersion=4" }
         }.getOrDefault(false)
         return currentInstaller && File(ubuntuRoot, "etc/os-release").isFile &&
             (File(ubuntuRoot, "bin/sh").exists() || File(ubuntuRoot, "usr/bin/sh").exists())
