@@ -55,7 +55,22 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val err = synchronized(errors) { errors.toString() }
         val exit = process.exitValue()
         val success = exit == 0 && out.contains("CPPIDE_UBUNTU_RUNTIME_OK")
-        return Result(success, exit, out, if (success) null else listOf("Ubuntu shell exited with code $exit.", err.takeIf { it.isNotBlank() }).filterNotNull().joinToString(" "))
+        val androidExecBlocker = if (
+            !success && (err.contains("EACCES") || err.contains("Permission denied", ignoreCase = true))
+        ) {
+            "Android denied execution of the Ubuntu shell from app-private storage. " +
+                "On Android 10+ with targetSdk 29 or higher, W^X execution restrictions can block this " +
+                "PRoot-RS launcher. The runtime must remain inactive until an Android-compatible PRoot " +
+                "execution/loader path is installed; chmod or disabling SELinux is not a valid fix."
+        } else {
+            null
+        }
+        val failure = listOf(
+            "Ubuntu shell exited with code $exit.",
+            androidExecBlocker,
+            err.takeIf { it.isNotBlank() }
+        ).filterNotNull().joinToString(" ")
+        return Result(success, exit, out, if (success) null else failure)
     }
 
     private fun pump(input: InputStream, destination: StringBuilder): Thread = Thread({
