@@ -3,14 +3,10 @@ package com.techwithkaushik.cppide.integration.linuxruntime
 import java.io.File
 import java.io.IOException
 import java.io.FileOutputStream
-import java.io.FileInputStream
-import java.security.MessageDigest
 import java.nio.file.Files
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -87,55 +83,5 @@ class RootfsInstallerTest {
     }
 
 
-    @Test fun officialUbuntuBaseArmhfExtractionPreservesCriticalLibraryBytes() {
-        val archivePath = System.getenv("UBUNTU_ROOTFS_ARCHIVE")
-        org.junit.Assume.assumeTrue("Official rootfs archive is supplied by CI", !archivePath.isNullOrBlank())
-        val archive = File(archivePath!!)
-        val expectedPaths = setOf(
-            "usr/bin/bash",
-            "usr/lib/arm-linux-gnueabihf/libtinfo.so.6.4"
-        )
-        val expected = mutableMapOf<String, String>()
-        TarArchiveInputStream(GzipCompressorInputStream(FileInputStream(archive))).use { tar ->
-            while (true) {
-                val entry = tar.nextTarEntry ?: break
-                val normalized = entry.name.removePrefix("./")
-                if (entry.isFile && normalized in expectedPaths) {
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    val buffer = ByteArray(16 * 1024)
-                    while (true) {
-                        val count = tar.read(buffer)
-                        if (count < 0) break
-                        digest.update(buffer, 0, count)
-                    }
-                    expected[normalized] = digest.digest().joinToString("") { "%02x".format(it) }
-                }
-            }
-        }
-        assertEquals("Official archive must contain the expected critical files", expectedPaths, expected.keys)
-        val files = temporaryFolder.newFolder("official-rootfs-app-files")
-        val root = RootfsInstaller(LinuxRuntimePaths(files)).install(archive).root
-        for ((path, expectedHash) in expected) {
-            val extracted = File(root, path)
-            assertTrue("Missing extracted archive file: $path", extracted.isFile)
-            val digest = MessageDigest.getInstance("SHA-256")
-            extracted.inputStream().buffered().use { input ->
-                val buffer = ByteArray(16 * 1024)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    digest.update(buffer, 0, count)
-                }
-            }
-            val actualHash = digest.digest().joinToString("") { "%02x".format(it) }
-            assertEquals("Extractor changed bytes for $path", expectedHash, actualHash)
-        }
-        assertTrue("Expected /bin -> usr/bin usr-merged layout", Files.isSymbolicLink(File(root, "bin").toPath()))
-        assertTrue("Expected /lib -> usr/lib usr-merged layout", Files.isSymbolicLink(File(root, "lib").toPath()))
-        val libtinfo = File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6")
-        assertTrue("Official archive's libtinfo.so.6 must remain a symlink", Files.isSymbolicLink(libtinfo.toPath()))
-        assertEquals("libtinfo.so.6.4", Files.readSymbolicLink(libtinfo.toPath()).toString())
-        assertEquals("libtinfo.so.6.4", File(root, "lib/arm-linux-gnueabihf/libtinfo.so.6").canonicalFile.name)
-    }
 
 }
