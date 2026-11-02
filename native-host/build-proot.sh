@@ -151,12 +151,14 @@ PC
   LDFLAGS="-L$PREFIX/lib -Wl,-z,max-page-size=16384" \
     make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
       CC="$CC" LD="$CC" STRIP="$TC/llvm-strip" OBJCOPY="$TC/llvm-objcopy" OBJDUMP="$TC/llvm-objdump" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
-  VERSION_OUTPUT="$("$PROOT_SRC/src/proot" -V 2>&1)"
-  echo "$VERSION_OUTPUT"
-  if ! grep -Fq "5.5.0" <<<"$VERSION_OUTPUT"; then
-    echo "::error::Built PRoot reports the wrong version; expected v5.5.0." >&2
+  # This is a cross-compiled Android executable; do not execute it on the x86_64
+  # GitHub runner (that fails with Exec format error / exit 126). Inspect its
+  # embedded version string instead, and rely on the pinned source commit above.
+  if ! strings "$PROOT_SRC/src/proot" | grep -Fq "5.5.0"; then
+    echo "::error::Built PRoot binary does not contain version 5.5.0." >&2
     exit 1
   fi
+  echo "Verified embedded PRoot version 5.5.0 for $ABI"
   DEST="$OUT/$ABI"
   mkdir -p "$DEST"
   "$TC/llvm-strip" -o "$DEST/libproot.so" "$PROOT_SRC/src/proot"
