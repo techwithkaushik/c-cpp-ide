@@ -33,6 +33,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                 environment()["TERM"] = "xterm"
                 environment()["PROOT_TMP_DIR"] = hostTemp.absolutePath
+                // Android kernels can kill guest syscalls with SIGSYS under PRoot seccomp acceleration.
+                environment()["PROOT_NO_SECCOMP"] = "1"
                 environment()["PROOT_LOADER"] = paths.prootLoader.absolutePath
             }.start()
         } catch (e: Exception) {
