@@ -207,7 +207,11 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setenv("HOME", "/root", 1);
         // PRoot prepares loader files on the Android host before entering the rootfs.
         // /tmp may not exist for an unrooted Android app, so use the app-private host temp path.
+        // PRoot uses TMPDIR/PROOT_TMP_DIR for host-side temporary files and
+        // some builds also consult TMP. Keep all three on the same existing,
+        // app-private writable directory (never Android's missing /tmp).
         setenv("TMPDIR", temp.c_str(), 1);
+        setenv("TMP", temp.c_str(), 1);
         setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
         setenv("TERM", "xterm-256color", 1);
         setenv("COLORTERM", "truecolor", 1);
