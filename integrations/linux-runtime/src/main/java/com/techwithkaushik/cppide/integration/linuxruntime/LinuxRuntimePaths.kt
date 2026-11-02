@@ -5,11 +5,12 @@ import java.nio.file.Files
 
 /** Simple app-private paths for the extracted distro and bundled Android PRoot. */
 class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) {
-    val base = File(filesDir, "linux-runtime")
-    val distro = File(filesDir, "distro")
-    /** Backward-compatible name for the currently downloaded Ubuntu distro. */
+    val base = filesDir
+    val distro = File(filesDir, "rootfs")
     val ubuntuRoot: File get() = distro
-    val usrBin = File(filesDir, "usr/bin")
+    val usr = File(filesDir, "usr")
+    val usrTmp = File(usr, "tmp")
+    val usrBin = File(usr, "bin")
     val proot = File(usrBin, "proot")
     val prootLoader = File(usrBin, "libproot-loader.so")
     val marker = File(base, "runtime.properties")
