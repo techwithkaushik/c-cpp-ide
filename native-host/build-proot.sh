@@ -34,6 +34,18 @@ if [[ "$ACTUAL_COMMIT" != "$PROOT_COMMIT" ]]; then
   exit 1
 fi
 
+# The pinned Termux PRoot revision uses strcmp/memset in this extension
+# without including their standard declaration header. Clang rejects this
+# under modern C rules, so apply a narrow, idempotent compatibility patch.
+ASHMEM_SOURCE="$PROOT_SRC/src/extension/ashmem_memfd/ashmem_memfd.c"
+if [[ -f "$ASHMEM_SOURCE" ]] && ! grep -Eq '^[[:space:]]*#[[:space:]]*include[[:space:]]*<string\.h>' "$ASHMEM_SOURCE"; then
+  sed -i '1i#include <string.h>' "$ASHMEM_SOURCE"
+fi
+if [[ ! -f "$ASHMEM_SOURCE" ]] || ! grep -Eq '^[[:space:]]*#[[:space:]]*include[[:space:]]*<string\.h>' "$ASHMEM_SOURCE"; then
+  echo "::error::Could not apply string.h compatibility fix to PRoot ashmem_memfd extension" >&2
+  exit 1
+fi
+
 TALLOC_VERSION=2.5.0
 TALLOC_SHA=912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007
 curl -fsSL "https://www.samba.org/ftp/talloc/talloc-$TALLOC_VERSION.tar.gz" -o "$WORK/talloc.tar.gz"
