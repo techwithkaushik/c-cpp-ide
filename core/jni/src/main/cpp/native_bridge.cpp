@@ -225,7 +225,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setenv("TERM", "xterm-256color", 1);
         setenv("COLORTERM", "truecolor", 1);
         setenv("LANG", "C.UTF-8", 1);
-        setenv("PROOT_TMP_DIR", guest_tmp.c_str(), 1);
+        setenv("PROOT_TMP_DIR", host_tmp.c_str(), 1);
         // Android 10 / vendor kernels may deliver SIGSYS with PRoot seccomp acceleration.
         // Disable the accelerator for reliable guest execution; correctness takes priority over speed.
         setenv("PROOT_NO_SECCOMP", "1", 1);
