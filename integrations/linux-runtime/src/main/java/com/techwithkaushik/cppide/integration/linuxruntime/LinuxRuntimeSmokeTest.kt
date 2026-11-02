@@ -17,7 +17,13 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             if (!exists() && !mkdirs()) return Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath")
             if (!isDirectory || !canWrite()) return Result(false, null, "", "PRoot host temporary directory is not writable: $absolutePath")
         }
-        val shell = if (File(paths.ubuntuRoot, "bin/sh").exists()) "/bin/sh" else "/usr/bin/sh"
+        // Validate the same interactive shell the terminal will launch. A /bin/sh-only
+        // smoke test can pass even when /bin/bash has incompatible libc/libtinfo libraries.
+        val shell = when {
+            File(paths.ubuntuRoot, "bin/bash").isFile -> "/bin/bash"
+            File(paths.ubuntuRoot, "bin/sh").isFile -> "/bin/sh"
+            else -> "/usr/bin/sh"
+        }
         val process = try {
             ProcessBuilder(
                 paths.systemLinker.absolutePath, paths.proot.absolutePath,
