@@ -1447,10 +1447,10 @@ private fun WorkspaceScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     listOf(
-                        Triple("PROBLEMS", ToolPanel.Problems, "problems"),
-                        Triple("OUTPUT", ToolPanel.Output, "output"),
+                        Triple("TERMINAL", ToolPanel.Terminal, "terminal"),
                         Triple("BUILD", ToolPanel.Build, "build"),
-                        Triple("TERMINAL", ToolPanel.Terminal, "terminal")
+                        Triple("PROBLEMS", ToolPanel.Problems, "problems"),
+                        Triple("OUTPUT", ToolPanel.Output, "output")
                     ).forEach { (label, panel, icon) ->
                         val selected = selectedPanel == panel
                         Column(
