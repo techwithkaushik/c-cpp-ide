@@ -95,7 +95,7 @@ jobs:
           base_url="https://cdimage.ubuntu.com/ubuntu-base/releases/noble/release"
           archive="ubuntu-base-24.04.5-base-armhf.tar.gz"
           curl --fail --location --retry 3 --connect-timeout 20 "$base_url/SHA256SUMS" -o "$RUNNER_TEMP/SHA256SUMS"
-          expected="$(awk -v f="$archive" "$2 == f || $2 == \"*\" f {print $1; exit}" "$RUNNER_TEMP/SHA256SUMS")"
+          expected="$(awk -v f="$archive" '$2 == f || $2 == "*" f {print $1; exit}' "$RUNNER_TEMP/SHA256SUMS")"
           test -n "$expected" || { echo "::error::Ubuntu SHA256SUMS does not list $archive"; exit 1; }
           curl --fail --location --retry 3 --connect-timeout 20 "$base_url/$archive" -o "$RUNNER_TEMP/$archive"
           echo "$expected  $RUNNER_TEMP/$archive" | sha256sum --check -
