@@ -1,83 +1,47 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
-import android.os.Process
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 
 /**
- * Downloads a version-pinned upstream proot-rs Android binary (not a Termux package).
- * The v0.1.0 upstream release does not publish asset SHA-256 values, so this method
- * pins the immutable release URL, enforces a strict size limit, and validates the ELF.
- * A future app release should replace this with a project-published digest manifest.
+ * Validates Android-native PRoot binaries bundled in the APK. Downloading a
+ * generic Linux release into app data is not compatible with Android W^X or bionic.
  */
 class ProotDownloader(private val paths: LinuxRuntimePaths) {
     data class Result(val sha256: String, val bytes: Long, val release: String)
 
     fun downloadAndInstall(): Result {
         paths.ensureDirectories()
-        val asset = if (Process.is64Bit()) {
-            "proot-rs-v0.1.0-aarch64-linux-android.tar.gz"
-        } else {
-            "proot-rs-v0.1.0-arm-linux-androideabi.tar.gz"
+        val binary = paths.proot
+        val loader = paths.prootLoader
+        if (paths.nativeLibraryDir == null) {
+            throw IllegalStateException(
+                "This APK cannot locate its native library directory. Rebuild with PRoot v5.5.0 bundled as native libraries."
+            )
         }
-        val url = URL("https://github.com/proot-me/proot-rs/releases/download/v0.1.0/$asset")
-        val archive = File(paths.base, asset)
-        try {
-            val allowedHosts = setOf("github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
-            var current = url
-            var redirects = 0
-            var connection: HttpURLConnection
-            while (true) {
-                if (current.protocol != "https" || current.host !in allowedHosts) {
-                    throw SecurityException("PRoot download attempted an untrusted host.")
-                }
-                connection = (current.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 20_000
-                    readTimeout = 30_000
-                    instanceFollowRedirects = false
-                    requestMethod = "GET"
-                }
-                val code = connection.responseCode
-                if (code in 300..399) {
-                    val location = connection.getHeaderField("Location")
-                    connection.disconnect()
-                    if (location.isNullOrBlank() || ++redirects > 5) {
-                        throw IllegalStateException("PRoot download redirect chain is invalid.")
-                    }
-                    current = URL(current, location)
-                    continue
-                }
-                if (code !in 200..299) {
-                    connection.disconnect()
-                    throw IllegalStateException("PRoot download failed with HTTP $code.")
-                }
-                break
-            }
-            try {
-                if (connection.contentLengthLong > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
-                FileOutputStream(archive).use { out ->
-                    connection.inputStream.use { input ->
-                        val buffer = ByteArray(32 * 1024)
-                        var total = 0L
-                        while (true) {
-                            val n = input.read(buffer)
-                            if (n < 0) break
-                            total += n
-                            if (total > MAX_ARCHIVE_BYTES) throw IllegalStateException("PRoot archive is larger than expected.")
-                            out.write(buffer, 0, n)
-                        }
-                    }
-                }
-            } finally { connection.disconnect() }
-            val digest = sha256(archive)
-            ProotInstaller(paths).installFromPinnedRelease(archive)
-            return Result(digest, paths.proot.length(), "proot-rs v0.1.0")
-        } finally {
-            archive.delete()
+        if (!binary.isFile || !loader.isFile) {
+            throw IllegalStateException(
+                "PRoot v5.5.0 Android binaries are missing from ${paths.nativeLibraryDir}. Build the APK with the native PRoot build workflow."
+            )
         }
+        validateElf(binary)
+        validateElf(loader)
+        return Result(sha256(binary), binary.length() + loader.length(), "PRoot v5.5.0 (Android NDK)")
+    }
+
+    private fun validateElf(file: File) {
+        val header = file.inputStream().use { it.readNBytes(20) }
+        require(header.size == 20 && header.take(4).map { it.toInt() and 0xff } ==
+            listOf(0x7f, 0x45, 0x4c, 0x46)) { "Bundled ${file.name} is not a valid ELF executable." }
+        val machine = (header[18].toInt() and 0xff) or ((header[19].toInt() and 0xff) shl 8)
+        val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
+        val expected = when {
+            abi.contains("arm64") -> 183
+            abi.contains("armeabi") -> 40
+            abi.contains("x86_64") -> 62
+            else -> 3
+        }
+        require(machine == expected) { "PRoot ABI mismatch: ELF machine=$machine, expected=$expected." }
     }
 
     private fun sha256(file: File): String {
@@ -92,6 +56,4 @@ class ProotDownloader(private val paths: LinuxRuntimePaths) {
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
-
-    companion object { private const val MAX_ARCHIVE_BYTES = 8 * 1024 * 1024L }
 }
