@@ -28,10 +28,14 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             ProcessBuilder(
                 paths.systemLinker.absolutePath, paths.proot.absolutePath,
                 // Level 2 preserves useful errors without flooding stderr with ptrace traces.
-                "-v", "2",
-                "-r", root, "-w", "/",
+                "-0", "-v", "2",
+                "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
-                shell, "-c", "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'; test -x /bin/sh"
+                shell, "--noprofile", "--norc", "-c",
+                "set -e; echo '=== Bash ==='; /bin/bash --version; " +
+                    "echo '=== libc ==='; /usr/bin/ldd --version; " +
+                    "echo '=== apt ==='; /usr/bin/apt --version; " +
+                    "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.base).apply {
                 environment()["HOME"] = "/root"
                 // Do not leak Android/Termux preload libraries into Ubuntu's dynamic linker.
@@ -83,7 +87,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val failure = listOf(
             "Ubuntu shell exited with code $exit.",
             androidExecBlocker,
-            "PRoot command: ${paths.systemLinker.absolutePath} ${paths.proot.absolutePath} -v 2 -r $root -w / -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell -c <smoke-test>",
+            "PRoot command: ${paths.systemLinker.absolutePath} ${paths.proot.absolutePath} -0 -v 2 -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --noprofile --norc -c <smoke-test>",
             err.takeIf { it.isNotBlank() }?.let { "PRoot stderr (tail): ${it.takeLast(6000)}" }
                 ?: "PRoot stderr was empty.",
             out.takeIf { it.isNotBlank() }?.let { "PRoot stdout (tail): ${it.takeLast(2000)}" }
