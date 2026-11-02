@@ -130,7 +130,7 @@ for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
   B="$WORK/$ABI"
   PREFIX="$B/prefix"
   mkdir -p "$PREFIX/include" "$PREFIX/lib/pkgconfig" "$B/talloc"
-  echo "== Building upstream PRoot $PROOT_VERSION ($PROOT_COMMIT) for $ABI"
+  echo "== Building Termux PRoot ($PROOT_COMMIT) for $ABI"
   "$CC" -O2 -fPIC -D_GNU_SOURCE -D__STDC_WANT_LIB_EXT1__=1 -include "$WORK/config.h" \
     -I"$WORK" -I"$TALLOC_SRC" -I"$TALLOC_SRC/lib/replace" -c "$TALLOC_SRC/talloc.c" -o "$B/talloc/talloc.o"
   "$CC" -O2 -fPIC -c "$WORK/replace_min.c" -o "$B/talloc/replace_min.o"
