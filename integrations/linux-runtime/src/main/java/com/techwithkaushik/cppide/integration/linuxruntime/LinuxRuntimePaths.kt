@@ -68,5 +68,5 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
         (File(ubuntuRoot, "bin/sh").exists() || File(ubuntuRoot, "usr/bin/sh").exists())
 
     fun hasProot(): Boolean = nativeLibraryDir != null && proot.isFile && prootLoader.isFile
-    fun ready(): Boolean = hasRootfs() && hasProot() && systemLinker.isFile
+    fun ready(): Boolean = hasRootfs() && hasProot()
 }
