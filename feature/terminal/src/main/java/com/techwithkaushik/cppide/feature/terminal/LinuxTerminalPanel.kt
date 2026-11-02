@@ -312,15 +312,15 @@ fun LinuxTerminalPanel(
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
                             when (event.key) {
                                 androidx.compose.ui.input.key.Key.Enter -> {
-                                    try { active.send("\\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                                    try { active.send("\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
                                     command = ""
                                     true
                                 }
-                                androidx.compose.ui.input.key.Key.DirectionUp -> { active.send("\\u001b[A"); true }
-                                androidx.compose.ui.input.key.Key.DirectionDown -> { active.send("\\u001b[B"); true }
-                                androidx.compose.ui.input.key.Key.DirectionRight -> { active.send("\\u001b[C"); true }
-                                androidx.compose.ui.input.key.Key.DirectionLeft -> { active.send("\\u001b[D"); true }
-                                androidx.compose.ui.input.key.Key.Tab -> { active.send("\\t"); true }
+                                androidx.compose.ui.input.key.Key.DirectionUp -> { active.send("\u001b[A"); true }
+                                androidx.compose.ui.input.key.Key.DirectionDown -> { active.send("\u001b[B"); true }
+                                androidx.compose.ui.input.key.Key.DirectionRight -> { active.send("\u001b[C"); true }
+                                androidx.compose.ui.input.key.Key.DirectionLeft -> { active.send("\u001b[D"); true }
+                                androidx.compose.ui.input.key.Key.Tab -> { active.send("\t"); true }
                                 else -> false
                             }
                         },
