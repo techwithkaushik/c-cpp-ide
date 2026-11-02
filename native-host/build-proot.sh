@@ -21,6 +21,13 @@ curl -fsSL "https://github.com/termux/proot/archive/$PROOT_COMMIT.tar.gz" -o "$W
 tar -xzf "$WORK/proot.tar.gz" -C "$WORK/src"
 PROOT_SRC="$WORK/src/proot-$PROOT_COMMIT"
 
+# The pinned Termux fork uses strcmp()/memset() in this extension without
+# including their standard declarations; newer Android NDK Clang rejects it.
+ASHMEM_SOURCE="$PROOT_SRC/src/extension/ashmem_memfd/ashmem_memfd.c"
+if ! grep -q "^#include <string.h>" "$ASHMEM_SOURCE"; then
+  sed -i '1i#include <string.h>' "$ASHMEM_SOURCE"
+fi
+
 TALLOC_VERSION=2.5.0
 TALLOC_SHA=912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007
 curl -fsSL "https://www.samba.org/ftp/talloc/talloc-$TALLOC_VERSION.tar.gz" -o "$WORK/talloc.tar.gz"
