@@ -17,34 +17,22 @@ API=26
 JOBS="$(nproc)"
 mkdir -p "$WORK/src" "$WORK/talloc"
 
-PROOT_VERSION=v5.5.0
-PROOT_COMMIT=25dc6a3134891f98a79f57ce1c2c1b23ff15cad1
+# Use the Termux-maintained PRoot fork, which carries Android-specific
+# seccomp/syscall compatibility fixes absent from proot-me's generic release.
+# Pin an immutable commit so CI cannot silently change the runtime.
+PROOT_REPOSITORY=https://github.com/termux/proot.git
+PROOT_COMMIT=52d65a4dc140ca554d241a1438ddd4f6b00c9813
 PROOT_SRC="$WORK/src/proot"
 rm -rf "$PROOT_SRC"
-git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \
-  https://github.com/proot-me/proot.git "$PROOT_SRC"
+git init "$PROOT_SRC"
+git -C "$PROOT_SRC" remote add origin "$PROOT_REPOSITORY"
 git -C "$PROOT_SRC" fetch --depth 1 origin "$PROOT_COMMIT"
-git -C "$PROOT_SRC" checkout --detach "$PROOT_COMMIT"
+git -C "$PROOT_SRC" checkout --detach FETCH_HEAD
 ACTUAL_COMMIT="$(git -C "$PROOT_SRC" rev-parse HEAD)"
 if [[ "$ACTUAL_COMMIT" != "$PROOT_COMMIT" ]]; then
-  echo "Expected upstream PRoot $PROOT_VERSION at $PROOT_COMMIT, got $ACTUAL_COMMIT" >&2
+  echo "Expected Termux PRoot commit $PROOT_COMMIT, got $ACTUAL_COMMIT" >&2
   exit 1
 fi
-
-# Android's seccomp policy and upstream PRoot's acceleration filter can conflict:
-# the guest may be killed with SIGSYS (signal 31) before Bash starts. Compile the
-# seccomp module as a no-op on Android; ptrace remains the syscall translation path.
-python3 - "$PROOT_SRC/src/syscall/seccomp.c" <<'PY'
-from pathlib import Path
-import sys
-p = Path(sys.argv[1])
-source = p.read_text()
-needle = '#include "build.h"'
-replacement = '#include "build.h"\n\n/* Android app processes may SIGSYS-kill guest tasks using PRoot seccomp. */\n#undef HAVE_SECCOMP_FILTER'
-if source.count(needle) != 1:
-    raise SystemExit("Could not safely disable PRoot seccomp acceleration")
-p.write_text(source.replace(needle, replacement, 1))
-PY
 
 TALLOC_VERSION=2.5.0
 TALLOC_SHA=912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007
@@ -169,11 +157,11 @@ PC
   # This is a cross-compiled Android executable; do not execute it on the x86_64
   # GitHub runner (that fails with Exec format error / exit 126). Inspect its
   # embedded version string instead, and rely on the pinned source commit above.
-  if ! strings "$PROOT_SRC/src/proot" | grep -Fq "5.5.0"; then
-    echo "::error::Built PRoot binary does not contain version 5.5.0." >&2
+  if [[ ! -s "$PROOT_SRC/src/proot" || ! -s "$PROOT_SRC/src/loader/loader" ]]; then
+    echo "::error::Termux PRoot or loader build output is missing for $ABI." >&2
     exit 1
   fi
-  echo "Verified embedded PRoot version 5.5.0 for $ABI"
+  echo "Verified Termux PRoot build output for $ABI (source $PROOT_COMMIT)"
   DEST="$OUT/$ABI"
   mkdir -p "$DEST"
   "$TC/llvm-strip" -o "$DEST/libproot.so" "$PROOT_SRC/src/proot"
