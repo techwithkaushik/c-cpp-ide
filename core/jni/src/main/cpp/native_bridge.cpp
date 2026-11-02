@@ -159,9 +159,8 @@ void throw_state(JNIEnv* env, const std::string& message) {
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
-    JNIEnv* env, jobject /* thiz */, jstring linker_value, jstring proot_value,
-    jstring rootfs_value, jstring shell_value, jstring temp_value) {
-    const std::string linker = to_utf8(env, linker_value);
+    JNIEnv* env, jobject /* thiz */, jstring proot_value, jstring rootfs_value,
+    jstring shell_value, jstring temp_value) {
     const std::string proot = to_utf8(env, proot_value);
     const std::string rootfs = to_utf8(env, rootfs_value);
     const std::string shell = to_utf8(env, shell_value);
