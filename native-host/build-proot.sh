@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Build the actively maintained Termux PRoot fork for Android/bionic and bundle it as APK native
-# executables. NativeLibraryDir is the supported executable location on API 29+.
+# Build upstream PRoot v5.5.0 for Android/bionic and bundle it as APK native executables.
+# Pin and verify the upstream tag commit so the packaged binary cannot silently report v5.1.0.
+# NativeLibraryDir is the supported executable location on API 29+.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,16 +17,19 @@ API=26
 JOBS="$(nproc)"
 mkdir -p "$WORK/src" "$WORK/talloc"
 
-PROOT_COMMIT=52d65a4dc140ca554d241a1438ddd4f6b00c9813
-curl -fsSL "https://github.com/termux/proot/archive/$PROOT_COMMIT.tar.gz" -o "$WORK/proot.tar.gz"
-tar -xzf "$WORK/proot.tar.gz" -C "$WORK/src"
-PROOT_SRC="$WORK/src/proot-$PROOT_COMMIT"
-
-# The pinned Termux fork uses strcmp()/memset() in this extension without
-# including their standard declarations; newer Android NDK Clang rejects it.
-ASHMEM_SOURCE="$PROOT_SRC/src/extension/ashmem_memfd/ashmem_memfd.c"
-if ! grep -q "^#include <string.h>" "$ASHMEM_SOURCE"; then
-  sed -i '1i#include <string.h>' "$ASHMEM_SOURCE"
+PROOT_VERSION=v5.5.0
+PROOT_COMMIT=25dc6a3134891f98a79f57ce1c2c1b23ff15cad1
+PROOT_SRC="$WORK/src/proot"
+if [[ ! -d "$PROOT_SRC/.git" ]]; then
+  git clone --filter=blob:none --depth 1 --branch "$PROOT_VERSION" \\
+    https://github.com/proot-me/proot.git "$PROOT_SRC"
+fi
+git -C "$PROOT_SRC" fetch --depth 1 origin "$PROOT_COMMIT"
+git -C "$PROOT_SRC" checkout --detach "$PROOT_COMMIT"
+ACTUAL_COMMIT="$(git -C "$PROOT_SRC" rev-parse HEAD)"
+if [[ "$ACTUAL_COMMIT" != "$PROOT_COMMIT" ]]; then
+  echo "Expected upstream PRoot $PROOT_VERSION at $PROOT_COMMIT, got $ACTUAL_COMMIT" >&2
+  exit 1
 fi
 
 TALLOC_VERSION=2.5.0
@@ -124,7 +128,7 @@ for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
   B="$WORK/$ABI"
   PREFIX="$B/prefix"
   mkdir -p "$PREFIX/include" "$PREFIX/lib/pkgconfig" "$B/talloc"
-  echo "== Building Termux PRoot $PROOT_COMMIT for $ABI"
+  echo "== Building upstream PRoot $PROOT_VERSION ($PROOT_COMMIT) for $ABI"
   "$CC" -O2 -fPIC -D_GNU_SOURCE -D__STDC_WANT_LIB_EXT1__=1 -include "$WORK/config.h" \
     -I"$WORK" -I"$TALLOC_SRC" -I"$TALLOC_SRC/lib/replace" -c "$TALLOC_SRC/talloc.c" -o "$B/talloc/talloc.o"
   "$CC" -O2 -fPIC -c "$WORK/replace_min.c" -o "$B/talloc/replace_min.o"
@@ -148,6 +152,12 @@ PC
   LDFLAGS="-L$PREFIX/lib -Wl,-z,max-page-size=16384" \
     make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
       CC="$CC" LD="$CC" STRIP="$TC/llvm-strip" OBJCOPY="$TC/llvm-objcopy" OBJDUMP="$TC/llvm-objdump" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
+  VERSION_OUTPUT="$("$PROOT_SRC/src/proot" -V 2>&1)"
+  echo "$VERSION_OUTPUT"
+  if ! grep -Fq "5.5.0" <<<"$VERSION_OUTPUT"; then
+    echo "::error::Built PRoot reports the wrong version; expected v5.5.0." >&2
+    exit 1
+  fi
   DEST="$OUT/$ABI"
   mkdir -p "$DEST"
   "$TC/llvm-strip" -o "$DEST/libproot.so" "$PROOT_SRC/src/proot"
