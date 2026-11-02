@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.rules.TemporaryFolder
 
 class RootfsInstallerTest {
@@ -45,6 +46,10 @@ class RootfsInstallerTest {
                 }
                 file("etc/os-release", "NAME=Ubuntu\\nID=ubuntu\\n")
                 file("etc/group", "root:x:0:\\n")
+                val binAlias = TarArchiveEntry("bin", TarArchiveEntry.LF_SYMLINK)
+                    .apply { linkName = "usr/bin" }
+                tar.putArchiveEntry(binAlias)
+                tar.closeArchiveEntry()
                 file("usr/bin/sh", "shell-placeholder")
                 val libAlias = TarArchiveEntry("lib", TarArchiveEntry.LF_SYMLINK)
                     .apply { linkName = "usr/lib" }
@@ -65,6 +70,8 @@ class RootfsInstallerTest {
         installer.install(archive)
 
         val root = File(files, "linux-runtime/distributions/ubuntu")
+        assertTrue(Files.isSymbolicLink(File(root, "bin").toPath()))
+        assertEquals("usr/bin", Files.readSymbolicLink(File(root, "bin").toPath()).toString())
         assertEquals("original-target", File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6.4").readText())
         assertEquals("replacement-file", File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6").readText())
         assertFalse(Files.isSymbolicLink(File(root, "usr/lib/libtinfo.so.6").toPath()))
