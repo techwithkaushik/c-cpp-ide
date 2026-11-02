@@ -136,11 +136,10 @@ PC
   export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
   export PKG_CONFIG_SYSROOT_DIR=
   make -C "$PROOT_SRC/src" clean >/dev/null 2>&1 || true
-  make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
-    CC="$CC" LD="$CC" PKG_CONFIG=pkg-config \
-    CPPFLAGS="-I$PREFIX/include -DARG_MAX=131072" \
-    LDFLAGS="-L$PREFIX/lib -Wl,-z,max-page-size=16384" \
-    WITHOUT_PYTHON=1
+  CPPFLAGS="-I$PREFIX/include -DARG_MAX=131072" \
+  LDFLAGS="-L$PREFIX/lib -Wl,-z,max-page-size=16384" \
+    make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
+      CC="$CC" LD="$CC" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
   DEST="$OUT/$ABI"
   mkdir -p "$DEST"
   "$TC/llvm-strip" -o "$DEST/libproot.so" "$PROOT_SRC/src/proot"
