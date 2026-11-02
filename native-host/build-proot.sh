@@ -143,7 +143,9 @@ PC
   DEST="$OUT/$ABI"
   mkdir -p "$DEST"
   "$TC/llvm-strip" -o "$DEST/libproot.so" "$PROOT_SRC/src/proot"
-  cp "$PROOT_SRC/src/loader/loader" "$DEST/libproot-loader.so"
+  # Strip debug/symbol tables from the static loader as well to keep APK size down.
+  # Keep the ELF executable and required runtime sections intact.
+  "$TC/llvm-strip" --strip-unneeded -o "$DEST/libproot-loader.so" "$PROOT_SRC/src/loader/loader"
   chmod 755 "$DEST/libproot.so" "$DEST/libproot-loader.so"
   file "$DEST/libproot.so" "$DEST/libproot-loader.so"
   readelf -h "$DEST/libproot.so" | grep -E "Class:|Machine:"
