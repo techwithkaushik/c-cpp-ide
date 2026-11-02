@@ -78,7 +78,7 @@ class RootfsInstallerTest {
         val installer = RootfsInstaller(LinuxRuntimePaths(filesAlias))
         installer.install(archive)
 
-        val root = File(files, "linux-runtime/distributions/ubuntu")
+        val root = File(files, "distro")
         assertTrue(Files.isSymbolicLink(File(root, "bin").toPath()))
         assertEquals("usr/bin", Files.readSymbolicLink(File(root, "bin").toPath()).toString())
         assertEquals("original-target", File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6.4").readText())
