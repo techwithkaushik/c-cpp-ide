@@ -130,7 +130,7 @@ fun RuntimeSetupPanel(
         }) { Text("Download official Ubuntu Base 24.04.5") }
         Button(enabled = !busy, onClick = {
             busy = true
-            status = "Downloading pinned upstream Android PRoot…"
+            status = "Verifying APK-bundled Android PRoot v5.5.0…"
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
@@ -152,7 +152,7 @@ fun RuntimeSetupPanel(
                     }
                 }
             }
-        }) { Text("Download pinned Android PRoot") }
+        }) { Text("Verify bundled Android PRoot v5.5.0") }
         Text("Ubuntu rootfs checksum is verified against Ubuntu's official SHA256SUMS. PRoot v5.5.0 is built from upstream source for Android by CI and bundled in the APK.", color = Color(0xFF9AA7B5), fontSize = 11.sp)
 
         Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
