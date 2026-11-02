@@ -64,8 +64,16 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
         }
     }
 
-    fun hasRootfs(): Boolean = File(ubuntuRoot, "etc/os-release").isFile &&
-        (File(ubuntuRoot, "bin/sh").exists() || File(ubuntuRoot, "usr/bin/sh").exists())
+    fun hasRootfs(): Boolean {
+        // Rootfs installed by the previous extractor may contain corrupted files
+        // where /lib and /usr/lib alias one another. Require the current installer
+        // marker so old rootfs images are reinstalled instead of silently reused.
+        val currentInstaller = runCatching {
+            marker.readLines().any { it.trim() == "installerVersion=2" }
+        }.getOrDefault(false)
+        return currentInstaller && File(ubuntuRoot, "etc/os-release").isFile &&
+            (File(ubuntuRoot, "bin/sh").exists() || File(ubuntuRoot, "usr/bin/sh").exists())
+    }
 
     fun hasProot(): Boolean = nativeLibraryDir != null && proot.isFile && prootLoader.isFile
     fun ready(): Boolean = hasRootfs() && hasProot()
