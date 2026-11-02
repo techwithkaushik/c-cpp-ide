@@ -45,16 +45,29 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                     if (count > MAX_ENTRIES) throw IOException("Rootfs contains too many entries.")
                     val target = safeTarget(stage, entry.name)
                     when {
-                        entry.isDirectory -> if (!target.exists() && !target.mkdirs()) throw IOException("Cannot create directory: ${entry.name}")
                         entry.isSymbolicLink -> createSafeSymlink(stage, target, entry.linkName)
+                        entry.isDirectory -> {
+                            // A tar archive can contain a symlink and later replace
+                            // that exact path with a directory. Never let exists()
+                            // follow the symlink and accidentally accept its target.
+                            removeEntrySymlink(target)
+                            if (!target.exists() && !target.mkdirs()) throw IOException("Cannot create directory: ${entry.name}")
+                            if (!target.isDirectory) throw IOException("Directory entry conflicts with a non-directory: ${entry.name}")
+                        }
                         entry.isLink -> {
                             val linked = safeTarget(stage, entry.linkName)
-                            if (!linked.isFile) throw IOException("Invalid hard link: ${entry.name}")
+                            if (!linked.isFile || Files.isSymbolicLink(linked.toPath())) throw IOException("Invalid hard link: ${entry.name}")
                             target.parentFile?.mkdirs()
+                            removeEntrySymlink(target)
                             Files.copy(linked.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
                         }
                         entry.isFile -> {
                             if (entry.size < 0 || entry.size > MAX_EXPANDED_BYTES - expanded) throw IOException("Rootfs exceeds the 4 GiB expanded-size limit.")
+                            // FileOutputStream follows a symlink at the final path.
+                            // If the archive replaces that link with a regular file,
+                            // this would overwrite the link's destination (for example
+                            // libtinfo.so.6.4) instead of replacing the link itself.
+                            removeEntrySymlink(target)
                             target.parentFile?.let { if (!it.exists() && !it.mkdirs()) throw IOException("Cannot create parent directory.") }
                             target.outputStream().buffered().use { out ->
                                 var copied = 0L
@@ -150,6 +163,12 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         val target = rootPath.resolve(name).normalize()
         if (!target.startsWith(rootPath)) throw IOException("Path escapes rootfs: $name")
         return target.toFile()
+    }
+
+    private fun removeEntrySymlink(target: File) {
+        if (Files.isSymbolicLink(target.toPath()) && !Files.deleteIfExists(target.toPath())) {
+            throw IOException("Cannot replace existing symlink while extracting: $target")
+        }
     }
 
     private fun createSafeSymlink(root: File, link: File, rawTarget: String) {
