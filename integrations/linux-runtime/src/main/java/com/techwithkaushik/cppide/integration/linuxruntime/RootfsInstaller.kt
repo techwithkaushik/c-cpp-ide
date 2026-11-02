@@ -115,7 +115,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                 throw IOException("Cannot activate the new Ubuntu rootfs.")
             }
             old.deleteRecursively()
-            paths.marker.writeText("distro=ubuntu\nroot=${paths.ubuntuRoot.absolutePath}\nentries=$count\nexpandedBytes=$expanded\n")
+            paths.marker.writeText("distro=ubuntu\ninstallerVersion=$INSTALLER_VERSION\nroot=${paths.ubuntuRoot.absolutePath}\nentries=$count\nexpandedBytes=$expanded\n")
             return Result(paths.ubuntuRoot, count, expanded)
         } catch (error: Exception) {
             stage.deleteRecursively()
@@ -217,6 +217,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     }
 
     companion object {
+        private const val INSTALLER_VERSION = 2
         private const val MAX_ENTRIES = 500_000
         private const val MAX_EXPANDED_BYTES = 4L * 1024 * 1024 * 1024
     }
