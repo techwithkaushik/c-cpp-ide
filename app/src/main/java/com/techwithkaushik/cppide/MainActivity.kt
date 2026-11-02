@@ -1531,7 +1531,7 @@ private fun WorkspaceScreen(
             contentWindowInsets = { WindowInsets.navigationBars }
         ) {
             Column(
-                Modifier.fillMaxWidth().fillMaxHeight(0.92f),
+                Modifier.fillMaxWidth().fillMaxHeight(0.92f).heightIn(min = 280.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 ToolPanelContent(
