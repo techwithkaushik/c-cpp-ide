@@ -43,6 +43,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 // Do not leak Android/Termux preload libraries into Ubuntu's dynamic linker.
                 environment().remove("LD_PRELOAD")
                 environment().remove("LD_LIBRARY_PATH")
+                environment().remove("PREFIX")
+                environment().remove("BOOTSTRAP_ROOT")
                 // PRoot runs on Android: its loader temp files must use an existing host path.
                 environment()["TMPDIR"] = hostTemp.absolutePath
                 environment()["TMP"] = hostTemp.absolutePath
