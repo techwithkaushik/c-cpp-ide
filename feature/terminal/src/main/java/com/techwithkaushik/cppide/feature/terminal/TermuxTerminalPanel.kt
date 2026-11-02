@@ -277,7 +277,7 @@ fun TermuxTerminalPanel(
                     "CTRL+D" to "\u0004",
                     "CTRL+Z" to "\u001A",
                     "ESC" to "\u001B",
-                    "TAB" to "\\t",
+                    "TAB" to "\t",
                     "↑" to "\u001B[A",
                     "↓" to "\u001B[B",
                     "←" to "\u001B[D",
@@ -315,6 +315,14 @@ fun TermuxTerminalPanel(
                         attachSession(activeTab.session)
                         isFocusable = true
                         isFocusableInTouchMode = true
+                        setOnTouchListener { touchedView, event ->
+                            if (event.action == MotionEvent.ACTION_UP) {
+                                touchedView.requestFocus()
+                                (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+                                    ?.showSoftInput(touchedView, InputMethodManager.SHOW_IMPLICIT)
+                            }
+                            false
+                        }
                         post {
                             requestFocus()
                             if (autoShowKeyboard) {
