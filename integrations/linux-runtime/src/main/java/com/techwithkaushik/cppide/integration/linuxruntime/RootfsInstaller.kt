@@ -139,11 +139,17 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     }
 
     private fun safeTarget(root: File, name: String): File {
-        if (name.startsWith("/") || name.split('/').any { it == ".." }) throw IOException("Unsafe rootfs path: $name")
-        val canonicalRoot = root.canonicalFile.toPath()
-        val target = File(root, name).canonicalFile
-        if (!target.toPath().startsWith(canonicalRoot)) throw IOException("Path escapes rootfs: $name")
-        return target
+        // Keep archive paths lexical. canonicalFile follows existing symlinks,
+        // which is unsafe while extracting usr-merged rootfs archives: /lib may
+        // already point to /usr/lib, and canonicalizing later /lib entries can
+        // overwrite the wrong target or collapse distinct archive entries.
+        if (name.startsWith("/") || name.split('/').any { it == ".." }) {
+            throw IOException("Unsafe rootfs path: $name")
+        }
+        val rootPath = root.absoluteFile.toPath().normalize()
+        val target = rootPath.resolve(name).normalize()
+        if (!target.startsWith(rootPath)) throw IOException("Path escapes rootfs: $name")
+        return target.toFile()
     }
 
     private fun createSafeSymlink(root: File, link: File, rawTarget: String) {
