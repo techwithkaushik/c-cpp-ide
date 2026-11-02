@@ -8,7 +8,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
@@ -190,8 +189,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         // in-root targets so they remain inside the staged rootfs before activation.
         val target = parent.relativize(resolved)
         parent.toFile().let { if (!it.exists() && !it.mkdirs()) throw IOException("Cannot create symlink parent.") }
-        if (Files.isSymbolicLink(linkPath)) Files.delete(linkPath)
-        else if (Files.exists(linkPath)) throw IOException("Symlink path conflicts with an existing file: $link")
+        if (Files.exists(linkPath) || Files.isSymbolicLink(linkPath)) Files.delete(linkPath)
         Files.createSymbolicLink(linkPath, target)
     }
 
