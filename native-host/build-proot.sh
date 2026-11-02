@@ -148,10 +148,10 @@ for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
   PREFIX="$B/prefix"
   mkdir -p "$PREFIX/include" "$PREFIX/lib/pkgconfig" "$B/talloc"
   echo "== Building Termux PRoot ($PROOT_COMMIT) for $ABI"
-  # Optimize the runtime for device execution, not just CI build time. PRoot's
-  # syscall translation cannot match native Termux, but -O3/LTO reduces host
-  # overhead without enabling unsafe device-specific CPU instructions.
-  OPT_CFLAGS="-O3 -flto -fPIC -fomit-frame-pointer -ffunction-sections -fdata-sections"
+  # Optimize device execution without link-time optimization. PRoot's loader
+  # build runs objdump/objcopy on intermediate objects; preserve ordinary ELF
+  # objects while retaining native compiler optimizations.
+  OPT_CFLAGS="-O3 -fPIC -fomit-frame-pointer -ffunction-sections -fdata-sections"
   "$CC" $OPT_CFLAGS -D_GNU_SOURCE -D__STDC_WANT_LIB_EXT1__=1 -include "$WORK/config.h" \
     -I"$WORK" -I"$TALLOC_SRC" -I"$TALLOC_SRC/lib/replace" -c "$TALLOC_SRC/talloc.c" -o "$B/talloc/talloc.o"
   "$CC" $OPT_CFLAGS -c "$WORK/replace_min.c" -o "$B/talloc/replace_min.o"
@@ -172,8 +172,8 @@ PC
   export PKG_CONFIG_SYSROOT_DIR=
   make -C "$PROOT_SRC/src" clean >/dev/null 2>&1 || true
   CPPFLAGS="-I$WORK -I$PREFIX/include -DARG_MAX=131072" \
-  CFLAGS="-O3 -flto -fomit-frame-pointer -ffunction-sections -fdata-sections" \
-  LDFLAGS="-L$PREFIX/lib -flto -Wl,--gc-sections -Wl,-z,max-page-size=16384" \
+  CFLAGS="-O3 -fomit-frame-pointer -ffunction-sections -fdata-sections" \
+  LDFLAGS="-L$PREFIX/lib -Wl,--gc-sections -Wl,-z,max-page-size=16384" \
     make -C "$PROOT_SRC/src" -j"$JOBS" proot loader/loader \
       CC="$CC" LD="$CC" STRIP="$TC/llvm-strip" OBJCOPY="$TC/llvm-objcopy" OBJDUMP="$TC/llvm-objdump" PKG_CONFIG=pkg-config WITHOUT_PYTHON=1
   # This is a cross-compiled Android executable; do not execute it on the x86_64
