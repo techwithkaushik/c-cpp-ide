@@ -1525,12 +1525,13 @@ private fun WorkspaceScreen(
     if (showToolPanel) {
         ModalBottomSheet(
             onDismissRequest = onCloseToolPanel,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+            // Keep the terminal sheet stable when the soft keyboard opens or closes.
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = Color(0xFF10151C),
             contentWindowInsets = { WindowInsets.navigationBars }
         ) {
             Column(
-                Modifier.fillMaxWidth().fillMaxHeight(),
+                Modifier.fillMaxWidth().fillMaxHeight(0.92f),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 ToolPanelContent(
