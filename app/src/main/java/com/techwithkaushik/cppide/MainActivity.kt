@@ -1537,7 +1537,9 @@ private fun WorkspaceScreen(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .fillMaxHeight(sheetFraction.coerceIn(minFraction.coerceAtMost(0.95f), 1f))
                     .background(Color(0xFF10151C), RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                    .pointerInput(maxHeightPx) {
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().height(28.dp).pointerInput(maxHeightPx) {
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, dragAmount ->
                                 change.consume()
@@ -1545,9 +1547,9 @@ private fun WorkspaceScreen(
                                     .coerceIn(minFraction.coerceAtMost(0.95f), 1f)
                             }
                         )
-                    }
-            ) {
-                Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                    },
+                    contentAlignment = Alignment.Center
+                ) {
                     Box(Modifier.width(36.dp).height(4.dp).background(Color(0xFF718096), RoundedCornerShape(2.dp)))
                 }
                 ToolPanelContent(selected = selectedPanel, onSelect = onPanel, onClose = onCloseToolPanel, onOpenSettings = onOpenSettings)
