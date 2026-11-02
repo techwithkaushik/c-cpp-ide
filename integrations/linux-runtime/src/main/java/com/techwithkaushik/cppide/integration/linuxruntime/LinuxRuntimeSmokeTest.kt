@@ -13,7 +13,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         if (!paths.hasRootfs()) return Result(false, null, "", "Ubuntu rootfs is missing or incomplete.")
         if (!paths.hasProot()) return Result(false, null, "", "PRoot or its bundled loader is missing from files/usr/bin.")
         val root = paths.ubuntuRoot.absolutePath
-        val hostTemp = File(paths.base, "tmp").apply {
+        val hostTemp = paths.usrTmp.apply {
             if (!exists() && !mkdirs()) return Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath")
             if (!isDirectory || !canWrite()) return Result(false, null, "", "PRoot host temporary directory is not writable: $absolutePath")
         }
