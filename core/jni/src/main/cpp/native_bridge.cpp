@@ -247,8 +247,8 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // visible inside Ubuntu. The Kotlin launcher prepares this file in temp;
         // bind it only for this process without rewriting Ubuntu's rootfs resolver.
         const std::string resolver = temp + "/resolv.conf";
-        // Match the simple shell launch: start from the rootfs directory and
-        // expose the usr-merged paths explicitly. PRoot still owns the guest cwd.
+        // Match the simple shell launch: start from the rootfs directory.
+        // The rootfs already contains its own usr-merge symlinks; do not overlay them.
         if (chdir(rootfs.c_str()) != 0) {
             dprintf(STDERR_FILENO, "Could not enter distro directory: %s\\r\\n", std::strerror(errno));
             _exit(126);
