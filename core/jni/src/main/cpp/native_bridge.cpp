@@ -213,6 +213,13 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setenv("COLORTERM", "truecolor", 1);
         setenv("LANG", "C.UTF-8", 1);
         setenv("PROOT_TMP_DIR", temp.c_str(), 1);
+        // Android 10+ blocks execve from writable app data. PRoot's loader is
+        // packaged beside the host executable in the APK native library directory.
+        const size_t proot_slash = proot.find_last_of('/');
+        if (proot_slash != std::string::npos) {
+            const std::string loader = proot.substr(0, proot_slash + 1) + "libproot-loader.so";
+            if (access(loader.c_str(), X_OK) == 0) setenv("PROOT_LOADER", loader.c_str(), 1);
+        }
 
         std::vector<std::string> arguments = {
             linker, proot, "-r", rootfs, "-w", "/root",
