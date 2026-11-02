@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
-import com.techwithkaushik.cppide.integration.linuxruntime.ProotInstaller
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
 import com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader
 import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
@@ -48,9 +47,7 @@ fun RuntimeSetupPanel(
     val paths = remember(context) { LinuxRuntimePaths(context.filesDir) }
     val scope = rememberCoroutineScope()
     var rootfsUri by remember { mutableStateOf<Uri?>(null) }
-    var prootUri by remember { mutableStateOf<Uri?>(null) }
     var rootfsSha by remember { mutableStateOf("") }
-    var prootSha by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember(message) { mutableStateOf(message) }
 
@@ -83,10 +80,6 @@ fun RuntimeSetupPanel(
     val rootfsPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { rootfsUri = it }
-    val prootPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { prootUri = it }
-
     LaunchedEffect(context) {
         status = withContext(Dispatchers.IO) {
             when {
@@ -107,7 +100,7 @@ fun RuntimeSetupPanel(
     ) {
         Text("Ubuntu Linux runtime", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Text(
-            "This branch does not use Termux or its app-private prefix. Rootfs and PRoot are stored under this app's files/linux-runtime directory. Import an Ubuntu .tar, .tar.gz or .tar.xz rootfs and a PRoot Android .tar.gz archive. The PRoot archive must be verified with its SHA-256 before installation.",
+            "This branch does not use Termux or its app-private prefix. Rootfs is stored under this app's files/linux-runtime directory. PRoot v5.5.0 and its Android loader are bundled in the APK to satisfy Android 10+ executable-file restrictions.",
             color = Color(0xFFE8EDF5), fontSize = 12.sp
         )
         Button(enabled = !busy, onClick = {
@@ -144,7 +137,7 @@ fun RuntimeSetupPanel(
                         val installed = ProotDownloader(paths).downloadAndInstall()
                         "${installed.release} installed (SHA-256 ${installed.sha256.take(16)}…). The upstream asset currently publishes no SHA-256 digest; the release URL and version are pinned."
                     } catch (e: Exception) {
-                        "PRoot download failed: ${e.message ?: e.javaClass.simpleName}"
+                        "Bundled PRoot validation failed: ${e.message ?: e.javaClass.simpleName}"
                     }
                 }
                 status = result
@@ -160,7 +153,7 @@ fun RuntimeSetupPanel(
                 }
             }
         }) { Text("Download pinned Android PRoot") }
-        Text("Ubuntu rootfs checksum is verified against Ubuntu's official SHA256SUMS. PRoot uses the fixed upstream proot-rs v0.1.0 Android release because that upstream release does not publish an asset digest.", color = Color(0xFF9AA7B5), fontSize = 11.sp)
+        Text("Ubuntu rootfs checksum is verified against Ubuntu's official SHA256SUMS. PRoot v5.5.0 is built from upstream source for Android by CI and bundled in the APK.", color = Color(0xFF9AA7B5), fontSize = 11.sp)
 
         Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
             Text(if (rootfsUri == null) "1 · Select Ubuntu rootfs archive" else "Change Ubuntu rootfs")
@@ -216,49 +209,10 @@ fun RuntimeSetupPanel(
             }
         }) { Text("Install Ubuntu rootfs") }
 
-        Button(enabled = !busy, onClick = { prootPicker.launch(arrayOf("application/gzip", "application/octet-stream", "*/*")) }) {
-            Text(if (prootUri == null) "2 · Select Android PRoot .tar.gz" else "Change PRoot archive")
-        }
-        Text(prootUri?.let(::displayName) ?: "No PRoot archive selected", color = Color(0xFF9AA7B5), fontSize = 11.sp)
-        OutlinedTextField(
-            value = prootSha,
-            onValueChange = { prootSha = it.trim() },
-            label = { Text("Required PRoot archive SHA-256") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+        Text(
+            "PRoot v5.5.0 is bundled with the APK as an Android-native executable and loader. Android 10+ blocks running downloaded executables from writable app storage, so a user-selected PRoot archive is no longer supported. Tap the button above to verify the bundled binaries.",
+            color = Color(0xFF9AA7B5), fontSize = 11.sp
         )
-        Button(enabled = !busy && prootUri != null && prootSha.matches(Regex("[a-fA-F0-9]{64}")), onClick = {
-            val uri = prootUri ?: return@Button
-            busy = true
-            status = "Verifying and installing PRoot…"
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    var staged: File? = null
-                    try {
-                        staged = copySelected(uri, "proot")
-                        val namedArchive = File(staged.parentFile, "proot-import.tar.gz")
-                        staged.copyTo(namedArchive, overwrite = true)
-                        ProotInstaller(paths).install(namedArchive, prootSha)
-                        namedArchive.delete()
-                        if (!paths.ready()) throw IOException("PRoot installed, but Ubuntu rootfs is still missing or invalid.")
-                        "Ubuntu runtime files are installed. Local shell launch will be tested when Terminal opens."
-                    } catch (e: Exception) {
-                        "PRoot installation failed: ${e.message ?: e.javaClass.simpleName}"
-                    } finally { staged?.delete() }
-                }
-                status = result
-                busy = false
-                if (paths.ready()) {
-                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
-                    if (smoke.success) {
-                        status = "Ubuntu shell smoke test passed."
-                        onRuntimeReady()
-                    } else {
-                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
-                    }
-                }
-            }
-        }) { Text("Verify and install PRoot") }
 
         if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
         Text("Install location: ${paths.base.absolutePath}", color = Color(0xFF9AA7B5), fontSize = 11.sp)
