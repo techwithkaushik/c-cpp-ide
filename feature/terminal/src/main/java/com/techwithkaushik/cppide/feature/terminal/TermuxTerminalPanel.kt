@@ -272,15 +272,15 @@ fun TermuxTerminalPanel(
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 listOf(
-                    "CTRL+C" to "\\u0003",
-                    "CTRL+D" to "\\u0004",
-                    "CTRL+Z" to "\\u001A",
-                    "ESC" to "\\u001B",
+                    "CTRL+C" to "\u0003",
+                    "CTRL+D" to "\u0004",
+                    "CTRL+Z" to "\u001A",
+                    "ESC" to "\u001B",
                     "TAB" to "\\t",
-                    "↑" to "\\u001B[A",
-                    "↓" to "\\u001B[B",
-                    "←" to "\\u001B[D",
-                    "→" to "\\u001B[C"
+                    "↑" to "\u001B[A",
+                    "↓" to "\u001B[B",
+                    "←" to "\u001B[D",
+                    "→" to "\u001B[C"
                 ).forEach { (label, sequence) ->
                     Text(
                         label,
