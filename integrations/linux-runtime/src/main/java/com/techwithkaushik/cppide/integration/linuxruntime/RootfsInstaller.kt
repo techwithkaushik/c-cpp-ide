@@ -152,17 +152,25 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     }
 
     private fun safeTarget(root: File, name: String): File {
-        // Keep archive paths lexical. canonicalFile follows existing symlinks,
-        // which is unsafe while extracting usr-merged rootfs archives: /lib may
-        // already point to /usr/lib, and canonicalizing later /lib entries can
-        // overwrite the wrong target or collapse distinct archive entries.
+        // Reject traversal lexically first, then resolve existing parent symlinks.
+        // Ubuntu's usr-merged rootfs commonly has /lib -> usr/lib and /bin -> usr/bin.
+        // Treating /lib/x and /usr/lib/x as different extraction destinations lets
+        // duplicate tar entries overwrite each other through aliases, corrupting ELF
+        // libraries (for example libtinfo.so.6.4). Resolve only the parent so an
+        // entry can still replace a symlink at its own final path.
         if (name.startsWith("/") || name.split('/').any { it == ".." }) {
             throw IOException("Unsafe rootfs path: $name")
         }
-        val rootPath = root.absoluteFile.toPath().normalize()
-        val target = rootPath.resolve(name).normalize()
-        if (!target.startsWith(rootPath)) throw IOException("Path escapes rootfs: $name")
-        return target.toFile()
+        val rootPath = root.canonicalFile.toPath().normalize()
+        val lexical = rootPath.resolve(name).normalize()
+        if (!lexical.startsWith(rootPath)) throw IOException("Path escapes rootfs: $name")
+        val fileName = lexical.fileName ?: throw IOException("Invalid rootfs path: $name")
+        val parent = lexical.parent ?: throw IOException("Invalid rootfs path: $name")
+        val canonicalParent = parent.toFile().canonicalFile.toPath().normalize()
+        if (!canonicalParent.startsWith(rootPath)) {
+            throw IOException("Rootfs path traverses a symlink outside the root: $name")
+        }
+        return canonicalParent.resolve(fileName).normalize().toFile()
     }
 
     private fun removeEntrySymlink(target: File) {
