@@ -150,6 +150,38 @@ class EmbeddedTermuxRuntime(
     fun repairInstalledRuntimePaths() {
         installer.repairInstalledRuntimePaths(layout.prefix)
         layout.ensurePrivateDirectories()
+        ensureSupplementaryGroupNames()
+    }
+
+    /**
+     * Android injects supplementary host GIDs into the app process. Inside PRoot,
+     * Ubuntu's groups(1) resolves those IDs against /etc/group and warns when a
+     * host GID has no entry. Add stable names for common Android GIDs without
+     * changing their numeric IDs or touching Ubuntu's core packages.
+     */
+    private fun ensureSupplementaryGroupNames() {
+        val groupFile = File(layout.prefix, "etc/group")
+        if (!groupFile.isFile || !groupFile.canWrite()) return
+
+        val androidGroups = mapOf(
+            3003 to "android_inet",
+            9997 to "android_everybody",
+            20490 to "android_shared",
+            50490 to "android_user"
+        )
+        val existingLines = groupFile.readLines(Charsets.UTF_8)
+        val existingGids = existingLines.mapNotNull { line ->
+            line.split(':').getOrNull(2)?.toIntOrNull()
+        }.toSet()
+        val missing = androidGroups.filterKeys { it !in existingGids }
+        if (missing.isEmpty()) return
+
+        groupFile.appendText(
+            missing.entries.joinToString(separator = "", prefix = if (existingLines.isEmpty()) "" else "\n") {
+                "${it.value}:x:${it.key}:\n"
+            },
+            Charsets.UTF_8
+        )
     }
 
     /** Structural check only; a real executable smoke test still has to run. */
