@@ -11,7 +11,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
     fun run(timeoutSeconds: Long = 20): Result {
         paths.ensureDirectories()
         if (!paths.hasRootfs()) return Result(false, null, "", "Ubuntu rootfs is missing or incomplete.")
-        if (!paths.hasProot()) return Result(false, null, "", "Bundled Android PRoot v5.5.0 binary/loader is missing from the APK native library directory.")
+        if (!paths.hasProot()) return Result(false, null, "", "PRoot or its bundled loader is missing from files/usr/bin.")
         val root = paths.ubuntuRoot.absolutePath
         val hostTemp = File(paths.base, "tmp").apply {
             if (!exists() && !mkdirs()) return Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath")
@@ -34,7 +34,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val process = try {
             ProcessBuilder(
                 paths.proot.absolutePath,
-                // Level 2 preserves useful errors without flooding stderr with ptrace traces.
+                // Keep PRoot quiet; the smoke test reports the shell exit and captured stderr.
                 "-0", "-v", "0",
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
@@ -103,7 +103,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val failure = listOf(
             "Ubuntu shell exited with code $exit.",
             androidExecBlocker,
-            "PRoot command: ${paths.proot.absolutePath} -0 -v 2 -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --noprofile --norc -c <smoke-test>",
+            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --noprofile --norc -c <smoke-test>",
             err.takeIf { it.isNotBlank() }?.let { "PRoot stderr (tail): ${it.takeLast(6000)}" }
                 ?: "PRoot stderr was empty.",
             out.takeIf { it.isNotBlank() }?.let { "PRoot stdout (tail): ${it.takeLast(2000)}" }
