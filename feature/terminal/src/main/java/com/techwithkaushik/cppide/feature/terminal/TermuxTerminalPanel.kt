@@ -246,7 +246,7 @@ fun TermuxTerminalPanel(
                     .background(Color(0xFF151B23), RoundedCornerShape(8.dp))
                     .clickable {
                         TerminalSessionRegistry.createTab(
-                            appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                            appContext, linker, shell, shellArguments, home, environment, terminalFontSize, scrollbackLines
                         )
                     }
                     .padding(horizontal = 12.dp, vertical = 6.dp)
