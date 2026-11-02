@@ -9,6 +9,8 @@ class LinuxRuntimePaths(filesDir: File) {
     val distributions = File(base, "distributions")
     val ubuntuRoot = File(distributions, "ubuntu")
     val bin = File(base, "bin")
+    val binProot = File(bin, "proot")
+    val binProotLoader = File(bin, "loader")
 
     /** APK-extracted nativeLibraryDir is executable on Android 10+; app data is not. */
     val nativeLibraryDir: File? by lazy {
@@ -21,8 +23,8 @@ class LinuxRuntimePaths(filesDir: File) {
             }
         }.getOrNull()
     }
-    val proot: File get() = nativeLibraryDir?.let { File(it, "libproot.so") } ?: File(bin, "proot")
-    val prootLoader: File get() = nativeLibraryDir?.let { File(it, "libproot-loader.so") } ?: File(bin, "loader")
+    val proot: File get() = nativeLibraryDir?.let { File(it, "libproot.so") } ?: binProot
+    val prootLoader: File get() = nativeLibraryDir?.let { File(it, "libproot-loader.so") } ?: binProotLoader
     val marker = File(base, "runtime.properties")
     val staging = File(base, "staging")
     val systemLinker: File get() = File(if (Process.is64Bit()) "/system/bin/linker64" else "/system/bin/linker")
@@ -31,6 +33,30 @@ class LinuxRuntimePaths(filesDir: File) {
         listOf(base, distributions, bin, staging).forEach {
             if (!it.exists() && !it.mkdirs()) throw IllegalStateException("Cannot create app-private runtime directory: $it")
             if (!it.isDirectory) throw IllegalStateException("Runtime path is not a directory: $it")
+        }
+        // Keep the expected bin/proot and bin/loader paths available for UI,
+        // scripts and older callers, but point them at APK-extracted native
+        // binaries. Never copy executable binaries into writable app data:
+        // Android 10+ W^X policy can prevent launching those copies.
+        nativeLibraryDir?.let { nativeDir ->
+            linkNativeBinary(binProot, File(nativeDir, "libproot.so"))
+            linkNativeBinary(binProotLoader, File(nativeDir, "libproot-loader.so"))
+        }
+    }
+
+    private fun linkNativeBinary(alias: File, target: File) {
+        if (!target.isFile) return
+        if (alias.exists() || java.nio.file.Files.isSymbolicLink(alias.toPath())) {
+            val currentTarget = runCatching { alias.canonicalFile }.getOrNull()
+            if (currentTarget == target.canonicalFile) return
+            if (!alias.delete()) {
+                throw IllegalStateException("Cannot replace stale runtime binary alias: $alias")
+            }
+        }
+        try {
+            java.nio.file.Files.createSymbolicLink(alias.toPath(), target.toPath())
+        } catch (e: Exception) {
+            throw IllegalStateException("Cannot create runtime binary alias $alias -> $target", e)
         }
     }
 
