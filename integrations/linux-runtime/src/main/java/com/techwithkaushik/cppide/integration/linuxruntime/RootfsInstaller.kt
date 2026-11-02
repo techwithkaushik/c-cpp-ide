@@ -83,14 +83,8 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             if (!File(stage, "bin/sh").exists() && !File(stage, "usr/bin/sh").exists()) {
                 throw IOException("Ubuntu rootfs does not contain /bin/sh or /usr/bin/sh.")
             }
-            // Ubuntu Base may ship a systemd-resolved stub symlink that cannot
-            // work in this rootless environment. Replace only a missing/broken
-            // resolver with explicit public DNS so apt can resolve package hosts.
-            val resolver = File(stage, "etc/resolv.conf")
-            if (Files.isSymbolicLink(resolver.toPath()) || !resolver.isFile || resolver.length() == 0L) {
-                if (Files.isSymbolicLink(resolver.toPath())) Files.delete(resolver.toPath())
-                resolver.writeText("nameserver 1.1.1.1\nnameserver 8.8.8.8\noptions timeout:2 attempts:2\n")
-            }
+            // Preserve the resolver exactly as provided by the Ubuntu rootfs; do not rewrite it.
+            ensureAndroidGroups(File(stage, "etc/group"))
             val aptSourcesDir = File(stage, "etc/apt/sources.list.d")
             if (!aptSourcesDir.exists() && !aptSourcesDir.mkdirs()) throw IOException("Cannot create Ubuntu APT sources directory.")
             File(aptSourcesDir, "ubuntu.sources").writeText(
@@ -113,6 +107,34 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         } catch (error: Exception) {
             stage.deleteRecursively()
             throw error
+        }
+    }
+
+    /** Add Android-compatible group names/IDs to Ubuntu's group database.
+     * This does not grant host kernel supplementary-group privileges; Android
+     * assigns those to the app process. */
+    private fun ensureAndroidGroups(groupFile: File) {
+        if (!groupFile.isFile) throw IOException("Ubuntu /etc/group is missing.")
+        val existing = groupFile.readLines()
+            .mapNotNull { it.substringBefore(':').takeIf(String::isNotBlank) }
+            .toMutableSet()
+        val androidGroups = listOf(
+            "system" to 1000, "radio" to 1001, "bluetooth" to 1002,
+            "graphics" to 1003, "input" to 1004, "audio" to 1005,
+            "camera" to 1006, "log" to 1007, "adb" to 1011,
+            "sdcard_rw" to 1015, "media_rw" to 1023, "sdcard_r" to 1028,
+            "dns" to 1051, "network_stack" to 1073, "net_bt_admin" to 3001,
+            "net_bt" to 3002, "inet" to 3003, "net_raw" to 3004,
+            "net_admin" to 3005, "net_bw_stats" to 3006, "net_bw_acct" to 3007,
+            "readproc" to 3009, "wakelock" to 3010, "everybody" to 9997
+        )
+        val missing = androidGroups.filter { (name, _) -> name !in existing }
+        if (missing.isNotEmpty()) {
+            groupFile.appendText(
+                missing.joinToString(separator = "", prefix = if (groupFile.length() > 0L) "\n" else "") {
+                    "${it.first}:x:${it.second}:\n"
+                }
+            )
         }
     }
 
