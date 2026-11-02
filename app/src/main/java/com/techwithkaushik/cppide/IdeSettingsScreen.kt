@@ -67,6 +67,7 @@ internal fun IdeSettingsScreen(
     val prefs = remember(context) { context.getSharedPreferences(SettingsPreference.FILE, Context.MODE_PRIVATE) }
     var category by rememberSaveable { mutableStateOf("Interface") }
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
+    var scrollbackLines by remember { mutableStateOf(prefs.getInt("terminal_scrollback_lines", 5000).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     var connectionMode by remember { mutableStateOf(prefs.getString("terminal_connection_mode", "local") ?: "local") }
     var sshHost by remember { mutableStateOf(prefs.getString("terminal_ssh_host", "") ?: "") }
@@ -143,6 +144,8 @@ internal fun IdeSettingsScreen(
                             terminalFontSize = it
                             prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, it.toInt()).apply()
                         }, valueRange = 10f..22f, steps = 11)
+                        SettingsCard("Scrollback lines", "Terminal history", scrollbackLines.toInt().toString())
+                        Slider(value = scrollbackLines, onValueChange = { scrollbackLines = it; prefs.edit().putInt("terminal_scrollback_lines", it.toInt()).apply() }, valueRange = 1000f..10000f, steps = 8)
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
