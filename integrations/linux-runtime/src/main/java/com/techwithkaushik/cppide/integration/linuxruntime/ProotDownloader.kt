@@ -30,8 +30,19 @@ class ProotDownloader(private val paths: LinuxRuntimePaths) {
     }
 
     private fun validateElf(file: File) {
-        val header = file.inputStream().use { it.readNBytes(20) }
-        require(header.size == 20 && header.take(4).map { it.toInt() and 0xff } ==
+        // InputStream.readNBytes() is unavailable on some supported Android releases.
+        // Use a bounded read loop to avoid NoSuchMethodError on Android 10.
+        val header = ByteArray(20)
+        var headerBytes = 0
+        file.inputStream().use { input ->
+            while (headerBytes < header.size) {
+                val count = input.read(header, headerBytes, header.size - headerBytes)
+                if (count < 0) break
+                if (count == 0) continue
+                headerBytes += count
+            }
+        }
+        require(headerBytes == 20 && header.take(4).map { it.toInt() and 0xff } ==
             listOf(0x7f, 0x45, 0x4c, 0x46)) { "Bundled ${file.name} is not a valid ELF executable." }
         val machine = (header[18].toInt() and 0xff) or ((header[19].toInt() and 0xff) shl 8)
         val x86Device = android.os.Build.SUPPORTED_ABIS.any { it.startsWith("x86") }
