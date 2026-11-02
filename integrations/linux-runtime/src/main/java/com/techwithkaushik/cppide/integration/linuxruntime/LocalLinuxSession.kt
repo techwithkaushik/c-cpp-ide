@@ -50,7 +50,7 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed.")
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
             val shell = if (java.io.File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
-            val temp = java.io.File(paths.base, "tmp").apply {
+            val temp = paths.usrTmp.apply {
                 if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.")
             }
             // Android DNS is network-scoped and is not inherited by the guest.
