@@ -93,7 +93,7 @@ class TerminalScreenTest {
 
     @Test fun scrollingRegionKeepsRowsOutsideTheRegionInPlace() {
         val screen = TerminalScreen(columns = 20, rows = 5)
-        screen.append("top\\r\\n")
+        screen.append("top\r\n")
         screen.append("one\\r\\ntwo\\r\\nthree\\r\\nfour")
         screen.append("\u001B[2;4r")
         screen.append("\u001B[4;1Hbottom-scroll\\r\\n")
@@ -108,6 +108,38 @@ class TerminalScreenTest {
         screen.append("\u001Bc")
         screen.append("fresh")
         assertTrue(screen.render().contains("fresh"))
+    }
+
+    @Test fun indexedAndTrueColorSgrArePreserved() {
+        val screen = TerminalScreen()
+        screen.append("\u001B[38;5;196mindexed\u001B[0m ")
+        screen.append("\u001B[38;2;12;34;56mtruecolor\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        assertTrue(rendered.text.contains("indexed"))
+        assertTrue(rendered.text.contains("truecolor"))
+        assertTrue(rendered.spanStyles.count { it.item.color != Color.Unspecified } >= 2)
+    }
+
+    @Test fun saveAndRestoreCursorReturnsToOriginalCell() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("hello")
+        screen.append("\u001B[s")
+        screen.append("\u001B[2;1Hsecond")
+        screen.append("\u001B[uX")
+        val lines = screen.render().replace("▏", "").lines()
+        assertTrue(lines.first().startsWith("helloX"))
+        assertTrue(lines.any { it.startsWith("second") })
+    }
+
+    @Test fun resetClearsScrollbackAndRestoresDefaultStyle() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("line1\r\nline2\r\nline3\r\nline4\r\nline5\r\nline6")
+        screen.append("\u001B[31m")
+        screen.append("\u001Bc")
+        screen.append("clean")
+        val rendered = screen.renderAnnotated()
+        assertTrue(rendered.text.contains("clean"))
+        assertFalse(rendered.text.contains("line1"))
     }
 
 }
