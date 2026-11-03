@@ -111,9 +111,11 @@ private object LinuxTerminalSessions {
             output = mutableStateOf(screen.renderAnnotated()),
             screen = screen,
             send = { text ->
-                check(!ended.get()) { "This terminal session has exited. Start a new session to continue." }
-                input.write(text.toByteArray(Charsets.UTF_8))
-                input.flush()
+                // Ignore late IME/key events racing with the reader's exit callback.
+                if (!ended.get()) {
+                    input.write(text.toByteArray(Charsets.UTF_8))
+                    input.flush()
+                }
             },
             interrupt = { if (!ended.get()) interrupt() },
             session = session,
