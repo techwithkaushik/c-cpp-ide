@@ -298,6 +298,7 @@ fun LinuxTerminalPanel(
                         }
                     }
                 }
+                }
                 Text("−", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
                 Text("+", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize + 1).coerceAtMost(28); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
                 Text("+", modifier = Modifier.background(Color(0xFF173D5C), RoundedCornerShape(7.dp)).clickable {
