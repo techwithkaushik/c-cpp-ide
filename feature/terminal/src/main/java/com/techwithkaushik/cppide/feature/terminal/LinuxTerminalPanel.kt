@@ -55,6 +55,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -78,6 +79,7 @@ import kotlinx.coroutines.withContext
 import java.io.OutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.roundToInt
 
 private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~")
 private val TERMINAL_EXTRA_KEY_ORDER = listOf("ESC", "-", "HOME", "UP", "END", "PGUP", "TAB", "CTRL", "ALT", "LEFT", "DOWN", "RIGHT", "PGDN", "/", "|", "~")
@@ -457,7 +459,7 @@ fun LinuxTerminalPanel(
                         active.output.value,
                         color = Color(0xFFD8DEE9),
                         fontFamily = FontFamily.Monospace,
-                        softWrap = false,
+                        softWrap = true,
                         fontSize = terminalFontSize.sp,
                         lineHeight = (terminalFontSize * 1.28f).sp,
                         modifier = Modifier.fillMaxWidth()
@@ -467,7 +469,19 @@ fun LinuxTerminalPanel(
                                     keyboardController?.show()
                                 }
                             }
-                            .horizontalScroll(rememberScrollState())
+                            .pointerInput(terminalFontSize) {
+                                detectTransformGestures { _, _, zoom, _ ->
+                                    if (zoom.isFinite() && kotlin.math.abs(zoom - 1f) > 0.015f) {
+                                        val updatedSize = (terminalFontSize * zoom).roundToInt().coerceIn(10, 28)
+                                        if (updatedSize != terminalFontSize) {
+                                            terminalFontSize = updatedSize
+                                            terminalPreferences.edit()
+                                                .putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, updatedSize)
+                                                .apply()
+                                        }
+                                    }
+                                }
+                            }
                             .verticalScroll(outputScrollState)
                     )
                 }
@@ -549,14 +563,6 @@ fun LinuxTerminalPanel(
                     val activeKeys = extraKeyOrder.filter { it in visibleExtraKeys }
                     val firstRowCount = (activeKeys.size + 1) / 2
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        TextButton(enabled = terminalFontSize > 10, onClick = {
-                            terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10)
-                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
-                        }) { Text("A−", fontSize = 11.sp) }
-                        TextButton(enabled = terminalFontSize < 28, onClick = {
-                            terminalFontSize = (terminalFontSize + 1).coerceAtMost(28)
-                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
-                        }) { Text("A+", fontSize = 11.sp) }
                         activeKeys.take(firstRowCount).forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
                         val sequence = when (key) {
