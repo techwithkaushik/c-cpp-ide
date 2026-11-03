@@ -199,21 +199,21 @@ class TerminalScreenTest {
 
     @Test fun wideCharactersRemainCleanWhenTheirLineMovesIntoScrollback() {
         val screen = TerminalScreen(columns = 20, rows = 5)
-        screen.append("界\\r\\nline1\\r\\nline2\\r\\nline3\\r\\nline4\\r\\nline5")
+        screen.append("界\r\nline1\r\nline2\r\nline3\r\nline4\r\nline5")
         val rendered = screen.render()
         assertTrue(rendered.contains("界"))
-        assertFalse(rendered.contains("\\u0000"))
+        assertFalse(rendered.contains("\u0000"))
     }
 
     @Test fun danglingHighSurrogateUsesReplacementCharacter() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         // A following non-low-surrogate proves the previous high surrogate
         // was malformed rather than the first half of a chunk-split pair.
-        screen.append("broken: \\uD83D")
+        screen.append("broken: \uD83D")
         screen.append("!")
         val rendered = screen.render()
         assertTrue(rendered.contains("broken:"))
-        assertTrue(rendered.contains("\\uFFFD"))
+        assertTrue(rendered.contains("\uFFFD"))
     }
 
     @Test fun cursorBlinkPhaseHidesAndRestoresCursorWithoutChangingText() {
