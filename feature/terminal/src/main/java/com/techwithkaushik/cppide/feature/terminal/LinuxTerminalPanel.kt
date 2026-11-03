@@ -481,7 +481,14 @@ fun LinuxTerminalPanel(
                             val added = updated.substring(commonPrefix.length)
                             try {
                                 repeat(removed) { active.send("\u007f") }
-                                if (added.isNotEmpty()) active.send(added)
+                                if (added.isNotEmpty()) {
+                                if (ctrlMode && added.length == 1) {
+                                    active.send((added[0].uppercaseChar().code and 0x1f).toChar().toString())
+                                    ctrlMode = false
+                                } else {
+                                    active.send(added)
+                                }
+                            }
                             } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
                         }
                         command = updated
