@@ -191,8 +191,13 @@ fun LinuxTerminalPanel(
     var extraKeysEnabled by remember { mutableStateOf(terminalPreferences.getBoolean("terminal_extra_keys_enabled", true)) }
     var showExtraKeysSetup by remember { mutableStateOf(false) }
     var visibleExtraKeys by remember { mutableStateOf(terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS) }
-    val savedKeyOrder = terminalPreferences.getString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(",")) ?: TERMINAL_EXTRA_KEY_ORDER.joinToString(",")
-    val extraKeyOrder = savedKeyOrder.split(",").filter { it in TERMINAL_EXTRA_KEY_ORDER }.let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
+    var extraKeyOrder by remember {
+        mutableStateOf(
+            (terminalPreferences.getString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(",")) ?: TERMINAL_EXTRA_KEY_ORDER.joinToString(","))
+                .split(",").filter { it in TERMINAL_EXTRA_KEY_ORDER }
+                .let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
+        )
+    }
     val customTerminalKeys = terminalPreferences.getStringSet("terminal_custom_extra_keys", emptySet())?.toList().orEmpty().mapNotNull { entry ->
         val parts = entry.split("::", limit = 2)
         if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotEmpty()) parts[0] to parts[1] else null
@@ -521,46 +526,30 @@ fun LinuxTerminalPanel(
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
                     decorationBox = { inner -> inner() }
                 )
-            Row(
-                Modifier.fillMaxWidth().background(Color(0xFF101820))
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 5.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                TextButton(enabled = terminalFontSize > 10, onClick = {
-                    terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10)
-                    terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
-                }) { Text("A−", fontSize = 11.sp) }
-                TextButton(enabled = terminalFontSize < 28, onClick = {
-                    terminalFontSize = (terminalFontSize + 1).coerceAtMost(28)
-                    terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
-                }) { Text("A+", fontSize = 11.sp) }
-                TextButton(onClick = {
-                    extraKeysEnabled = !extraKeysEnabled
-                    terminalPreferences.edit().putBoolean("terminal_extra_keys_enabled", extraKeysEnabled).apply()
-                }) { Text(if (extraKeysEnabled) "Keys: ON" else "Keys: OFF", fontSize = 11.sp) }
-                TextButton(onClick = { showExtraKeysSetup = true }) { Text("⚙", fontSize = 13.sp) }
-                if (extraKeysEnabled) extraKeyOrder.filter { it in visibleExtraKeys }.forEach { key ->
+            Column(Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                if (extraKeysEnabled) {
+                    val activeKeys = extraKeyOrder.filter { it in visibleExtraKeys }
+                    val firstRowCount = (activeKeys.size + 1) / 2
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        TextButton(enabled = terminalFontSize > 10, onClick = {
+                            terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10)
+                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
+                        }) { Text("A−", fontSize = 11.sp) }
+                        TextButton(enabled = terminalFontSize < 28, onClick = {
+                            terminalFontSize = (terminalFontSize + 1).coerceAtMost(28)
+                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
+                        }) { Text("A+", fontSize = 11.sp) }
+                        activeKeys.take(firstRowCount).forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
                         val sequence = when (key) {
-                            "ESC" -> "\u001b"
-                            "TAB" -> "\t"
-                            "HOME" -> "\u001b[H"
-                            "END" -> "\u001b[F"
-                            "UP" -> "\u001b[A"
-                            "DOWN" -> "\u001b[B"
-                            "LEFT" -> "\u001b[D"
-                            "RIGHT" -> "\u001b[C"
-                            "PGUP" -> "\u001b[5~"
-                            "PGDN" -> "\u001b[6~"
-                            else -> key
+                            "ESC" -> "\u001b"; "TAB" -> "\t"; "HOME" -> "\u001b[H"; "END" -> "\u001b[F"
+                            "UP" -> "\u001b[A"; "DOWN" -> "\u001b[B"; "LEFT" -> "\u001b[D"; "RIGHT" -> "\u001b[C"
+                            "PGUP" -> "\u001b[5~"; "PGDN" -> "\u001b[6~"; else -> key
                         }
                         when (key) {
                             "CTRL" -> ctrlMode = !ctrlMode
                             "ALT" -> altMode = !altMode
-                            else -> runCatching { active.send(sequence) }
-                                .onFailure { error = it.message ?: "Terminal input failed." }
+                            else -> runCatching { active.send(sequence) }.onFailure { error = it.message ?: "Terminal input failed." }
                         }
                         terminalInputFocusRequester.requestFocus()
                     }) {
@@ -572,36 +561,65 @@ fun LinuxTerminalPanel(
                             }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }
                 }
-                customTerminalKeys.forEach { (label, sequence) ->
+                    }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        activeKeys.drop(firstRowCount).forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
-                        val payload = when (sequence.uppercase()) {
-                            "CTRL+C" -> 3.toChar().toString()
-                            "CTRL+D" -> 4.toChar().toString()
-                            "CTRL+Z" -> 26.toChar().toString()
-                            "CTRL+L" -> 12.toChar().toString()
-                            "ESC" -> 27.toChar().toString()
-                            "TAB" -> 9.toChar().toString()
-                            "ENTER" -> 13.toChar().toString()
-                            else -> sequence
+                        val sequence = when (key) {
+                            "ESC" -> "\u001b"; "TAB" -> "\t"; "HOME" -> "\u001b[H"; "END" -> "\u001b[F"
+                            "UP" -> "\u001b[A"; "DOWN" -> "\u001b[B"; "LEFT" -> "\u001b[D"; "RIGHT" -> "\u001b[C"
+                            "PGUP" -> "\u001b[5~"; "PGDN" -> "\u001b[6~"; else -> key
                         }
-                        runCatching { active.send(payload) }
-                            .onFailure { error = it.message ?: "Custom key failed." }
+                        when (key) {
+                            "CTRL" -> ctrlMode = !ctrlMode
+                            "ALT" -> altMode = !altMode
+                            else -> runCatching { active.send(sequence) }.onFailure { error = it.message ?: "Terminal input failed." }
+                        }
                         terminalInputFocusRequester.requestFocus()
-                    }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
+                    }) {
+                        Text(when (key) { "PGUP" -> "PgUp"; "PGDN" -> "PgDn"; else -> key },
+                            color = when (key) {
+                                "CTRL" -> if (ctrlMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
+                                "ALT" -> if (altMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
+                                else -> Color(0xFFD5E3F0)
+                            }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    }
                 }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    val pasted = clipboardManager.getText()?.text.orEmpty()
-                    if (pasted.isNotEmpty()) runCatching { active.send(pasted) }
-                        .onFailure { error = it.message ?: "Could not paste into terminal." }
-                    terminalInputFocusRequester.requestFocus()
-                }) { Text("Paste", fontSize = 11.sp) }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    runCatching { active.send("\u000c") }.onFailure { error = it.message ?: "Could not clear terminal." }
-                }) { Text("Clear", fontSize = 11.sp) }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    terminalInputFocusRequester.requestFocus()
-                    keyboardController?.show()
-                }) { Text("⌨", fontSize = 13.sp) }
+                        customTerminalKeys.forEach { (label, sequence) ->
+                            TextButton(enabled = active.exited.value == null, onClick = {
+                                val payload = when (sequence.uppercase()) {
+                                    "CTRL+C" -> 3.toChar().toString(); "CTRL+D" -> 4.toChar().toString()
+                                    "CTRL+Z" -> 26.toChar().toString(); "CTRL+L" -> 12.toChar().toString()
+                                    "ESC" -> 27.toChar().toString(); "TAB" -> 9.toChar().toString()
+                                    "ENTER" -> 13.toChar().toString(); else -> sequence
+                                }
+                                runCatching { active.send(payload) }.onFailure { error = it.message ?: "Custom key failed." }
+                                terminalInputFocusRequester.requestFocus()
+                            }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
+                        }
+                        TextButton(enabled = active.exited.value == null, onClick = {
+                            val pasted = clipboardManager.getText()?.text.orEmpty()
+                            if (pasted.isNotEmpty()) runCatching { active.send(pasted) }.onFailure { error = it.message ?: "Could not paste into terminal." }
+                            terminalInputFocusRequester.requestFocus()
+                        }) { Text("Paste", fontSize = 11.sp) }
+                        TextButton(enabled = active.exited.value == null, onClick = {
+                            runCatching { active.send("\u000c") }.onFailure { error = it.message ?: "Could not clear terminal." }
+                        }) { Text("Clear", fontSize = 11.sp) }
+                        TextButton(enabled = active.exited.value == null, onClick = {
+                            terminalInputFocusRequester.requestFocus()
+                            keyboardController?.show()
+                        }) { Text("⌨", fontSize = 13.sp) }
+                        TextButton(onClick = { showExtraKeysSetup = true }) { Text("⚙", fontSize = 13.sp) }
+                    }
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            extraKeysEnabled = true
+                            terminalPreferences.edit().putBoolean("terminal_extra_keys_enabled", true).apply()
+                        }) { Text("Enable extra keys", fontSize = 11.sp) }
+                        TextButton(onClick = { showExtraKeysSetup = true }) { Text("⚙", fontSize = 13.sp) }
+                    }
+                }
             }
 
             }
@@ -652,11 +670,29 @@ fun LinuxTerminalPanel(
                                     terminalPreferences.edit().putStringSet("terminal_extra_keys", updated).apply()
                                 }
                             )
-                            Text(key, fontFamily = FontFamily.Monospace)
+                            Text(key, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
+                            val index = extraKeyOrder.indexOf(key)
+                            TextButton(enabled = index > 0, onClick = {
+                                val reordered = extraKeyOrder.toMutableList()
+                                val item = reordered.removeAt(index)
+                                reordered.add(index - 1, item)
+                                extraKeyOrder = reordered
+                                terminalPreferences.edit().putString("terminal_extra_key_order", reordered.joinToString(",")).apply()
+                            }) { Text("↑") }
+                            TextButton(enabled = index < extraKeyOrder.lastIndex, onClick = {
+                                val reordered = extraKeyOrder.toMutableList()
+                                val item = reordered.removeAt(index)
+                                reordered.add(index + 1, item)
+                                extraKeyOrder = reordered
+                                terminalPreferences.edit().putString("terminal_extra_key_order", reordered.joinToString(",")).apply()
+                            }) { Text("↓") }
                         }
                     }
                     TextButton(onClick = {
                         visibleExtraKeys = DEFAULT_TERMINAL_EXTRA_KEYS
+                        extraKeyOrder = TERMINAL_EXTRA_KEY_ORDER
+                        terminalPreferences.edit().putString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(","))
+                            .putStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS).apply()
                         terminalPreferences.edit().putStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS).apply()
                         showExtraKeysSetup = false
                     }) { Text("Reset to default") }
