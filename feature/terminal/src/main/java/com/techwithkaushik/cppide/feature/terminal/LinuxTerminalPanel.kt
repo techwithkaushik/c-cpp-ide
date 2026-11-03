@@ -3,7 +3,6 @@ package com.techwithkaushik.cppide.feature.terminal
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -23,14 +22,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.KeyboardActions
@@ -61,7 +57,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -168,46 +163,14 @@ fun LinuxTerminalPanel(
     var renameValue by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var showSshDialog by remember { mutableStateOf(false) }
     var host by remember { mutableStateOf(terminalPreferences.getString("terminal_ssh_host", "").orEmpty()) }
     var port by remember { mutableStateOf(terminalPreferences.getInt("terminal_ssh_port", 22).toString()) }
     var username by remember { mutableStateOf(terminalPreferences.getString("terminal_ssh_user", "").orEmpty()) }
     var password by remember { mutableStateOf(TerminalConnectionConfig.sshPassword) }
-    var privateKeyUri by remember { mutableStateOf<Uri?>(null) }
-    var privateKeyBytes by remember { mutableStateOf<ByteArray?>(null) }
-    var privateKeyPassphrase by remember { mutableStateOf("") }
+    var privateKeyBytes by remember { mutableStateOf(TerminalConnectionConfig.sshPrivateKey) }
+    var privateKeyPassphrase by remember { mutableStateOf(TerminalConnectionConfig.sshPrivateKeyPassphrase) }
     var expectedFingerprint by remember { mutableStateOf("") }
     var fingerprintConfirmation by remember { mutableStateOf<String?>(null) }
-
-    val privateKeyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        privateKeyUri = uri
-        privateKeyBytes = null
-        if (uri != null) {
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    try {
-                        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
-                            val output = ByteArrayOutputStream()
-                            val buffer = ByteArray(8 * 1024)
-                            var total = 0
-                            while (true) {
-                                val count = input.read(buffer)
-                                if (count < 0) break
-                                total += count
-                                if (total > 128 * 1024) throw IllegalStateException("Private key file must be at most 128 KiB.")
-                                output.write(buffer, 0, count)
-                            }
-                            output.toByteArray()
-                        } ?: throw IllegalStateException("Could not read the selected private key.")
-                        if (bytes.isEmpty()) throw IllegalStateException("The selected private key file is empty.")
-                        Result.success(bytes)
-                    } catch (e: Exception) { Result.failure<ByteArray>(e) }
-                }
-                result.onSuccess { privateKeyBytes = it }
-                    .onFailure { error = it.message ?: "Could not load private key." }
-            }
-        }
-    }
 
     DisposableEffect(onCloseTerminal) {
         LinuxTerminalSessions.onLastSessionExited = onCloseTerminal
@@ -247,11 +210,11 @@ fun LinuxTerminalPanel(
                         LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code — output is preserved. Close this tab to dismiss.]\n")
                     } }
                 )
-                showSshDialog = false
                 password = ""
                 TerminalConnectionConfig.sshPassword = ""
                 privateKeyBytes = null
-                privateKeyUri = null
+                TerminalConnectionConfig.sshPrivateKey = null
+                TerminalConnectionConfig.sshPrivateKeyPassphrase = ""
                 privateKeyPassphrase = ""
             }.onFailure { e ->
                 if (e is HostKeyConfirmationRequired) {
@@ -292,8 +255,11 @@ fun LinuxTerminalPanel(
 
     LaunchedEffect(connectionMode) {
         if (connectionMode == "ssh") {
-            if (host.isNotBlank() && username.isNotBlank() && password.isNotBlank()) connectSsh(null)
-            else showSshDialog = true
+            when {
+                host.isBlank() || username.isBlank() -> error = "Configure SSH host and username in Settings → Terminal."
+                password.isBlank() && privateKeyBytes == null -> error = "Add an SSH password or private key in Settings → Terminal."
+                else -> connectSsh(null)
+            }
         } else {
             startLocalSession()
         }
@@ -465,41 +431,6 @@ fun LinuxTerminalPanel(
         )
     }
 
-    if (showSshDialog) {
-        AlertDialog(
-            onDismissRequest = { if (!busy) showSshDialog = false },
-            title = { Text("Connect directly over SSH") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("SSH endpoint is managed in Terminal Settings: $username@$host:$port. Enter a password here or select a private key.", fontSize = 12.sp)
-                    if (host.isBlank() || username.isBlank()) {
-                        Text("Set the SSH host and username in Settings → Terminal before connecting.", color = Color(0xFFFFAB91), fontSize = 11.sp)
-                    }
-                    OutlinedTextField(
-                        password,
-                        { password = it; TerminalConnectionConfig.sshPassword = it },
-                        label = { Text("Password (optional if using key)") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true
-                    )
-                    OutlinedButton(onClick = { privateKeyPicker.launch(arrayOf("application/octet-stream", "text/plain", "*/*")) }) {
-                        Text(if (privateKeyUri == null) "Select private key (optional)" else "Change private key")
-                    }
-                    privateKeyUri?.let { Text(if (privateKeyBytes == null) "Reading private key…" else "Private key loaded into memory", color = Color(0xFF9AA7B5), fontSize = 10.sp) }
-                    if (privateKeyBytes != null) {
-                        OutlinedTextField(privateKeyPassphrase, { privateKeyPassphrase = it }, label = { Text("Key passphrase (if encrypted)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
-                    }
-                    expectedFingerprint.takeIf { it.isNotBlank() }?.let {
-                        Text("Trusted host fingerprint: $it", color = Color(0xFF9AA7B5), fontSize = 10.sp)
-                    }
-                    error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 11.sp) }
-                }
-            },
-            confirmButton = { Button(enabled = !busy && host.isNotBlank() && username.isNotBlank() && (password.isNotBlank() || privateKeyBytes != null), onClick = { connectSsh(expectedFingerprint.ifBlank { null }) }) { Text(if (busy) "Connecting…" else "Connect") } },
-            dismissButton = { TextButton(onClick = { showSshDialog = false }) { Text("Cancel") } }
-        )
-    }
-
     fingerprintConfirmation?.let { fingerprint ->
         AlertDialog(
             onDismissRequest = { fingerprintConfirmation = null; expectedFingerprint = "" },
@@ -516,7 +447,7 @@ fun LinuxTerminalPanel(
                 }) { Text("Trust fingerprint and connect") }
             },
             dismissButton = {
-                TextButton(onClick = { fingerprintConfirmation = null; expectedFingerprint = ""; showSshDialog = true }) { Text("Cancel") }
+                TextButton(onClick = { fingerprintConfirmation = null; expectedFingerprint = "" }) { Text("Cancel") }
             }
         )
     }
