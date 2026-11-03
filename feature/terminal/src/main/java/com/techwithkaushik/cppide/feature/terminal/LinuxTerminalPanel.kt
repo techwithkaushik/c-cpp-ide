@@ -479,7 +479,7 @@ fun LinuxTerminalPanel(
                             softWrap = false,
                             fontSize = terminalFontSize.sp,
                             lineHeight = (terminalFontSize * 1.28f).sp,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxWidth()
                                 .pointerInput(terminalInputFocusRequester) {
                                     detectTapGestures {
                                         terminalInputFocusRequester.requestFocus()
@@ -566,6 +566,18 @@ fun LinuxTerminalPanel(
                 )
             Column(Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 4.dp, vertical = 1.dp)) {
                 if (extraKeysEnabled) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            terminalFontSize = (terminalFontSize - 1).coerceIn(10, 28)
+                            pinchFontSize = terminalFontSize.toFloat()
+                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
+                        }) { Text("A−", fontSize = 11.sp) }
+                        TextButton(onClick = {
+                            terminalFontSize = (terminalFontSize + 1).coerceIn(10, 28)
+                            pinchFontSize = terminalFontSize.toFloat()
+                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
+                        }) { Text("A+", fontSize = 11.sp) }
+                    }
                     val activeKeys = extraKeyOrder.filter { it in visibleExtraKeys }
                     val firstRowCount = (activeKeys.size + 1) / 2
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
