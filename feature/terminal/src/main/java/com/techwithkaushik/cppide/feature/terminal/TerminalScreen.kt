@@ -251,7 +251,9 @@ internal class TerminalScreen(
                 builder,
                 cells[lineIndex],
                 styles[lineIndex],
-                includeCursor = lineIndex == row && cursorVisible && cursorBlinkOn,
+                // Keep terminal-cell padding stable during blink-off phases so
+                // the text layout and cursor coordinates never jump.
+                includeCursor = lineIndex == row,
             )
         }
         return builder.toAnnotatedString()
@@ -265,6 +267,7 @@ internal class TerminalScreen(
     ) {
         val visibleLength = lineCells.indexOfLast { it != ' ' && it != '\u0000' } + 1
         val cursorAt = if (includeCursor) column.coerceAtMost(columns - 1) else -1
+        val cursorDrawn = includeCursor && cursorVisible && cursorBlinkOn
         val end = maxOf(visibleLength, if (cursorAt >= 0) cursorAt + 1 else 0)
         for (cellIndex in 0 until end) {
             val isCursor = cellIndex == cursorAt
@@ -273,9 +276,8 @@ internal class TerminalScreen(
             val style = lineStyles[cellIndex]
             val foreground = if (style.inverse) style.background else style.foreground
             val background = if (style.inverse) style.foreground else style.background
-            val cursorBlock = isCursor && cursorShape in 0..2
-            val cursorUnderline = isCursor && cursorShape in 3..4
-            val cursorBar = isCursor && cursorShape in 5..6
+            val cursorBlock = cursorDrawn && isCursor && cursorShape in 0..2
+            val cursorUnderline = cursorDrawn && isCursor && cursorShape in 3..4
             val span = SpanStyle(
                 color = when {
                     cursorBlock -> Color(0xFF0B0F14)
@@ -293,7 +295,10 @@ internal class TerminalScreen(
             builder.pushStyle(span)
             if (cellIndex < visibleLength) {
                 builder.append(cell.toString())
-            } else if (isCursor) {
+            } else if (includeCursor && cellIndex <= cursorAt) {
+                // Materialize blank terminal cells before the cursor. Without
+                // this padding, a cursor addressed to column N would be drawn
+                // at the end of the visible text rather than at column N.
                 builder.append(" ")
             }
             builder.pop()
