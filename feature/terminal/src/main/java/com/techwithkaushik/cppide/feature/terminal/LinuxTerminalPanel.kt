@@ -415,7 +415,7 @@ fun LinuxTerminalPanel(
                                 androidx.compose.ui.input.key.Key.MoveEnd -> { active.send("\u001b[F"); true }
                                 androidx.compose.ui.input.key.Key.PageUp -> { active.send("\u001b[5~"); true }
                                 androidx.compose.ui.input.key.Key.PageDown -> { active.send("\u001b[6~"); true }
-                                androidx.compose.ui.input.key.Key.ForwardDelete -> { active.send("\u001b[3~"); true }
+                                androidx.compose.ui.input.key.Key.Delete -> { active.send("\u001b[3~"); true }
                                 androidx.compose.ui.input.key.Key.Tab -> { active.send("\t"); true }
                                 androidx.compose.ui.input.key.Key.Escape -> { active.send("\u001b"); true }
                                 androidx.compose.ui.input.key.Key.Backspace -> { active.send("\u007f"); true }
