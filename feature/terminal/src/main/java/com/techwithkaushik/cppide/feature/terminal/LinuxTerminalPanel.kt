@@ -190,7 +190,7 @@ fun LinuxTerminalPanel(
     var altMode by remember { mutableStateOf(false) }
     var extraKeysEnabled by remember { mutableStateOf(terminalPreferences.getBoolean("terminal_extra_keys_enabled", true)) }
     var showExtraKeysSetup by remember { mutableStateOf(false) }
-    val visibleExtraKeys = terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS
+    var visibleExtraKeys by remember { mutableStateOf(terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS) }
     val savedKeyOrder = terminalPreferences.getString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(",")) ?: TERMINAL_EXTRA_KEY_ORDER.joinToString(",")
     val extraKeyOrder = savedKeyOrder.split(",").filter { it in TERMINAL_EXTRA_KEY_ORDER }.let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
     val customTerminalKeys = terminalPreferences.getStringSet("terminal_custom_extra_keys", emptySet())?.toList().orEmpty().mapNotNull { entry ->
@@ -625,6 +625,7 @@ fun LinuxTerminalPanel(
                     presets.forEach { (name, keys) ->
                         OutlinedButton(
                             onClick = {
+                                visibleExtraKeys = keys
                                 terminalPreferences.edit().putStringSet("terminal_extra_keys", keys).apply()
                                 showExtraKeysSetup = false
                             },
@@ -637,27 +638,25 @@ fun LinuxTerminalPanel(
                             Modifier.fillMaxWidth().clickable {
                                 val updated = visibleExtraKeys.toMutableSet()
                                 if (key in updated) updated.remove(key) else updated.add(key)
+                                visibleExtraKeys = updated
                                 terminalPreferences.edit().putStringSet("terminal_extra_keys", updated).apply()
-                                // Trigger recomposition after changing the selected key set.
-                                showExtraKeysSetup = false
-                                showExtraKeysSetup = true
                             }.padding(vertical = 2.dp),
                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                         ) {
                             androidx.compose.material3.Checkbox(
-                                checked = key in (terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS) ?: DEFAULT_TERMINAL_EXTRA_KEYS),
+                                checked = key in visibleExtraKeys,
                                 onCheckedChange = { checked ->
-                                    val updated = (terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS).toMutableSet()
+                                    val updated = visibleExtraKeys.toMutableSet()
                                     if (checked) updated.add(key) else updated.remove(key)
+                                    visibleExtraKeys = updated
                                     terminalPreferences.edit().putStringSet("terminal_extra_keys", updated).apply()
-                                    showExtraKeysSetup = false
-                                    showExtraKeysSetup = true
                                 }
                             )
                             Text(key, fontFamily = FontFamily.Monospace)
                         }
                     }
                     TextButton(onClick = {
+                        visibleExtraKeys = DEFAULT_TERMINAL_EXTRA_KEYS
                         terminalPreferences.edit().putStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS).apply()
                         showExtraKeysSetup = false
                     }) { Text("Reset to default") }
