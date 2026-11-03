@@ -243,7 +243,7 @@ fun LinuxTerminalPanel(
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
-                        LinuxTerminalSessions.markExited(tab, code, "\n[SSH session exited: $code — output is preserved. Close this tab to dismiss.]\n")
+                        LinuxTerminalSessions.closeTab(tab.id)
                     } }
                 )
                 password = ""
@@ -312,7 +312,7 @@ fun LinuxTerminalPanel(
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
-                        LinuxTerminalSessions.markExited(tab, code, "\r\n[Shell exited: " + code + " — output preserved. Close this tab to dismiss.]\r\n")
+                        LinuxTerminalSessions.closeTab(tab.id)
                     } }
                 )
             }.onFailure { failure ->
@@ -322,6 +322,8 @@ fun LinuxTerminalPanel(
     }
 
     LaunchedEffect(connectionMode) {
+        // Reopening the terminal must reuse the process kept in the session registry.
+        if (LinuxTerminalSessions.tabs.isNotEmpty()) return@LaunchedEffect
         if (connectionMode == "ssh") {
             when {
                 host.isBlank() || username.isBlank() -> error = "Configure SSH host and username in Settings → Terminal."
