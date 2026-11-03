@@ -75,6 +75,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.OutputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 
 private data class LinuxTerminalTab(
     val id: Int,
@@ -86,6 +87,7 @@ private data class LinuxTerminalTab(
     val session: AutoCloseable,
     val resize: (Int, Int) -> Unit,
     val exited: MutableState<Int?>,
+    val ended: AtomicBoolean = AtomicBoolean(false),
     var lastPtyColumns: Int = 0,
     var lastPtyRows: Int = 0,
 )
@@ -107,15 +109,25 @@ private object LinuxTerminalSessions {
             title = mutableStateOf(title),
             output = mutableStateOf(screen.renderAnnotated()),
             screen = screen,
-            send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
-            interrupt = interrupt,
+            send = { text ->
+                check(!ended.get()) { "This terminal session has exited. Start a new session to continue." }
+                input.write(text.toByteArray(Charsets.UTF_8))
+                input.flush()
+            },
+            interrupt = { if (!ended.get()) interrupt() },
             session = session,
-            resize = resize,
+            resize = { columns, rows -> if (!ended.get()) resize(columns, rows) },
             exited = mutableStateOf(null)
         )
         tabs.add(tab)
         selectedId = tab.id
         return tab
+    }
+
+    fun markExited(tab: LinuxTerminalTab, code: Int, message: String) {
+        if (!tabs.any { it.id == tab.id } || !tab.ended.compareAndSet(false, true)) return
+        tab.exited.value = code
+        append(tab, message)
     }
 
     fun append(tab: LinuxTerminalTab, text: String) {
@@ -213,8 +225,7 @@ fun LinuxTerminalPanel(
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
-                        tab.exited.value = code
-                        LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code — output is preserved. Close this tab to dismiss.]\n")
+                        LinuxTerminalSessions.markExited(tab, code, "\n[SSH session exited: $code — output is preserved. Close this tab to dismiss.]\n")
                     } }
                 )
                 password = ""
@@ -283,8 +294,7 @@ fun LinuxTerminalPanel(
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
-                        tab.exited.value = code
-                        LinuxTerminalSessions.append(tab, "\r\n[Shell exited: " + code + " — output preserved. Close this tab to dismiss.]\r\n")
+                        LinuxTerminalSessions.markExited(tab, code, "\r\n[Shell exited: " + code + " — output preserved. Close this tab to dismiss.]\r\n")
                     } }
                 )
             }.onFailure { failure ->
