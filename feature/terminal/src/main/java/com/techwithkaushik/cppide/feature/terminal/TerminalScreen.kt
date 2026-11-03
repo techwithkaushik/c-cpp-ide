@@ -88,7 +88,7 @@ internal class TerminalScreen(
                     else if (ch == '\u001B') escapeState = 4
                     else if (osc.length < 4096) osc.append(ch)
                 }
-                4 -> escapeState = if (ch == '\\\\') 0 else 3
+                4 -> escapeState = if (ch == '\\') 0 else 3
                 else -> consume(ch)
             }
         }
@@ -124,8 +124,8 @@ internal class TerminalScreen(
                     val foreground = if (style.inverse) style.background else style.foreground
                     val background = if (style.inverse) style.foreground else style.background
                     val span = SpanStyle(
-                        color = foreground?.let(::Color) ?: Color.Unspecified,
-                        background = background?.let(::Color) ?: Color.Unspecified,
+                        color = foreground?.let { Color(it.toLong()) } ?: Color.Unspecified,
+                        background = background?.let { Color(it.toLong()) } ?: Color.Unspecified,
                         fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                         fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
                         textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
