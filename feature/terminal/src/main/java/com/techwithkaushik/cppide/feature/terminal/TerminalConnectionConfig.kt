@@ -7,4 +7,10 @@ package com.techwithkaushik.cppide.feature.terminal
 object TerminalConnectionConfig {
     @Volatile
     var sshPassword: String = ""
+
+    @Volatile
+    var sshPrivateKey: ByteArray? = null
+
+    @Volatile
+    var sshPrivateKeyPassphrase: String = ""
 }
