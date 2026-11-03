@@ -254,3 +254,44 @@ class TerminalScreenTest {
     }
 
 }
+
+    @Test fun decscusrSelectsBlockUnderlineAndBarCursorShapes() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("cursor")
+        screen.append("\u001B[2 q")
+        assertTrue(screen.cursorShapeCode() == 2)
+        val block = screen.renderAnnotated()
+        assertTrue(block.spanStyles.any { it.item.background != Color.Unspecified })
+
+        screen.append("\u001B[4 q")
+        assertTrue(screen.cursorShapeCode() == 4)
+        val underline = screen.renderAnnotated()
+        assertTrue(underline.spanStyles.any { it.item.textDecoration == androidx.compose.ui.text.style.TextDecoration.Underline })
+
+        screen.append("\u001B[6 q")
+        assertTrue(screen.cursorShapeCode() == 6)
+        assertTrue(screen.renderAnnotated().text.contains("▏"))
+    }
+
+    @Test fun ansiBoldUnderlineAndBackgroundColorsArePreserved() {
+        val screen = TerminalScreen(columns = 30, rows = 5)
+        screen.append("\u001B[1;4;44;33mstyled\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        val start = rendered.text.indexOf("styled")
+        val style = rendered.spanStyles.first { start in it.start until it.end }.item
+        assertTrue(style.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold)
+        assertTrue(style.textDecoration == androidx.compose.ui.text.style.TextDecoration.Underline)
+        assertTrue(style.background != Color.Unspecified)
+        assertTrue(style.color != Color.Unspecified)
+    }
+
+    @Test fun cursorRenderingDoesNotInjectCursorGlyphIntoBlockOrUnderlineText() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("prompt")
+        screen.append("\u001B[2 q")
+        assertFalse(screen.renderAnnotated().text.contains("▏"))
+        screen.append("\u001B[6 q")
+        assertTrue(screen.renderAnnotated().text.contains("▏"))
+    }
+
+
