@@ -78,6 +78,9 @@ import java.io.OutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
+private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~")
+private val TERMINAL_EXTRA_KEY_ORDER = listOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~")
+
 private data class LinuxTerminalTab(
     val id: Int,
     val title: MutableState<String>,
@@ -184,6 +187,8 @@ fun LinuxTerminalPanel(
     val handler = remember { Handler(Looper.getMainLooper()) }
     var command by remember { mutableStateOf("") }
     var ctrlMode by remember { mutableStateOf(false) }
+    var altMode by remember { mutableStateOf(false) }
+    val visibleExtraKeys = terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS
     var sessionMenuId by remember { mutableIntStateOf(0) }
     var renameTabId by remember { mutableIntStateOf(0) }
     var renameValue by remember { mutableStateOf("") }
@@ -380,25 +385,39 @@ fun LinuxTerminalPanel(
                 Modifier.fillMaxWidth().background(Color(0xFF101820))
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 5.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    runCatching { active.send("\u001b") }.onFailure { error = it.message ?: "Terminal input failed." }
-                    terminalInputFocusRequester.requestFocus()
-                }) { Text("Esc", fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    runCatching { active.send("\t") }.onFailure { error = it.message ?: "Terminal input failed." }
-                    terminalInputFocusRequester.requestFocus()
-                }) { Text("Tab", fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
-                TextButton(enabled = active.exited.value == null, onClick = { ctrlMode = !ctrlMode }) {
-                    Text("Ctrl", color = if (ctrlMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                }
-                listOf("↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C").forEach { (label, sequence) ->
+                TERMINAL_EXTRA_KEY_ORDER.filter { it in visibleExtraKeys }.forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
-                        runCatching { active.send(sequence) }.onFailure { error = it.message ?: "Terminal input failed." }
+                        val sequence = when (key) {
+                            "ESC" -> "\u001b"
+                            "TAB" -> "\t"
+                            "HOME" -> "\u001b[H"
+                            "END" -> "\u001b[F"
+                            "UP" -> "\u001b[A"
+                            "DOWN" -> "\u001b[B"
+                            "LEFT" -> "\u001b[D"
+                            "RIGHT" -> "\u001b[C"
+                            "PGUP" -> "\u001b[5~"
+                            "PGDN" -> "\u001b[6~"
+                            else -> key
+                        }
+                        when (key) {
+                            "CTRL" -> ctrlMode = !ctrlMode
+                            "ALT" -> altMode = !altMode
+                            else -> runCatching { active.send(sequence) }
+                                .onFailure { error = it.message ?: "Terminal input failed." }
+                        }
                         terminalInputFocusRequester.requestFocus()
-                    }) { Text(label, fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
+                    }) {
+                        Text(when (key) { "PGUP" -> "PgUp"; "PGDN" -> "PgDn"; else -> key },
+                            color = when (key) {
+                                "CTRL" -> if (ctrlMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
+                                "ALT" -> if (altMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
+                                else -> Color(0xFFD5E3F0)
+                            }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    }
                 }
                 TextButton(enabled = active.exited.value == null, onClick = {
                     val pasted = clipboardManager.getText()?.text.orEmpty()
@@ -486,7 +505,10 @@ fun LinuxTerminalPanel(
                                     active.send((added[0].uppercaseChar().code and 0x1f).toChar().toString())
                                     ctrlMode = false
                                 } else {
-                                    active.send(added)
+                                    if (altMode) {
+                                        active.send("\u001b" + added)
+                                        altMode = false
+                                    } else active.send(added)
                                 }
                             }
                             } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
