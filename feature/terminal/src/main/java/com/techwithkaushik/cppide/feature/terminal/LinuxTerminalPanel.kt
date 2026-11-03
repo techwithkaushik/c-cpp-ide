@@ -318,7 +318,10 @@ fun LinuxTerminalPanel(
             val outputScrollState = rememberScrollState()
             val density = LocalDensity.current
             LaunchedEffect(active.output.value) {
-                outputScrollState.scrollTo(outputScrollState.maxValue)
+                // Follow live output only when the user was already at the bottom.
+                // This keeps scrollback readable while a command is producing output.
+                val wasFollowingOutput = outputScrollState.maxValue - outputScrollState.value <= 48
+                if (wasFollowingOutput) outputScrollState.scrollTo(outputScrollState.maxValue)
             }
             Column(
                 Modifier.weight(1f).fillMaxWidth()
