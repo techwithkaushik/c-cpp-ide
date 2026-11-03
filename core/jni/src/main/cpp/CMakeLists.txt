@@ -18,7 +18,7 @@ target_include_directories(vterm PUBLIC ${LIBVTERM_DIR}/include PRIVATE ${LIBVTE
 target_compile_features(vterm PRIVATE c_std_99)
 target_compile_options(vterm PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
-add_library(cppide_native SHARED native_bridge.cpp)
+add_library(cppide_native SHARED native_bridge.cpp native_vterm.cpp)
 target_compile_features(cppide_native PRIVATE cxx_std_20)
 target_compile_options(cppide_native PRIVATE -Wall -Wextra -Wpedantic)
 find_library(android_log log)
