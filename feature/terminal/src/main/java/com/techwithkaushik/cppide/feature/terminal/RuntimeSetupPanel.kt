@@ -86,6 +86,9 @@ fun RuntimeSetupPanel(
     ) { rootfsUri = it }
     LaunchedEffect(context) {
         status = withContext(Dispatchers.IO) {
+            // Ensure bundled PRoot and its loader are linked into the runtime
+            // directory before reporting either component as missing.
+            paths.ensureDirectories()
             when {
                 !paths.hasRootfs() -> "Ubuntu rootfs is not installed."
                 !paths.hasProot() -> "Ubuntu rootfs is present; PRoot is missing."
