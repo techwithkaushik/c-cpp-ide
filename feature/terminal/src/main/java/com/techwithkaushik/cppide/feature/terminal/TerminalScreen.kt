@@ -29,6 +29,7 @@ internal class TerminalScreen(
         val foreground: Int? = null,
         val background: Int? = null,
         val bold: Boolean = false,
+        val dim: Boolean = false,
         val italic: Boolean = false,
         val underline: Boolean = false,
         val inverse: Boolean = false,
@@ -154,7 +155,7 @@ internal class TerminalScreen(
                     val span = SpanStyle(
                         color = foreground?.let(::composeColor) ?: Color.Unspecified,
                         background = background?.let(::composeColor) ?: Color.Unspecified,
-                        fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (style.bold) FontWeight.Bold else if (style.dim) FontWeight.Light else FontWeight.Normal,
                         fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
                         textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
                     )
@@ -291,12 +292,12 @@ internal class TerminalScreen(
         while (index < values.size) {
             when (val code = values[index]) {
                 0 -> currentStyle = CellStyle()
-                1 -> currentStyle = currentStyle.copy(bold = true)
-                2 -> currentStyle = currentStyle.copy(foreground = currentStyle.foreground)
+                1 -> currentStyle = currentStyle.copy(bold = true, dim = false)
+                2 -> currentStyle = currentStyle.copy(dim = true)
                 3 -> currentStyle = currentStyle.copy(italic = true)
                 4 -> currentStyle = currentStyle.copy(underline = true)
                 7 -> currentStyle = currentStyle.copy(inverse = true)
-                22 -> currentStyle = currentStyle.copy(bold = false)
+                22 -> currentStyle = currentStyle.copy(bold = false, dim = false)
                 23 -> currentStyle = currentStyle.copy(italic = false)
                 24 -> currentStyle = currentStyle.copy(underline = false)
                 27 -> currentStyle = currentStyle.copy(inverse = false)
