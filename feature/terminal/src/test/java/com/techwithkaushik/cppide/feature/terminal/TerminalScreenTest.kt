@@ -263,6 +263,24 @@ class TerminalScreenTest {
     }
 
 
+
+    @Test fun cursorTextOffsetTracksAddressedBlankColumns() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("\u001B[1;10H")
+        val rendered = screen.renderAnnotated()
+        assertTrue(rendered.text.length == 10)
+        assertTrue(screen.cursorTextOffset() == 9)
+        assertFalse(rendered.text.contains("▏"))
+    }
+
+    @Test fun cursorTextOffsetIncludesScrollbackAndWideGlyphs() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("界\\r\\nline1\\r\\nline2\\r\\nline3\\r\\nline4\\r\\nline5")
+        val rendered = screen.renderAnnotated()
+        assertTrue(rendered.text.endsWith("line5 "))
+        assertTrue(screen.cursorTextOffset() == rendered.text.length - 1)
+    }
+
     @Test fun ansiStylesSurviveWhenRowsMoveIntoScrollback() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("\u001B[31mRED\u001B[0m\r\nline1\r\nline2\r\nline3\r\nline4\r\nline5")
