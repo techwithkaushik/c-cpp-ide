@@ -231,7 +231,7 @@ class TerminalScreenTest {
 
     @Test fun scrollbackRemainsBoundedAndKeepsNewestLines() {
         val screen = TerminalScreen(columns = 20, rows = 5, maxScrollbackLines = 2)
-        screen.append("row0\\r\\nrow1\\r\\nrow2\\r\\nrow3\\r\\nrow4\\r\\nrow5\\r\\nrow6\\r\\nrow7\\r\\nrow8\\r\\nrow9")
+        screen.append("row0\r\nrow1\r\nrow2\r\nrow3\r\nrow4\r\nrow5\r\nrow6\r\nrow7\r\nrow8\r\nrow9")
         val rendered = screen.render()
         assertFalse(rendered.contains("row0"))
         assertFalse(rendered.contains("row1"))
