@@ -119,6 +119,9 @@ internal class TerminalScreen(
         savedColumn = savedColumn.coerceIn(0, columns - 1)
     }
 
+    /** Exposes the active DECSCUSR mode for deterministic tests. */
+    fun cursorShapeCode(): Int = cursorShape
+
     fun setCursorBlinkPhase(visible: Boolean) {
         if (cursorBlinkOn == visible) return
         cursorBlinkOn = visible
