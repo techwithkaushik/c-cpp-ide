@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalClipboardManager
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -177,6 +178,7 @@ fun LinuxTerminalPanel(
     val connectionMode = terminalPreferences.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu"
     val terminalInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val clipboardManager = LocalClipboardManager.current
     val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
@@ -373,6 +375,37 @@ fun LinuxTerminalPanel(
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
             }
         } else {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 8.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                TextButton(
+                    enabled = active.exited.value == null,
+                    onClick = {
+                        val pasted = clipboardManager.getText()?.text.orEmpty()
+                        if (pasted.isNotEmpty()) {
+                            runCatching { active.send(pasted) }
+                                .onFailure { error = it.message ?: "Could not paste into terminal." }
+                        }
+                    }
+                ) { Text("Paste", color = if (active.exited.value == null) Color(0xFF9CCBFF) else Color(0xFF687482), fontSize = 12.sp) }
+                TextButton(
+                    enabled = active.exited.value == null,
+                    onClick = {
+                        runCatching { active.send("\\u000c") }
+                            .onFailure { error = it.message ?: "Could not clear terminal." }
+                    }
+                ) { Text("Clear", color = if (active.exited.value == null) Color(0xFF9CCBFF) else Color(0xFF687482), fontSize = 12.sp) }
+                Spacer(Modifier.weight(1f))
+                TextButton(
+                    enabled = active.exited.value == null,
+                    onClick = {
+                        terminalInputFocusRequester.requestFocus()
+                        keyboardController?.show()
+                    }
+                ) { Text("Keyboard", color = if (active.exited.value == null) Color(0xFF9CCBFF) else Color(0xFF687482), fontSize = 12.sp) }
+            }
             // Blink the block cursor at a terminal-like cadence. DEC ?25l still
             // suppresses it because visibility is controlled by the VT screen.
             LaunchedEffect(active.id) {
