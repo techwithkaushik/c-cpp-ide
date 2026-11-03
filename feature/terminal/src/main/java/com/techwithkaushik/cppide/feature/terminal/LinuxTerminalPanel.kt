@@ -64,6 +64,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.integration.linuxruntime.HostKeyConfirmationRequired
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
+import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
 import com.techwithkaushik.cppide.integration.linuxruntime.LocalLinuxSession
 import com.techwithkaushik.cppide.integration.linuxruntime.SshHost
 import com.techwithkaushik.cppide.integration.linuxruntime.SshShellSession
@@ -232,24 +234,48 @@ fun LinuxTerminalPanel(
 
     fun startLocalSession() {
         if (busy) return
-        val pathError = runCatching { paths.ensureDirectories() }.exceptionOrNull()
-        if (pathError != null) {
-            error = "Could not prepare bundled Android PRoot: ${pathError.message ?: pathError.javaClass.simpleName}"
-            return
-        }
-        if (!paths.ready()) {
-            val validation = context.getSharedPreferences("linux_runtime_validation", Context.MODE_PRIVATE)
-                .getString("message", null)
-            error = validation ?: if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime & Bootstrap in Settings."
-            else "The app-owned PRoot binary is missing or invalid. Open Runtime & Bootstrap in Settings."
-            return
-        }
         busy = true
         error = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                try { Result.success(LocalLinuxSession.start(paths)) }
-                catch (e: Exception) { Result.failure<LocalLinuxSession>(e) }
+                runCatching {
+                    paths.ensureDirectories()
+                    val prefs = context.getSharedPreferences("linux_runtime_validation", Context.MODE_PRIVATE)
+                    val checkedAt = prefs.getLong("checked_at", 0L)
+                    val cachedReady = prefs.getBoolean("ready", false)
+                    val cacheFresh = cachedReady && checkedAt > 0L &&
+                        System.currentTimeMillis() - checkedAt in 0L..120_000L
+
+                    if (!cacheFresh) {
+                        val validationMessage = when {
+                            !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
+                            else -> {
+                                ProotDownloader(paths).downloadAndInstall()
+                                val smoke = LinuxRuntimeSmokeTest(paths).run()
+                                if (!smoke.success) {
+                                    "Ubuntu shell validation failed: ${smoke.error ?: smoke.output}"
+                                } else {
+                                    "Ubuntu runtime ready."
+                                }
+                            }
+                        }
+                        val ready = validationMessage == "Ubuntu runtime ready."
+                        prefs.edit()
+                            .putBoolean("ready", ready)
+                            .putString("message", validationMessage)
+                            .putLong("checked_at", System.currentTimeMillis())
+                            .apply()
+                        check(ready) { validationMessage }
+                    } else {
+                        // Re-check the APK-owned executables and rootfs markers even when
+                        // reusing a recent successful shell smoke test.
+                        ProotDownloader(paths).downloadAndInstall()
+                        check(paths.hasRootfs() && paths.hasProot()) {
+                            "Ubuntu runtime files changed after the last successful validation. Reopen Runtime & Bootstrap."
+                        }
+                    }
+                    LocalLinuxSession.start(paths)
+                }
             }
             busy = false
             result.onSuccess { session ->
@@ -261,7 +287,9 @@ fun LinuxTerminalPanel(
                         LinuxTerminalSessions.append(tab, "\r\n[Shell exited: " + code + " — output preserved. Close this tab to dismiss.]\r\n")
                     } }
                 )
-            }.onFailure { error = it.message ?: "Could not start Ubuntu shell." }
+            }.onFailure { failure ->
+                error = failure.message ?: "Could not validate or start Ubuntu shell."
+            }
         }
     }
 
