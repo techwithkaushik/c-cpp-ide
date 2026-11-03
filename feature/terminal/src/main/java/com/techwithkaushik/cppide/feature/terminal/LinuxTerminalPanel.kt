@@ -198,10 +198,16 @@ fun LinuxTerminalPanel(
                 .let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
         )
     }
-    val customTerminalKeys = terminalPreferences.getStringSet("terminal_custom_extra_keys", emptySet())?.toList().orEmpty().mapNotNull { entry ->
-        val parts = entry.split("::", limit = 2)
-        if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotEmpty()) parts[0] to parts[1] else null
-    }.sortedBy { it.first.lowercase() }
+    var customTerminalKeys by remember {
+        mutableStateOf(
+            terminalPreferences.getStringSet("terminal_custom_extra_keys", emptySet())?.toList().orEmpty().mapNotNull { entry ->
+                val parts = entry.split("::", limit = 2)
+                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotEmpty()) parts[0] to parts[1] else null
+            }.sortedBy { it.first.lowercase() }
+        )
+    }
+    var newCustomKeyLabel by remember { mutableStateOf("") }
+    var newCustomKeySequence by remember { mutableStateOf("") }
     var sessionMenuId by remember { mutableIntStateOf(0) }
     var renameTabId by remember { mutableIntStateOf(0) }
     var renameValue by remember { mutableStateOf("") }
@@ -651,6 +657,43 @@ fun LinuxTerminalPanel(
                         ) { Text(name) }
                     }
                     Text("Custom keys", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = newCustomKeyLabel,
+                            onValueChange = { newCustomKeyLabel = it.take(10) },
+                            label = { Text("Label") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = newCustomKeySequence,
+                            onValueChange = { newCustomKeySequence = it.take(32) },
+                            label = { Text("Sequence") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.5f)
+                        )
+                    }
+                    Button(
+                        enabled = newCustomKeyLabel.isNotBlank() && newCustomKeySequence.isNotEmpty(),
+                        onClick = {
+                            val updated = (customTerminalKeys + (newCustomKeyLabel.trim() to newCustomKeySequence)).distinctBy { it.first.lowercase() }
+                            customTerminalKeys = updated
+                            terminalPreferences.edit().putStringSet("terminal_custom_extra_keys", updated.map { "${it.first}::${it.second}" }.toSet()).apply()
+                            newCustomKeyLabel = ""
+                            newCustomKeySequence = ""
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Add custom key") }
+                    customTerminalKeys.forEach { (label, sequence) ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("$label  →  $sequence", modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                            TextButton(onClick = {
+                                val updated = customTerminalKeys.filterNot { it.first == label }
+                                customTerminalKeys = updated
+                                terminalPreferences.edit().putStringSet("terminal_custom_extra_keys", updated.map { "${it.first}::${it.second}" }.toSet()).apply()
+                            }) { Text("Remove") }
+                        }
+                    }
                     TERMINAL_EXTRA_KEY_ORDER.forEach { key ->
                         Row(
                             Modifier.fillMaxWidth().clickable {
