@@ -7,11 +7,13 @@ package com.techwithkaushik.cppide.feature.terminal
  * remain outside this first implementation.
  */
 internal class TerminalScreen(
-    private val columns: Int = 100,
-    private val rows: Int = 30,
+    columns: Int = 100,
+    rows: Int = 30,
     private val maxScrollbackLines: Int = 5_000,
 ) {
-    private var cells = Array(rows) { CharArray(columns) { ' ' } }
+    private var columns = columns.coerceIn(20, 300)
+    private var rows = rows.coerceIn(5, 120)
+    private var cells = Array(this.rows) { CharArray(this.columns) { ' ' } }
     private val scrollback = ArrayDeque<String>()
     private var row = 0
     private var column = 0
@@ -20,6 +22,26 @@ internal class TerminalScreen(
     private var escapeState = 0
     private val csi = StringBuilder()
     private val osc = StringBuilder()
+
+    /** Resize the terminal grid while preserving the visible cells and scrollback. */
+    fun resize(newColumns: Int, newRows: Int) {
+        val width = newColumns.coerceIn(20, 300)
+        val height = newRows.coerceIn(5, 120)
+        if (width == columns && height == rows) return
+        val resized = Array(height) { CharArray(width) { ' ' } }
+        val rowsToCopy = minOf(rows, height)
+        val columnsToCopy = minOf(columns, width)
+        for (index in 0 until rowsToCopy) {
+            cells[index].copyInto(resized[index], endIndex = columnsToCopy)
+        }
+        cells = resized
+        columns = width
+        rows = height
+        row = row.coerceIn(0, rows - 1)
+        column = column.coerceIn(0, columns - 1)
+        savedRow = savedRow.coerceIn(0, rows - 1)
+        savedColumn = savedColumn.coerceIn(0, columns - 1)
+    }
 
     fun append(chunk: String) {
         chunk.forEach { ch ->
