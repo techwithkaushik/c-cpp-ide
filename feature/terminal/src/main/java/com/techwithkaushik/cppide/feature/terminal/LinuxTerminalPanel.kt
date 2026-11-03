@@ -149,7 +149,7 @@ fun LinuxTerminalPanel(
         LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir)
     }
     val terminalPreferences = remember(context) { context.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE) }
-    val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 22)
+    var terminalFontSize by remember { mutableIntStateOf(terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 22)) }
     val scrollbackLines = terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)
     val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
     val connectionMode = terminalPreferences.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu"
@@ -227,7 +227,7 @@ fun LinuxTerminalPanel(
     }
 
     fun startLocalSession() {
-        if (busy || LinuxTerminalSessions.tabs.isNotEmpty()) return
+        if (busy) return
         if (!paths.ready()) {
             error = if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime & Bootstrap in Settings."
             else "The app-owned PRoot binary is missing or invalid. Open Runtime & Bootstrap in Settings."
@@ -242,7 +242,7 @@ fun LinuxTerminalPanel(
             }
             busy = false
             result.onSuccess { session ->
-                val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, resize = session::resize, initialOutput = "Ubuntu shell started.\r\n", maxScrollbackLines = scrollbackLines)
+                val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, resize = session::resize, initialOutput = "", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
@@ -266,11 +266,12 @@ fun LinuxTerminalPanel(
         }
     }
 
-    Column(modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxSize().background(Color(0xFF080B10))) {
         if (busy) Text("Starting session…", color = Color(0xFF9AA7B5), modifier = Modifier.padding(8.dp))
 
         if (LinuxTerminalSessions.tabs.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 LinuxTerminalSessions.tabs.forEach { tab ->
                     Row {
                         Row(
@@ -279,10 +280,10 @@ fun LinuxTerminalPanel(
                                     onClick = { LinuxTerminalSessions.select(tab.id) },
                                     onLongClick = { sessionMenuId = tab.id }
                                 )
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(tab.title.value, color = Color(0xFFE8EDF5), maxLines = 1)
+                            Text(tab.title.value, color = Color(0xFFE8EDF5), maxLines = 1, fontSize = 12.sp)
                         }
                         DropdownMenu(expanded = sessionMenuId == tab.id, onDismissRequest = { sessionMenuId = 0 }) {
                             DropdownMenuItem(text = { Text("Rename session") }, onClick = {
@@ -297,6 +298,11 @@ fun LinuxTerminalPanel(
                         }
                     }
                 }
+                Text("−", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
+                Text("+", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize + 1).coerceAtMost(28); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
+                Text("+", modifier = Modifier.background(Color(0xFF173D5C), RoundedCornerShape(7.dp)).clickable {
+                    if (connectionMode == "ssh") onOpenSettings() else startLocalSession()
+                }.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, fontSize = 16.sp)
             }
         }
 
@@ -325,8 +331,7 @@ fun LinuxTerminalPanel(
             }
             Column(
                 Modifier.weight(1f).fillMaxWidth()
-                    .background(Color(0xFF080B10), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
+                    .background(Color(0xFF080B10))
                     .onSizeChanged { size ->
                         val cellWidth = with(density) { (terminalFontSize.sp.toPx() * 0.62f).coerceAtLeast(1f) }
                         val cellHeight = with(density) { (terminalFontSize.sp.toPx() * 1.35f).coerceAtLeast(1f) }
