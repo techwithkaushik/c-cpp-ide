@@ -120,6 +120,19 @@ class TerminalScreenTest {
         assertTrue(rendered.spanStyles.count { it.item.color != Color.Unspecified } >= 2)
     }
 
+    @Test fun indexedAndTrueColorUseExpectedRgbValues() {
+        val screen = TerminalScreen(columns = 40, rows = 5)
+        screen.append("\u001B[38;5;196mindexed\u001B[0m ")
+        screen.append("\u001B[38;2;12;34;56mtruecolor\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        val indexedStart = rendered.text.indexOf("indexed")
+        val trueColorStart = rendered.text.indexOf("truecolor")
+        val indexedStyle = rendered.spanStyles.first { indexedStart in it.start until it.end }.item
+        val trueColorStyle = rendered.spanStyles.first { trueColorStart in it.start until it.end }.item
+        assertTrue(indexedStyle.color == Color(1f, 0f, 0f))
+        assertTrue(trueColorStyle.color == Color(12f / 255f, 34f / 255f, 56f / 255f))
+    }
+
     @Test fun saveAndRestoreCursorReturnsToOriginalCell() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("hello")
