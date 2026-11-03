@@ -207,7 +207,10 @@ class TerminalScreenTest {
 
     @Test fun danglingHighSurrogateUsesReplacementCharacter() {
         val screen = TerminalScreen(columns = 20, rows = 5)
+        // A following non-low-surrogate proves the previous high surrogate
+        // was malformed rather than the first half of a chunk-split pair.
         screen.append("broken: \\uD83D")
+        screen.append("!")
         val rendered = screen.render()
         assertTrue(rendered.contains("broken:"))
         assertTrue(rendered.contains("\\uFFFD"))
