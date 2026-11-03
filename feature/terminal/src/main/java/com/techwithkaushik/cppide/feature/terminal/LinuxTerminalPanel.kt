@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.layout.onSizeChanged
@@ -32,6 +33,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
@@ -58,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.integration.linuxruntime.HostKeyConfirmationRequired
@@ -305,7 +309,6 @@ fun LinuxTerminalPanel(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(tab.title.value, color = Color(0xFFE8EDF5), maxLines = 1)
-                            Text("×", color = Color(0xFF9AA7B5), modifier = Modifier.clickable { LinuxTerminalSessions.closeTab(tab.id) })
                         }
                         DropdownMenu(expanded = sessionMenuId == tab.id, onDismissRequest = { sessionMenuId = 0 }) {
                             DropdownMenuItem(text = { Text("Rename session") }, onClick = {
@@ -406,6 +409,11 @@ fun LinuxTerminalPanel(
                             }
                         },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        try { active.send("\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                        command = ""
+                    }),
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.Transparent, fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
                     decorationBox = { inner -> inner() }
