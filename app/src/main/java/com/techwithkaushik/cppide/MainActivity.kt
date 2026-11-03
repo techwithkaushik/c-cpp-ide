@@ -189,11 +189,6 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             val controller = WindowCompat.getInsetsController(window, localView)
             if (fullScreen) controller.hide(WindowInsetsCompat.Type.systemBars())
             else controller.show(WindowInsetsCompat.Type.systemBars())
-            // Keep the terminal sheet anchored while the IME overlays the bottom edge.
-            window.setSoftInputMode(
-                if (showToolPanel) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-                else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-            )
         }
     }
     val onboardingPreferences = remember(appContext) { appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, android.content.Context.MODE_PRIVATE) }
@@ -217,6 +212,13 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
+    // Apply IME policy after the panel state is declared so it remains reactive.
+    SideEffect {
+        hostActivity?.window?.setSoftInputMode(
+            if (showToolPanel) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
+    }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
     var showExplorer by rememberSaveable { mutableStateOf(false) }
     var activeActivity by rememberSaveable { mutableStateOf("Explorer") }
