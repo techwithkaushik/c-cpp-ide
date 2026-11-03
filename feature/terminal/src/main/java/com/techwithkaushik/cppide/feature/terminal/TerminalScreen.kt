@@ -1,19 +1,34 @@
 package com.techwithkaushik.cppide.feature.terminal
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+
 /**
- * Small VT-style terminal screen model for the Compose renderer.
- * Handles common CSI cursor movement, erase, CR/LF, backspace and SGR sequences.
- * It is intentionally bounded; full alternate-screen and Unicode width support
- * remain outside this first implementation.
+ * Bounded VT-style terminal grid. It preserves cursor-addressed output and SGR
+ * styling instead of treating the PTY stream as a plain append-only log.
  */
 internal class TerminalScreen(
     columns: Int = 100,
     rows: Int = 30,
     private val maxScrollbackLines: Int = 5_000,
 ) {
+    private data class CellStyle(
+        val foreground: Int? = null,
+        val background: Int? = null,
+        val bold: Boolean = false,
+        val italic: Boolean = false,
+        val underline: Boolean = false,
+        val inverse: Boolean = false,
+    )
+
     private var columns = columns.coerceIn(20, 300)
     private var rows = rows.coerceIn(5, 120)
     private var cells = Array(this.rows) { CharArray(this.columns) { ' ' } }
+    private var styles = Array(this.rows) { Array(this.columns) { CellStyle() } }
     private val scrollback = ArrayDeque<String>()
     private var row = 0
     private var column = 0
@@ -22,19 +37,22 @@ internal class TerminalScreen(
     private var escapeState = 0
     private val csi = StringBuilder()
     private val osc = StringBuilder()
+    private var currentStyle = CellStyle()
 
-    /** Resize the terminal grid while preserving the visible cells and scrollback. */
     fun resize(newColumns: Int, newRows: Int) {
         val width = newColumns.coerceIn(20, 300)
         val height = newRows.coerceIn(5, 120)
         if (width == columns && height == rows) return
-        val resized = Array(height) { CharArray(width) { ' ' } }
+        val resizedCells = Array(height) { CharArray(width) { ' ' } }
+        val resizedStyles = Array(height) { Array(width) { CellStyle() } }
         val rowsToCopy = minOf(rows, height)
         val columnsToCopy = minOf(columns, width)
         for (index in 0 until rowsToCopy) {
-            cells[index].copyInto(resized[index], endIndex = columnsToCopy)
+            cells[index].copyInto(resizedCells[index], endIndex = columnsToCopy)
+            styles[index].copyInto(resizedStyles[index], endIndex = columnsToCopy)
         }
-        cells = resized
+        cells = resizedCells
+        styles = resizedStyles
         columns = width
         rows = height
         row = row.coerceIn(0, rows - 1)
@@ -52,6 +70,10 @@ internal class TerminalScreen(
                         ']' -> { osc.setLength(0); 3 }
                         '7' -> { savedRow = row; savedColumn = column; 0 }
                         '8' -> { row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1); 0 }
+                        'D' -> { lineFeed(); 0 }
+                        'M' -> { reverseIndex(); 0 }
+                        'E' -> { column = 0; lineFeed(); 0 }
+                        'c' -> { reset(); 0 }
                         else -> 0
                     }
                 }
@@ -66,7 +88,7 @@ internal class TerminalScreen(
                     else if (ch == '\u001B') escapeState = 4
                     else if (osc.length < 4096) osc.append(ch)
                 }
-                4 -> escapeState = if (ch == '\\') 0 else 3
+                4 -> escapeState = if (ch == '\\\\') 0 else 3
                 else -> consume(ch)
             }
         }
@@ -75,20 +97,58 @@ internal class TerminalScreen(
     fun render(): String {
         val lines = ArrayList<String>(scrollback.size + rows)
         lines.addAll(scrollback)
-        var last = rows - 1
-        while (last > row && cells[last].all { it == ' ' }) last--
-        for (i in 0..last) {
-            val line = String(cells[i]).trimEnd()
-            if (i == row && column <= columns - 1) {
-                val shown = StringBuilder(line)
-                val cursor = column.coerceAtMost(shown.length)
-                shown.insert(cursor, '▏')
-                lines.add(shown.toString())
-            } else {
-                lines.add(line)
-            }
+        val last = lastVisibleRow()
+        for (index in 0..last) {
+            val line = String(cells[index]).trimEnd()
+            lines.add(if (index == row) insertCursor(line) else line)
         }
         return lines.joinToString("\n")
+    }
+
+    fun renderAnnotated(): AnnotatedString {
+        val builder = AnnotatedString.Builder()
+        scrollback.forEachIndexed { index, line ->
+            if (index > 0) builder.append("\n")
+            builder.append(line)
+        }
+        if (scrollback.isNotEmpty()) builder.append("\n")
+        val last = lastVisibleRow()
+        for (lineIndex in 0..last) {
+            if (lineIndex > 0) builder.append("\n")
+            val visibleLength = String(cells[lineIndex]).trimEnd().length
+            val cursorAt = if (lineIndex == row) column.coerceAtMost(visibleLength) else -1
+            for (cellIndex in 0..visibleLength) {
+                if (cellIndex == cursorAt) builder.append("▏")
+                if (cellIndex < visibleLength) {
+                    val style = styles[lineIndex][cellIndex]
+                    val foreground = if (style.inverse) style.background else style.foreground
+                    val background = if (style.inverse) style.foreground else style.background
+                    val span = SpanStyle(
+                        color = foreground?.let(::Color) ?: Color.Unspecified,
+                        background = background?.let(::Color) ?: Color.Unspecified,
+                        fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
+                        fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
+                        textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
+                    )
+                    builder.pushStyle(span)
+                    builder.append(cells[lineIndex][cellIndex])
+                    builder.pop()
+                }
+            }
+        }
+        return builder.toAnnotatedString()
+    }
+
+    private fun lastVisibleRow(): Int {
+        var last = rows - 1
+        while (last > row && cells[last].all { it == ' ' }) last--
+        return last
+    }
+
+    private fun insertCursor(line: String): String {
+        val shown = StringBuilder(line)
+        shown.insert(column.coerceAtMost(shown.length), '▏')
+        return shown.toString()
     }
 
     private fun consume(ch: Char) {
@@ -98,10 +158,11 @@ internal class TerminalScreen(
             '\n' -> lineFeed()
             '\b' -> column = (column - 1).coerceAtLeast(0)
             '\u0007' -> Unit
-            '\t' -> column = ((column / 8) + 1).times(8).coerceAtMost(columns - 1)
+            '\t' -> column = (((column / 8) + 1) * 8).coerceAtMost(columns - 1)
             else -> if (ch >= ' ' && ch != '\u007f') {
                 if (column >= columns) { column = 0; lineFeed() }
                 cells[row][column] = ch
+                styles[row][column] = currentStyle
                 column++
                 if (column >= columns) { column = 0; lineFeed() }
             }
@@ -114,9 +175,26 @@ internal class TerminalScreen(
         } else {
             scrollback.addLast(String(cells[0]).trimEnd())
             while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
-            for (i in 0 until rows - 1) cells[i] = cells[i + 1]
+            for (index in 0 until rows - 1) {
+                cells[index] = cells[index + 1]
+                styles[index] = styles[index + 1]
+            }
             cells[rows - 1] = CharArray(columns) { ' ' }
+            styles[rows - 1] = Array(columns) { CellStyle() }
             row = rows - 1
+        }
+    }
+
+    private fun reverseIndex() {
+        if (row > 0) {
+            row--
+        } else {
+            for (index in rows - 1 downTo 1) {
+                cells[index] = cells[index - 1]
+                styles[index] = styles[index - 1]
+            }
+            cells[0] = CharArray(columns) { ' ' }
+            styles[0] = Array(columns) { CellStyle() }
         }
     }
 
@@ -137,27 +215,158 @@ internal class TerminalScreen(
                 column = (param(1) - 1).coerceIn(0, columns - 1)
             }
             'J' -> when (parameters.firstOrNull() ?: 0) {
-                0 -> { eraseLineFromCursor(); for (i in row + 1 until rows) cells[i].fill(' ') }
+                0 -> { eraseLineFromCursor(); for (index in row + 1 until rows) eraseRow(index) }
                 1 -> {
-                    for (i in 0 until row) cells[i].fill(' ')
-                    for (j in 0..column.coerceAtMost(columns - 1)) cells[row][j] = ' '
+                    for (index in 0 until row) eraseRow(index)
+                    for (index in 0..column.coerceAtMost(columns - 1)) eraseCell(row, index)
                 }
-                2, 3 -> { cells = Array(rows) { CharArray(columns) { ' ' } }; row = 0; column = 0; if (parameters.firstOrNull() == 3) scrollback.clear() }
+                2, 3 -> {
+                    for (index in 0 until rows) eraseRow(index)
+                    row = 0
+                    column = 0
+                    if (parameters.firstOrNull() == 3) scrollback.clear()
+                }
             }
             'K' -> when (parameters.firstOrNull() ?: 0) {
                 0 -> eraseLineFromCursor()
-                1 -> for (i in 0..column.coerceAtMost(columns - 1)) cells[row][i] = ' '
-                2 -> cells[row].fill(' ')
+                1 -> for (index in 0..column.coerceAtMost(columns - 1)) eraseCell(row, index)
+                2 -> eraseRow(row)
             }
-            'X' -> repeat(param(0).coerceAtMost(columns)) { if (column + it < columns) cells[row][column + it] = ' ' }
+            'X' -> repeat(param(0).coerceAtMost(columns)) { if (column + it < columns) eraseCell(row, column + it) }
+            '@' -> insertCharacters(param(0))
+            'P' -> deleteCharacters(param(0))
+            'L' -> insertLines(param(0))
+            'M' -> deleteLines(param(0))
+            'S' -> repeat(param(0)) { lineFeed() }
+            'T' -> repeat(param(0)) { reverseIndex() }
             's' -> { savedRow = row; savedColumn = column }
             'u' -> { row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1) }
-            'm' -> Unit // Color attributes are parsed and safely ignored by the text renderer.
-            'h', 'l' -> Unit // DEC private modes; alternate screen/cursor visibility are not implemented yet.
+            'm' -> applySgr(parameters)
+            'h', 'l' -> Unit
         }
     }
 
+    private fun applySgr(parameters: List<Int>) {
+        val values = if (parameters.isEmpty()) listOf(0) else parameters
+        var index = 0
+        while (index < values.size) {
+            when (val code = values[index]) {
+                0 -> currentStyle = CellStyle()
+                1 -> currentStyle = currentStyle.copy(bold = true)
+                2 -> currentStyle = currentStyle.copy(foreground = currentStyle.foreground)
+                3 -> currentStyle = currentStyle.copy(italic = true)
+                4 -> currentStyle = currentStyle.copy(underline = true)
+                7 -> currentStyle = currentStyle.copy(inverse = true)
+                22 -> currentStyle = currentStyle.copy(bold = false)
+                23 -> currentStyle = currentStyle.copy(italic = false)
+                24 -> currentStyle = currentStyle.copy(underline = false)
+                27 -> currentStyle = currentStyle.copy(inverse = false)
+                39 -> currentStyle = currentStyle.copy(foreground = null)
+                49 -> currentStyle = currentStyle.copy(background = null)
+                in 30..37 -> currentStyle = currentStyle.copy(foreground = ansiColor(code - 30, false))
+                in 90..97 -> currentStyle = currentStyle.copy(foreground = ansiColor(code - 90, true))
+                in 40..47 -> currentStyle = currentStyle.copy(background = ansiColor(code - 40, false))
+                in 100..107 -> currentStyle = currentStyle.copy(background = ansiColor(code - 100, true))
+                38, 48 -> {
+                    val isForeground = code == 38
+                    val mode = values.getOrNull(index + 1)
+                    if (mode == 5) {
+                        val color = indexedColor(values.getOrNull(index + 2) ?: 7)
+                        currentStyle = if (isForeground) currentStyle.copy(foreground = color) else currentStyle.copy(background = color)
+                        index += 2
+                    } else if (mode == 2 && index + 4 < values.size) {
+                        val color = rgb(values[index + 2], values[index + 3], values[index + 4])
+                        currentStyle = if (isForeground) currentStyle.copy(foreground = color) else currentStyle.copy(background = color)
+                        index += 4
+                    }
+                }
+            }
+            index++
+        }
+    }
+
+    private fun ansiColor(index: Int, bright: Boolean): Int {
+        val normal = intArrayOf(0xFF1C1C1C.toInt(), 0xFFCC3333.toInt(), 0xFF33AA55.toInt(), 0xFFCCAA33.toInt(), 0xFF4477CC.toInt(), 0xFFAA55AA.toInt(), 0xFF33AAAA.toInt(), 0xFFCCCCCC.toInt())
+        val vivid = intArrayOf(0xFF666666.toInt(), 0xFFFF6666.toInt(), 0xFF66DD88.toInt(), 0xFFFFDD66.toInt(), 0xFF77AAFF.toInt(), 0xFFDD88DD.toInt(), 0xFF66DDDD.toInt(), 0xFFFFFFFF.toInt())
+        return (if (bright) vivid else normal)[index.coerceIn(0, 7)]
+    }
+
+    private fun indexedColor(index: Int): Int {
+        val value = index.coerceIn(0, 255)
+        if (value < 16) return ansiColor(value % 8, value >= 8)
+        if (value >= 232) {
+            val gray = 8 + (value - 232) * 10
+            return rgb(gray, gray, gray)
+        }
+        val cube = value - 16
+        fun component(v: Int) = if (v == 0) 0 else 55 + v * 40
+        return rgb(component(cube / 36), component((cube / 6) % 6), component(cube % 6))
+    }
+
+    private fun rgb(red: Int, green: Int, blue: Int): Int =
+        (0xFF shl 24) or (red.coerceIn(0, 255) shl 16) or (green.coerceIn(0, 255) shl 8) or blue.coerceIn(0, 255)
+
+    private fun insertCharacters(count: Int) {
+        repeat(count.coerceAtMost(columns)) {
+            for (index in columns - 1 downTo column + 1) {
+                cells[row][index] = cells[row][index - 1]
+                styles[row][index] = styles[row][index - 1]
+            }
+            eraseCell(row, column)
+        }
+    }
+
+    private fun deleteCharacters(count: Int) {
+        repeat(count.coerceAtMost(columns)) {
+            for (index in column until columns - 1) {
+                cells[row][index] = cells[row][index + 1]
+                styles[row][index] = styles[row][index + 1]
+            }
+            eraseCell(row, columns - 1)
+        }
+    }
+
+    private fun insertLines(count: Int) {
+        repeat(count.coerceAtMost(rows)) {
+            for (index in rows - 1 downTo row + 1) {
+                cells[index] = cells[index - 1]
+                styles[index] = styles[index - 1]
+            }
+            eraseRow(row)
+        }
+    }
+
+    private fun deleteLines(count: Int) {
+        repeat(count.coerceAtMost(rows)) {
+            for (index in row until rows - 1) {
+                cells[index] = cells[index + 1]
+                styles[index] = styles[index + 1]
+            }
+            eraseRow(rows - 1)
+        }
+    }
+
+    private fun eraseCell(targetRow: Int, targetColumn: Int) {
+        cells[targetRow][targetColumn] = ' '
+        styles[targetRow][targetColumn] = CellStyle()
+    }
+
+    private fun eraseRow(targetRow: Int) {
+        cells[targetRow].fill(' ')
+        styles[targetRow] = Array(columns) { CellStyle() }
+    }
+
     private fun eraseLineFromCursor() {
-        for (i in column.coerceIn(0, columns - 1) until columns) cells[row][i] = ' '
+        for (index in column.coerceIn(0, columns - 1) until columns) eraseCell(row, index)
+    }
+
+    private fun reset() {
+        for (index in 0 until rows) eraseRow(index)
+        scrollback.clear()
+        row = 0
+        column = 0
+        savedRow = 0
+        savedColumn = 0
+        currentStyle = CellStyle()
     }
 }
