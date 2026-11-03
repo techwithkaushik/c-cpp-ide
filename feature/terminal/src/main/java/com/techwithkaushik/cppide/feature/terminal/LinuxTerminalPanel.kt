@@ -89,6 +89,7 @@ private data class LinuxTerminalTab(
     val id: Int,
     val title: MutableState<String>,
     val output: MutableState<AnnotatedString>,
+    val outputRevision: MutableState<Int>,
     val screen: TerminalScreen,
     val send: (String) -> Unit,
     val interrupt: () -> Unit,
@@ -117,6 +118,7 @@ private object LinuxTerminalSessions {
             id = nextId++,
             title = mutableStateOf(title),
             output = mutableStateOf(screen.renderAnnotated()),
+            outputRevision = mutableIntStateOf(0),
             screen = screen,
             send = { text ->
                 // Ignore late IME/key events racing with the reader's exit callback.
@@ -146,6 +148,7 @@ private object LinuxTerminalSessions {
         if (tabs.none { it.id == tab.id }) return
         tab.screen.append(text)
         tab.output.value = tab.screen.renderAnnotated()
+        tab.outputRevision.value++
     }
 
     fun finish(tab: LinuxTerminalTab) {
@@ -419,7 +422,7 @@ fun LinuxTerminalPanel(
             }
             val outputScrollState = rememberScrollState()
             val terminalTextMeasurer = rememberTextMeasurer()
-            LaunchedEffect(active.output.value) {
+            LaunchedEffect(active.id, active.outputRevision.value) {
                 // Follow live output only when the user was already at the bottom.
                 // This keeps scrollback readable while a command is producing output.
                 val wasFollowingOutput = outputScrollState.maxValue - outputScrollState.value <= 48
@@ -452,6 +455,7 @@ fun LinuxTerminalPanel(
                             active.lastPtyRows = rows
                             active.resize(columns, rows)
                             active.output.value = active.screen.renderAnnotated()
+                            active.outputRevision.value++
                         }
                     }
             ) {
