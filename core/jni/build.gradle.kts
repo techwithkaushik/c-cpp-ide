@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.techwithkaushik.cppide.core.jni"
     compileSdk = 36
+    ndkVersion = "27.2.12479018"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
