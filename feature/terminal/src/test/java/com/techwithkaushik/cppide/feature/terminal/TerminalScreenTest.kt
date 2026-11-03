@@ -266,7 +266,6 @@ class TerminalScreenTest {
     }
 
 
-}
 
     @Test fun decscusrSelectsBlockUnderlineAndBarCursorShapes() {
         val screen = TerminalScreen(columns = 20, rows = 5)
@@ -306,5 +305,4 @@ class TerminalScreenTest {
         screen.append("\u001B[6 q")
         assertTrue(screen.renderAnnotated().text.contains("▏"))
     }
-
-
+}
