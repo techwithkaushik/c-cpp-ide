@@ -251,7 +251,7 @@ class TerminalScreenTest {
         assertTrue(visible.text.contains("▏"))
         assertFalse(hidden.text.contains("▏"))
         assertTrue(restored.text.contains("▏"))
-        assertTrue(visible.text == hidden.text)
+        assertTrue(visible.text.replace("▏", "") == hidden.text)
     }
 
 
