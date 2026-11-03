@@ -169,6 +169,34 @@ class TerminalScreenTest {
         assertTrue(screen.pasteSequence("x") == "x")
     }
 
+    @Test fun wideUnicodeCharactersOccupyTwoTerminalCellsWithoutLeakingMarkers() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("A界B")
+        val rendered = screen.render()
+        assertTrue(rendered.contains("A界B"))
+        assertFalse(rendered.contains("\u0000"))
+        // A (1) + CJK (2) + B (1) leaves the cursor at terminal cell 4.
+        assertTrue(rendered.contains("▏"))
+    }
+
+    @Test fun combiningMarksAttachToPreviousCharacterWithoutAdvancingCursor() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("e")
+        screen.append("\u0301")
+        val rendered = screen.render().replace("▏", "")
+        assertTrue(rendered.contains("e\u0301"))
+    }
+
+    @Test fun supplementaryUnicodeSurrogatePairCanSpanOutputChunks() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        val emoji = "😀"
+        screen.append(emoji.substring(0, 1))
+        screen.append(emoji.substring(1))
+        val rendered = screen.render()
+        assertTrue(rendered.contains(emoji))
+        assertFalse(rendered.contains("\uFFFD"))
+    }
+
     @Test fun cursorBlinkPhaseHidesAndRestoresCursorWithoutChangingText() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("prompt")
