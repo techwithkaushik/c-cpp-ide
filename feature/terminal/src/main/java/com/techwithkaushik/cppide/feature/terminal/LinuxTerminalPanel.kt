@@ -183,6 +183,7 @@ fun LinuxTerminalPanel(
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
     var command by remember { mutableStateOf("") }
+    var ctrlMode by remember { mutableStateOf(false) }
     var sessionMenuId by remember { mutableIntStateOf(0) }
     var renameTabId by remember { mutableIntStateOf(0) }
     var renameValue by remember { mutableStateOf("") }
@@ -376,35 +377,42 @@ fun LinuxTerminalPanel(
             }
         } else {
             Row(
-                Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 8.dp, vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.fillMaxWidth().background(Color(0xFF101820))
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                TextButton(
-                    enabled = active.exited.value == null,
-                    onClick = {
-                        val pasted = clipboardManager.getText()?.text.orEmpty()
-                        if (pasted.isNotEmpty()) {
-                            runCatching { active.send(pasted) }
-                                .onFailure { error = it.message ?: "Could not paste into terminal." }
-                        }
-                    }
-                ) { Text("Paste", color = if (active.exited.value == null) Color(0xFF9CCBFF) else Color(0xFF687482), fontSize = 12.sp) }
-                TextButton(
-                    enabled = active.exited.value == null,
-                    onClick = {
-                        runCatching { active.send("\\u000c") }
-                            .onFailure { error = it.message ?: "Could not clear terminal." }
-                    }
-                ) { Text("Clear", color = if (active.exited.value == null) Color(0xFF9CCBFF) else Color(0xFF687482), fontSize = 12.sp) }
-                Spacer(Modifier.weight(1f))
-                TextButton(
-                    enabled = active.exited.value == null,
-                    onClick = {
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    runCatching { active.send("\u001b") }.onFailure { error = it.message ?: "Terminal input failed." }
+                    terminalInputFocusRequester.requestFocus()
+                }) { Text("Esc", fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    runCatching { active.send("\t") }.onFailure { error = it.message ?: "Terminal input failed." }
+                    terminalInputFocusRequester.requestFocus()
+                }) { Text("Tab", fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+                TextButton(enabled = active.exited.value == null, onClick = { ctrlMode = !ctrlMode }) {
+                    Text("Ctrl", color = if (ctrlMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0), fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                }
+                listOf("↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C").forEach { (label, sequence) ->
+                    TextButton(enabled = active.exited.value == null, onClick = {
+                        runCatching { active.send(sequence) }.onFailure { error = it.message ?: "Terminal input failed." }
                         terminalInputFocusRequester.requestFocus()
-                        keyboardController?.show()
-                    }
-                ) { Text("Keyboard", color = if (active.exited.value == null) Color(0xFF9CCBFF) else Color(0xFF687482), fontSize = 12.sp) }
+                    }) { Text(label, fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
+                }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    val pasted = clipboardManager.getText()?.text.orEmpty()
+                    if (pasted.isNotEmpty()) runCatching { active.send(pasted) }
+                        .onFailure { error = it.message ?: "Could not paste into terminal." }
+                    terminalInputFocusRequester.requestFocus()
+                }) { Text("Paste", fontSize = 11.sp) }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    runCatching { active.send("\u000c") }.onFailure { error = it.message ?: "Could not clear terminal." }
+                }) { Text("Clear", fontSize = 11.sp) }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    terminalInputFocusRequester.requestFocus()
+                    keyboardController?.show()
+                }) { Text("⌨", fontSize = 13.sp) }
             }
             // Blink the block cursor at a terminal-like cadence. DEC ?25l still
             // suppresses it because visibility is controlled by the VT screen.
