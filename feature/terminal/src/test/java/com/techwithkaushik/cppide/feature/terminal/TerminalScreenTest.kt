@@ -36,6 +36,15 @@ class TerminalScreenTest {
         assertFalse(screen.render().contains("\u001B"))
     }
 
+    @Test fun resizePreservesVisibleTextAndClampsCursor() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("terminal")
+        screen.resize(40, 10)
+        assertTrue(screen.render().contains("terminal"))
+        screen.resize(20, 5)
+        assertTrue(screen.render().contains("terminal"))
+    }
+
     @Test fun carriageReturnRewritesCurrentLine() {
         val screen = TerminalScreen()
         screen.append("downloading 100%")
