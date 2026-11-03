@@ -560,9 +560,14 @@ fun LinuxTerminalPanel(
                         activeKeys.take(firstRowCount).forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
                         val sequence = when (key) {
-                            "ESC" -> "\u001b"; "TAB" -> "\t"; "HOME" -> "\u001b[H"; "END" -> "\u001b[F"
-                            "UP" -> "\u001b[A"; "DOWN" -> "\u001b[B"; "LEFT" -> "\u001b[D"; "RIGHT" -> "\u001b[C"
-                            "PGUP" -> "\u001b[5~"; "PGDN" -> "\u001b[6~"; else -> key
+                            "ESC" -> "\u001b"
+                            "TAB" -> "\t"
+                            "HOME" -> "\u001b[H"
+                            "END" -> "\u001b[F"
+                            "UP", "DOWN", "LEFT", "RIGHT" -> active.screen.cursorKeySequence(key)
+                            "PGUP" -> "\u001b[5~"
+                            "PGDN" -> "\u001b[6~"
+                            else -> key
                         }
                         when (key) {
                             "CTRL" -> ctrlMode = !ctrlMode
@@ -617,7 +622,7 @@ fun LinuxTerminalPanel(
                         }
                         TextButton(enabled = active.exited.value == null, onClick = {
                             val pasted = clipboardManager.getText()?.text.orEmpty()
-                            if (pasted.isNotEmpty()) runCatching { active.send(pasted) }.onFailure { error = it.message ?: "Could not paste into terminal." }
+                            if (pasted.isNotEmpty()) runCatching { active.send(active.screen.pasteSequence(pasted)) }.onFailure { error = it.message ?: "Could not paste into terminal." }
                             terminalInputFocusRequester.requestFocus()
                         }) { Text("Paste", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
