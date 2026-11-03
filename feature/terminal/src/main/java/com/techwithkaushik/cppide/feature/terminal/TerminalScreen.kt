@@ -25,6 +25,8 @@ internal class TerminalScreen(
         val savedColumn: Int,
     )
 
+    private data class ScrollbackLine(val cells: CharArray, val styles: Array<CellStyle>)
+
     private data class CellStyle(
         val foreground: Int? = null,
         val background: Int? = null,
@@ -39,7 +41,7 @@ internal class TerminalScreen(
     private var rows = rows.coerceIn(5, 120)
     private var cells = Array(this.rows) { CharArray(this.columns) { ' ' } }
     private var styles = Array(this.rows) { Array(this.columns) { CellStyle() } }
-    private val scrollback = ArrayDeque<String>()
+    private val scrollback = ArrayDeque<ScrollbackLine>()
     private var row = 0
     private var column = 0
     private var savedRow = 0
@@ -180,7 +182,7 @@ internal class TerminalScreen(
 
     fun render(): String {
         val lines = ArrayList<String>(scrollback.size + rows)
-        if (!alternateBuffer) lines.addAll(scrollback)
+        if (!alternateBuffer) lines.addAll(scrollback.map { line -> buildString { line.cells.forEach { if (it != '\u0000') append(it) } }.trimEnd() })
         val last = lastVisibleRow()
         for (index in 0..last) {
             val line = visibleLine(index).trimEnd()
@@ -191,55 +193,64 @@ internal class TerminalScreen(
 
     fun renderAnnotated(): AnnotatedString {
         val builder = AnnotatedString.Builder()
-        if (!alternateBuffer) scrollback.forEachIndexed { index, line ->
-            if (index > 0) builder.append("\n")
-            builder.append(line)
+        if (!alternateBuffer) scrollback.forEachIndexed { lineIndex, line ->
+            if (lineIndex > 0) builder.append("\n")
+            appendStyledLine(builder, line.cells, line.styles, includeCursor = false)
         }
         if (!alternateBuffer && scrollback.isNotEmpty()) builder.append("\n")
         val last = lastVisibleRow()
         for (lineIndex in 0..last) {
             if (lineIndex > 0) builder.append("\n")
-            val visibleLength = cells[lineIndex].indexOfLast { it != ' ' && it != '\u0000' } + 1
-            val cursorAt = if (lineIndex == row && cursorVisible && cursorBlinkOn) column.coerceAtMost(columns - 1) else -1
-            for (cellIndex in 0 until maxOf(visibleLength, if (cursorAt >= 0) cursorAt + 1 else 0)) {
-                val isCursor = cellIndex == cursorAt
-                val cell = cells[lineIndex][cellIndex]
-                if (cell == '\u0000') continue // wide-character continuation cell
-                val style = styles[lineIndex][cellIndex]
-                val foreground = if (style.inverse) style.background else style.foreground
-                val background = if (style.inverse) style.foreground else style.background
-                val cursorBlock = isCursor && cursorShape in 0..2
-                val cursorUnderline = isCursor && cursorShape in 3..4
-                val cursorBar = isCursor && cursorShape in 5..6
-                val span = SpanStyle(
-                    color = when {
-                        cursorBlock -> Color(0xFF0B0F14)
-                        cursorBar -> Color(0xFF8AB4F8)
-                        else -> foreground?.let(::composeColor) ?: Color.Unspecified
-                    },
-                    background = if (cursorBlock) Color(0xFFD8DEE9) else background?.let(::composeColor) ?: Color.Unspecified,
-                    fontWeight = if (style.bold) FontWeight.Bold else if (style.dim) FontWeight.Light else FontWeight.Normal,
-                    fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
-                    textDecoration = when {
-                        cursorUnderline -> TextDecoration.Underline
-                        style.underline -> TextDecoration.Underline
-                        else -> TextDecoration.None
-                    },
-                )
-                builder.pushStyle(span)
-                if (cellIndex < visibleLength) {
-                    builder.append(if (cursorBar) "▏" else cell)
-                } else if (isCursor) {
-                    builder.append(if (cursorBar) "▏" else " ")
-                }
-                builder.pop()
-            }
+            appendStyledLine(
+                builder,
+                cells[lineIndex],
+                styles[lineIndex],
+                includeCursor = lineIndex == row && cursorVisible && cursorBlinkOn,
+            )
         }
         return builder.toAnnotatedString()
     }
 
-    /** Current DECSCUSR cursor style, exposed for rendering and unit tests. */
-    fun cursorShapeCode(): Int = cursorShape
+    private fun appendStyledLine(
+        builder: AnnotatedString.Builder,
+        lineCells: CharArray,
+        lineStyles: Array<CellStyle>,
+        includeCursor: Boolean,
+    ) {
+        val visibleLength = lineCells.indexOfLast { it != ' ' && it != '\u0000' } + 1
+        val cursorAt = if (includeCursor) column.coerceAtMost(columns - 1) else -1
+        val end = maxOf(visibleLength, if (cursorAt >= 0) cursorAt + 1 else 0)
+        for (cellIndex in 0 until end) {
+            val isCursor = cellIndex == cursorAt
+            val cell = lineCells[cellIndex]
+            if (cell == '\u0000') continue
+            val style = lineStyles[cellIndex]
+            val foreground = if (style.inverse) style.background else style.foreground
+            val background = if (style.inverse) style.foreground else style.background
+            val cursorBlock = isCursor && cursorShape in 0..2
+            val cursorUnderline = isCursor && cursorShape in 3..4
+            val cursorBar = isCursor && cursorShape in 5..6
+            val span = SpanStyle(
+                color = when {
+                    cursorBlock -> Color(0xFF0B0F14)
+                    cursorBar -> Color(0xFF8AB4F8)
+                    else -> foreground?.let(::composeColor) ?: Color.Unspecified
+                },
+                background = if (cursorBlock) Color(0xFFD8DEE9) else background?.let(::composeColor) ?: Color.Unspecified,
+                fontWeight = if (style.bold) FontWeight.Bold else if (style.dim) FontWeight.Light else FontWeight.Normal,
+                fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
+                textDecoration = when {
+                    cursorUnderline -> TextDecoration.Underline
+                    style.underline -> TextDecoration.Underline
+                    else -> TextDecoration.None
+                },
+            )
+            builder.pushStyle(span)
+            if (cellIndex < visibleLength) builder.append(if (cursorBar) "▏" else cell)
+            else if (isCursor) builder.append(if (cursorBar) "▏" else " ")
+            builder.pop()
+        }
+    }
 
     /** Build a display string without the internal continuation-cell markers. */
     private fun visibleLine(lineIndex: Int): String = buildString {
@@ -348,13 +359,10 @@ internal class TerminalScreen(
     private fun scrollRegionUp(count: Int) {
         repeat(count.coerceAtMost(scrollBottom - scrollTop + 1)) {
             if (scrollTop == 0 && scrollBottom == rows - 1 && !alternateBuffer) {
-                scrollback.addLast(
-                    buildString {
-                        cells[scrollTop].forEach { cell ->
-                            if (cell != '\u0000') append(cell)
-                        }
-                    }.trimEnd(),
-                )
+                // Keep both glyph cells and their SGR attributes in scrollback.
+                // Storing only Strings silently discarded ANSI colors/styles once
+                // a styled row scrolled off the live screen.
+                scrollback.addLast(ScrollbackLine(cells[scrollTop].copyOf(), styles[scrollTop].copyOf()))
                 while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
             }
             for (index in scrollTop until scrollBottom) {
