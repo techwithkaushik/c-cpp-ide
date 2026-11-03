@@ -231,7 +231,11 @@ fun LinuxTerminalPanel(
 
     fun startLocalSession() {
         if (busy) return
-        paths.ensureDirectories()
+        val pathError = runCatching { paths.ensureDirectories() }.exceptionOrNull()
+        if (pathError != null) {
+            error = "Could not prepare bundled Android PRoot: ${pathError.message ?: pathError.javaClass.simpleName}"
+            return
+        }
         if (!paths.ready()) {
             val validation = context.getSharedPreferences("linux_runtime_validation", Context.MODE_PRIVATE)
                 .getString("message", null)
