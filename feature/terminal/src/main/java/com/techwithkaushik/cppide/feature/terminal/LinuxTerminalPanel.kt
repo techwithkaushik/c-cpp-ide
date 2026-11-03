@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
@@ -365,7 +365,7 @@ fun LinuxTerminalPanel(
                     modifier = Modifier.size(1.dp).focusRequester(terminalInputFocusRequester)
                         .onPreviewKeyEvent { event ->
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
-                            if (event.nativeKeyEvent.isCtrlPressed) {
+                            if (event.isCtrlPressed) {
                                 val control = when (event.key) {
                                     androidx.compose.ui.input.key.Key.C -> "\u0003"
                                     androidx.compose.ui.input.key.Key.D -> "\u0004"
