@@ -1838,19 +1838,14 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
         ToolPanel.Output -> "Output"
     }
     Column(
-        Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        Modifier.fillMaxWidth().fillMaxHeight(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title.uppercase(), fontSize = IdeDesignTokens.Typography.caption, fontWeight = FontWeight.Bold)
-                Text("PANEL", color = IdeMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            }
-            Text("Done", Modifier.clickable(onClick = onClose).padding(IdeDesignTokens.Spacing.sm), color = IdeAccent)
-        }
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             ToolPanel.entries.forEach { panel ->
                 val label = when (panel) {
@@ -1859,8 +1854,21 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
                     ToolPanel.Problems -> "Problems"
                     ToolPanel.Output -> "Output"
                 }
-                if (panel == selected) Button(onClick = { onSelect(panel) }) { Text(label, fontSize = IdeDesignTokens.Typography.caption) }
-                else OutlinedButton(onClick = { onSelect(panel) }) { Text(label, fontSize = IdeDesignTokens.Typography.caption) }
+                Box(
+                    Modifier.background(
+                        if (panel == selected) IdeAccent else Color(0xFF171D26),
+                        RoundedCornerShape(18.dp)
+                    ).clickable { onSelect(panel) }
+                        .padding(horizontal = 13.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        label,
+                        color = if (panel == selected) Color(0xFF0D1722) else IdeMuted,
+                        fontSize = 11.sp,
+                        fontWeight = if (panel == selected) FontWeight.SemiBold else FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
             }
         }
         when (selected) {
