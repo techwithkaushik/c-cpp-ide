@@ -242,15 +242,16 @@ class TerminalScreenTest {
     @Test fun cursorBlinkPhaseHidesAndRestoresCursorWithoutChangingText() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("prompt")
-        val visible = screen.renderAnnotated().text
+        screen.append("\u001B[6 q")
+        val visible = screen.renderAnnotated()
         screen.setCursorBlinkPhase(false)
-        val hidden = screen.renderAnnotated().text
+        val hidden = screen.renderAnnotated()
         screen.setCursorBlinkPhase(true)
-        val restored = screen.renderAnnotated().text
-        assertTrue(visible.contains("▏"))
-        assertFalse(hidden.contains("▏"))
-        assertTrue(restored.contains("▏"))
-        assertTrue(visible.replace("▏", "") == hidden)
+        val restored = screen.renderAnnotated()
+        assertTrue(visible.text.contains("▏"))
+        assertFalse(hidden.text.contains("▏"))
+        assertTrue(restored.text.contains("▏"))
+        assertTrue(visible.text == hidden.text)
     }
 
 }
