@@ -123,8 +123,11 @@ internal class TerminalScreen(
     fun cursorShapeCode(): Int = cursorShape
 
     fun setCursorBlinkPhase(visible: Boolean) {
-        if (cursorBlinkOn == visible) return
-        cursorBlinkOn = visible
+        val blinkingMode = cursorShape == 0 || cursorShape == 1 ||
+            cursorShape == 3 || cursorShape == 5
+        val next = !blinkingMode || visible
+        if (cursorBlinkOn == next) return
+        cursorBlinkOn = next
     }
 
     /** Advance only blinking DECSCUSR modes; steady cursor modes never disappear. */
