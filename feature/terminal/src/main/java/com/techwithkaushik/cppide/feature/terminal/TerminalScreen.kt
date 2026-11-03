@@ -52,6 +52,9 @@ internal class TerminalScreen(
     private var alternateBuffer = false
     private var cursorVisible = true
     private var cursorBlinkOn = true
+    // DECSCUSR: 0/1 blinking block, 2 steady block, 3 blinking underline,
+    // 4 steady underline, 5 blinking bar, 6 steady bar.
+    private var cursorShape = 1
     private var applicationCursorKeys = false
     private var bracketedPasteEnabled = false
     private var pendingHighSurrogate: Char? = null
@@ -192,28 +195,46 @@ internal class TerminalScreen(
         for (lineIndex in 0..last) {
             if (lineIndex > 0) builder.append("\n")
             val visibleLength = cells[lineIndex].indexOfLast { it != ' ' && it != '\u0000' } + 1
-            val cursorAt = if (lineIndex == row && cursorVisible && cursorBlinkOn) column.coerceAtMost(visibleLength) else -1
-            for (cellIndex in 0..visibleLength) {
-                if (cellIndex == cursorAt) builder.append("▏")
-                if (cellIndex < visibleLength && cells[lineIndex][cellIndex] != '\u0000') {
-                    val style = styles[lineIndex][cellIndex]
-                    val foreground = if (style.inverse) style.background else style.foreground
-                    val background = if (style.inverse) style.foreground else style.background
-                    val span = SpanStyle(
-                        color = foreground?.let(::composeColor) ?: Color.Unspecified,
-                        background = background?.let(::composeColor) ?: Color.Unspecified,
-                        fontWeight = if (style.bold) FontWeight.Bold else if (style.dim) FontWeight.Light else FontWeight.Normal,
-                        fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
-                        textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
-                    )
-                    builder.pushStyle(span)
-                    builder.append(cells[lineIndex][cellIndex])
-                    builder.pop()
+            val cursorAt = if (lineIndex == row && cursorVisible && cursorBlinkOn) column.coerceAtMost(columns - 1) else -1
+            for (cellIndex in 0 until maxOf(visibleLength, if (cursorAt >= 0) cursorAt + 1 else 0)) {
+                val isCursor = cellIndex == cursorAt
+                val cell = cells[lineIndex][cellIndex]
+                if (cell == '\u0000') continue // wide-character continuation cell
+                val style = styles[lineIndex][cellIndex]
+                val foreground = if (style.inverse) style.background else style.foreground
+                val background = if (style.inverse) style.foreground else style.background
+                val cursorBlock = isCursor && cursorShape in 0..2
+                val cursorUnderline = isCursor && cursorShape in 3..4
+                val cursorBar = isCursor && cursorShape in 5..6
+                val span = SpanStyle(
+                    color = when {
+                        cursorBlock -> Color(0xFF0B0F14)
+                        cursorBar -> Color(0xFF8AB4F8)
+                        else -> foreground?.let(::composeColor) ?: Color.Unspecified
+                    },
+                    background = if (cursorBlock) Color(0xFFD8DEE9) else background?.let(::composeColor) ?: Color.Unspecified,
+                    fontWeight = if (style.bold) FontWeight.Bold else if (style.dim) FontWeight.Light else FontWeight.Normal,
+                    fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
+                    textDecoration = when {
+                        cursorUnderline -> TextDecoration.Underline
+                        style.underline -> TextDecoration.Underline
+                        else -> TextDecoration.None
+                    },
+                )
+                builder.pushStyle(span)
+                if (cellIndex < visibleLength) {
+                    builder.append(if (cursorBar) "▏" else cell)
+                } else if (isCursor) {
+                    builder.append(if (cursorBar) "▏" else " ")
                 }
+                builder.pop()
             }
         }
         return builder.toAnnotatedString()
     }
+
+    /** Current DECSCUSR cursor style, exposed for rendering and unit tests. */
+    fun cursorShapeCode(): Int = cursorShape
 
     /** Build a display string without the internal continuation-cell markers. */
     private fun visibleLine(lineIndex: Int): String = buildString {
@@ -403,6 +424,8 @@ internal class TerminalScreen(
             's' -> { savedRow = row; savedColumn = column }
             'u' -> { row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1) }
             'm' -> applySgr(parameters)
+            // DECSCUSR uses CSI Ps SP q. Accept both omitted and explicit Ps.
+            'q' -> if (raw.contains(' ')) cursorShape = (raw.substringBefore(' ').trim().toIntOrNull() ?: 0).coerceIn(0, 6)
             'h', 'l' -> {
                 if (raw.startsWith("?")) {
                     parameters.forEach { mode ->
@@ -550,6 +573,8 @@ internal class TerminalScreen(
         primaryBuffer = null
         alternateBuffer = false
         cursorVisible = true
+        cursorBlinkOn = true
+        cursorShape = 1
         applicationCursorKeys = false
         bracketedPasteEnabled = false
         pendingHighSurrogate = null
