@@ -3,6 +3,9 @@ package com.techwithkaushik.cppide.integration.linuxruntime
 import com.techwithkaushik.cppide.core.jni.NativePtyProcess
 import java.io.File
 import java.io.OutputStream
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Persistent Ubuntu shell attached to a real kernel PTY, not plain stdin/stdout pipes. */
@@ -19,12 +22,33 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
 
     fun readOutput(onChunk: (String) -> Unit, onExit: (Int) -> Unit) {
         Thread({
-            val buffer = ByteArray(4096)
-            try {
-                while (true) {
+            // InputStreamReader keeps incomplete UTF-8 byte sequences between PTY
+            // reads. Decoding each native read independently corrupts split emoji,
+            // CJK characters and other multibyte output.
+            val ptyStream = object : InputStream() {
+                override fun read(): Int {
+                    val one = ByteArray(1)
+                    val count = pty.read(one)
+                    return if (count <= 0) -1 else one[0].toInt() and 0xff
+                }
+
+                override fun read(target: ByteArray, offset: Int, length: Int): Int {
+                    if (length == 0) return 0
+                    val buffer = if (offset == 0 && length == target.size) target else ByteArray(length)
                     val count = pty.read(buffer)
-                    if (count <= 0) break
-                    onChunk(String(buffer, 0, count, Charsets.UTF_8))
+                    if (count <= 0) return -1
+                    if (buffer !== target) buffer.copyInto(target, offset, 0, count)
+                    return count
+                }
+            }
+            try {
+                InputStreamReader(ptyStream, StandardCharsets.UTF_8).use { reader ->
+                    val chars = CharArray(2048)
+                    while (true) {
+                        val count = reader.read(chars)
+                        if (count < 0) break
+                        if (count > 0) onChunk(String(chars, 0, count))
+                    }
                 }
             } catch (_: Exception) { }
             val exit = runCatching { pty.waitForExit() }.getOrDefault(-1)
