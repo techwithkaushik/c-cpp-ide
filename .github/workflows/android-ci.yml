@@ -68,21 +68,46 @@ jobs:
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          if [[ ! -d "$SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin" ]]; then
+          NDK_VERSION="27.2.12479018"
+          NDK_BIN="$SDK_ROOT/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [[ ! -d "$NDK_BIN" ]]; then
             SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
             if [[ -z "$SDKMANAGER" ]]; then
               echo "::error::Android SDK command-line tools/sdkmanager not found under $SDK_ROOT"
               exit 1
             fi
-            yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" "ndk;27.2.12479018" || {
-              [[ -d "$SDK_ROOT/ndk" ]] || exit 1
+
+            # sdkmanager occasionally receives a truncated NDK archive on hosted
+            # runners. Retry from a clean package/cache state instead of accepting
+            # a half-created ndk/ directory as a successful installation.
+            installed=false
+            for attempt in 1 2 3; do
+              echo "Installing Android NDK $NDK_VERSION (attempt $attempt/3)"
+              rm -rf "$SDK_ROOT/ndk/$NDK_VERSION" "$SDK_ROOT/.temp"
+              if [[ "$attempt" -gt 1 ]]; then
+                rm -rf "$HOME/.android/cache"
+              fi
+              set +o pipefail
+              yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;$NDK_VERSION"
+              sdk_status=${PIPESTATUS[1]}
+              set -o pipefail
+              if [[ "$sdk_status" -eq 0 && -d "$NDK_BIN" ]]; then
+                installed=true
+                break
+              fi
+              echo "::warning::NDK installation attempt $attempt did not produce a complete toolchain (sdkmanager exit=$sdk_status)"
+              sleep $((attempt * 5))
+            done
+            [[ "$installed" == true ]] || {
+              echo "::error::Could not install a complete Android NDK $NDK_VERSION after 3 attempts"
+              exit 1
             }
           fi
-          test -d "$SDK_ROOT/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin" || {
-            echo "::error::Required Android NDK is not available after SDK setup"
+          test -x "$NDK_BIN/clang" || {
+            echo "::error::Required Android NDK clang compiler is missing under $NDK_BIN"
             exit 1
           }
-          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
 
       - name: Build upstream PRoot v5.5.0 for Android ABIs
         shell: bash
