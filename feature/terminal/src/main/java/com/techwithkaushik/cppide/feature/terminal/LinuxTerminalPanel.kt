@@ -191,6 +191,10 @@ fun LinuxTerminalPanel(
     val visibleExtraKeys = terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS
     val savedKeyOrder = terminalPreferences.getString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(",")) ?: TERMINAL_EXTRA_KEY_ORDER.joinToString(",")
     val extraKeyOrder = savedKeyOrder.split(",").filter { it in TERMINAL_EXTRA_KEY_ORDER }.let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
+    val customTerminalKeys = terminalPreferences.getStringSet("terminal_custom_extra_keys", emptySet())?.toList().orEmpty().mapNotNull { entry ->
+        val parts = entry.split("::", limit = 2)
+        if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotEmpty()) parts[0] to parts[1] else null
+    }.sortedBy { it.first.lowercase() }
     var sessionMenuId by remember { mutableIntStateOf(0) }
     var renameTabId by remember { mutableIntStateOf(0) }
     var renameValue by remember { mutableStateOf("") }
@@ -420,6 +424,13 @@ fun LinuxTerminalPanel(
                                 else -> Color(0xFFD5E3F0)
                             }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }
+                }
+                customTerminalKeys.forEach { (label, sequence) ->
+                    TextButton(enabled = active.exited.value == null, onClick = {
+                        runCatching { active.send(sequence) }
+                            .onFailure { error = it.message ?: "Custom key failed." }
+                        terminalInputFocusRequester.requestFocus()
+                    }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
                 }
                 TextButton(enabled = active.exited.value == null, onClick = {
                     val pasted = clipboardManager.getText()?.text.orEmpty()
