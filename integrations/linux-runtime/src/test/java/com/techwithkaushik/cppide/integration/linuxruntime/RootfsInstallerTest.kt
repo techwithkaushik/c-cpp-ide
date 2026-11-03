@@ -83,5 +83,20 @@ class RootfsInstallerTest {
     }
 
 
+    @Test fun ensureDirectoriesLinksBundledProotAndLoaderBeforeReadinessCheck() {
+        val files = temporaryFolder.newFolder("runtime-files")
+        val nativeLibraries = temporaryFolder.newFolder("native-libraries")
+        File(nativeLibraries, "libproot.so").writeBytes(byteArrayOf(1, 2, 3))
+        File(nativeLibraries, "libproot-loader.so").writeBytes(byteArrayOf(4, 5, 6))
+
+        val paths = LinuxRuntimePaths(files, nativeLibraries.absolutePath)
+        assertFalse(paths.hasProot())
+
+        paths.ensureDirectories()
+
+        assertTrue(paths.hasProot())
+        assertEquals(File(nativeLibraries, "libproot.so").canonicalFile, paths.proot.canonicalFile)
+        assertEquals(File(nativeLibraries, "libproot-loader.so").canonicalFile, paths.prootLoader.canonicalFile)
+    }
 
 }
