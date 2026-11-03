@@ -219,11 +219,14 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
-    // Apply IME policy after the panel state is declared so it remains reactive.
+    // The tool panel is a bottom-anchored overlay. It must receive the
+    // reduced window height when the IME opens so its terminal toolbar docks
+    // directly above the keyboard instead of staying at its old screen position.
+    // ADJUST_NOTHING prevents both the sheet and its extra-key row from moving.
     SideEffect {
         hostActivity?.window?.setSoftInputMode(
-            if (showToolPanel) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-            else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
         )
     }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
