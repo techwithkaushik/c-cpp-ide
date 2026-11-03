@@ -37,6 +37,11 @@ class SshShellSession private constructor(private val session: Session, private 
     val input: OutputStream = channel.outputStream
     private val closed = AtomicBoolean(false)
 
+    /** Keep the remote PTY dimensions in sync with the terminal viewport. */
+    fun resize(columns: Int, rows: Int) {
+        channel.setPtySize(columns.coerceIn(20, 300), rows.coerceIn(5, 120), columns * 8, rows * 16)
+    }
+
     fun readOutput(onChunk: (String) -> Unit, onExit: (Int) -> Unit) {
         Thread({
             val reader = Thread {
