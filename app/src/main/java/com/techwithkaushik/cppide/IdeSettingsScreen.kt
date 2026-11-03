@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -69,6 +70,9 @@ internal fun IdeSettingsScreen(
     var scrollbackLines by remember { mutableStateOf(prefs.getInt("terminal_scrollback_lines", 5000).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     var terminalConnectionMode by remember { mutableStateOf(prefs.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu") }
+    var sshHost by remember { mutableStateOf(prefs.getString("terminal_ssh_host", "").orEmpty()) }
+    var sshPort by remember { mutableStateOf(prefs.getInt("terminal_ssh_port", 22).toString()) }
+    var sshUser by remember { mutableStateOf(prefs.getString("terminal_ssh_user", "").orEmpty()) }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -145,6 +149,31 @@ internal fun IdeSettingsScreen(
                             terminalConnectionMode = "ssh"
                             prefs.edit().putString("terminal_connection_mode", "ssh").apply()
                         }
+                        Text("SSH connection", color = SettingsText, fontSize = 13.sp)
+                        OutlinedTextField(
+                            value = sshHost,
+                            onValueChange = { sshHost = it; prefs.edit().putString("terminal_ssh_host", it).apply() },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Host / IP") },
+                            singleLine = true
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(
+                                value = sshPort,
+                                onValueChange = { sshPort = it.filter(Char::isDigit).take(5); prefs.edit().putInt("terminal_ssh_port", sshPort.toIntOrNull() ?: 22).apply() },
+                                modifier = Modifier.weight(0.35f),
+                                label = { Text("Port") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = sshUser,
+                                onValueChange = { sshUser = it; prefs.edit().putString("terminal_ssh_user", it).apply() },
+                                modifier = Modifier.weight(0.65f),
+                                label = { Text("Username") },
+                                singleLine = true
+                            )
+                        }
+                        Text("Password and private-key material are requested only when connecting and are not saved in preferences.", color = SettingsMuted, fontSize = 10.sp)
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
