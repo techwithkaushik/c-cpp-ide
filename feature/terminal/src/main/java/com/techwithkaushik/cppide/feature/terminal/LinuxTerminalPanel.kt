@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +79,7 @@ private data class LinuxTerminalTab(
     val send: (String) -> Unit,
     val interrupt: () -> Unit,
     val session: AutoCloseable,
+    val resize: (Int, Int) -> Unit,
     val exited: MutableState<Int?>,
 )
 
@@ -88,7 +92,7 @@ private object LinuxTerminalSessions {
 
     fun select(id: Int) { if (tabs.any { it.id == id }) selectedId = id }
 
-    fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, initialOutput: String = "", maxScrollbackLines: Int = 5_000): LinuxTerminalTab {
+    fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, resize: (Int, Int) -> Unit = { _, _ -> }, initialOutput: String = "", maxScrollbackLines: Int = 5_000): LinuxTerminalTab {
         val screen = TerminalScreen(maxScrollbackLines = maxScrollbackLines)
         screen.append(initialOutput)
         val tab = LinuxTerminalTab(
@@ -99,6 +103,7 @@ private object LinuxTerminalSessions {
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
             interrupt = interrupt,
             session = session,
+            resize = resize,
             exited = mutableStateOf(null)
         )
         tabs.add(tab)
@@ -229,7 +234,7 @@ fun LinuxTerminalPanel(
             busy = false
             result.onSuccess { session ->
                 val title = "SSH ${sshHost.username}@${sshHost.host}"
-                val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
+                val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, resize = session::resize, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
@@ -267,7 +272,7 @@ fun LinuxTerminalPanel(
             }
             busy = false
             result.onSuccess { session ->
-                val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\r\n", maxScrollbackLines = scrollbackLines)
+                val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, resize = session::resize, initialOutput = "Ubuntu shell started.\r\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post {
@@ -334,14 +339,26 @@ fun LinuxTerminalPanel(
             }
         } else {
             val outputScrollState = rememberScrollState()
+            val density = LocalDensity.current
             LaunchedEffect(active.output.value) {
                 outputScrollState.scrollTo(outputScrollState.maxValue)
             }
-            Column(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF080B10), RoundedCornerShape(8.dp)).padding(8.dp)) {
+            Column(
+                Modifier.weight(1f).fillMaxWidth()
+                    .background(Color(0xFF080B10), RoundedCornerShape(8.dp))
+                    .padding(8.dp)
+                    .onSizeChanged { size ->
+                        val cellWidth = with(density) { (terminalFontSize.sp.toPx() * 0.62f).coerceAtLeast(1f) }
+                        val cellHeight = with(density) { (terminalFontSize.sp.toPx() * 1.35f).coerceAtLeast(1f) }
+                        active.screen.resize((size.width / cellWidth).toInt().coerceAtLeast(20), (size.height / cellHeight).toInt().coerceAtLeast(5))
+                        active.resize((size.width / cellWidth).toInt().coerceIn(20, 300), (size.height / cellHeight).toInt().coerceIn(5, 120))
+                    }
+            ) {
                 Text(
                     active.output.value,
                     color = Color(0xFFE6EDF3),
                     fontFamily = FontFamily.Monospace,
+                    softWrap = false,
                     fontSize = terminalFontSize.sp,
                     modifier = Modifier.weight(1f).fillMaxWidth()
                         .pointerInput(terminalInputFocusRequester) {
@@ -350,7 +367,8 @@ fun LinuxTerminalPanel(
                                 keyboardController?.show()
                             }
                         }
-                        .verticalScroll(outputScrollState)
+                        .horizontalScroll(rememberScrollState())
+                    .verticalScroll(outputScrollState)
                 )
                 active.exited.value?.let { code ->
                     Text("Process exited (code $code). Output is preserved; close this tab to dismiss.", color = Color(0xFFFFAB91), fontSize = 11.sp)
