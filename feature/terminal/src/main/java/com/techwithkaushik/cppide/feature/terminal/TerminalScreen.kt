@@ -441,6 +441,8 @@ internal class TerminalScreen(
         primaryBuffer = null
         alternateBuffer = false
         cursorVisible = true
+        scrollTop = 0
+        scrollBottom = rows - 1
     }
 
     private fun enterAlternateBuffer() {
