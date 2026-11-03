@@ -77,6 +77,10 @@ internal fun IdeSettingsScreen(
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     var extraKeys by remember { mutableStateOf(prefs.getStringSet("terminal_extra_keys", DefaultTerminalExtraKeys)?.toSet() ?: DefaultTerminalExtraKeys) }
     var extraKeyOrder by remember { mutableStateOf(prefs.getString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(","))?.split(",")?.filter { it in DefaultTerminalExtraKeyOrder }?.let { it + DefaultTerminalExtraKeyOrder.filterNot(it::contains) } ?: DefaultTerminalExtraKeyOrder) }
+    var customExtraKeys by remember { mutableStateOf(prefs.getStringSet("terminal_custom_extra_keys", emptySet())?.toSet() ?: emptySet()) }
+    var newExtraKeyLabel by remember { mutableStateOf("") }
+    var newExtraKeySequence by remember { mutableStateOf("") }
+    var extraKeyError by remember { mutableStateOf<String?>(null) }
     var terminalConnectionMode by remember { mutableStateOf(prefs.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu") }
     var sshHost by remember { mutableStateOf(prefs.getString("terminal_ssh_host", "").orEmpty()) }
     var sshPort by remember { mutableStateOf(prefs.getInt("terminal_ssh_port", 22).toString()) }
@@ -139,7 +143,7 @@ internal fun IdeSettingsScreen(
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
-                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; terminalConnectionMode = "ubuntu"; extraKeys = DefaultTerminalExtraKeys; extraKeyOrder = DefaultTerminalExtraKeyOrder; prefs.edit().putString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(",")).putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "ubuntu").putStringSet("terminal_extra_keys", DefaultTerminalExtraKeys).apply() }
+                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; terminalConnectionMode = "ubuntu"; extraKeys = DefaultTerminalExtraKeys; extraKeyOrder = DefaultTerminalExtraKeyOrder; customExtraKeys = emptySet(); prefs.edit().remove("terminal_custom_extra_keys").putString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(",")).putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "ubuntu").putStringSet("terminal_extra_keys", DefaultTerminalExtraKeys).apply() }
                 }
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
@@ -268,6 +272,50 @@ internal fun IdeSettingsScreen(
                                     extraKeys = if (enabled) extraKeys + key else extraKeys - key
                                     prefs.edit().putStringSet("terminal_extra_keys", extraKeys).apply()
                                 }
+                            }
+                        }
+                        SettingsHeading("CUSTOM SHORTCUTS")
+                        Text("Add your own toolbar buttons. Enter a label and the exact text or key sequence to send.", color = SettingsMuted, fontSize = 11.sp)
+                        OutlinedTextField(
+                            value = newExtraKeyLabel,
+                            onValueChange = { newExtraKeyLabel = it.take(10); extraKeyError = null },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Button label (e.g. &&, ../, Ctrl+C)") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = newExtraKeySequence,
+                            onValueChange = { newExtraKeySequence = it.take(80); extraKeyError = null },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Sequence to send") },
+                            singleLine = true
+                        )
+                        Button(onClick = {
+                            val label = newExtraKeyLabel.trim()
+                            val sequence = newExtraKeySequence
+                            when {
+                                label.isBlank() || label.contains("::") -> extraKeyError = "Enter a valid button label."
+                                sequence.isEmpty() -> extraKeyError = "Enter a sequence to send."
+                                customExtraKeys.any { it.substringBefore("::").equals(label, ignoreCase = true) } -> extraKeyError = "A shortcut with this label already exists."
+                                customExtraKeys.size >= 12 -> extraKeyError = "You can add up to 12 custom shortcuts."
+                                else -> {
+                                    val entry = label + "::" + sequence
+                                    customExtraKeys = customExtraKeys + entry
+                                    prefs.edit().putStringSet("terminal_custom_extra_keys", customExtraKeys).apply()
+                                    newExtraKeyLabel = ""
+                                    newExtraKeySequence = ""
+                                    extraKeyError = null
+                                }
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("＋ Add custom key") }
+                        extraKeyError?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 11.sp) }
+                        customExtraKeys.sortedBy { it.substringBefore("::").lowercase() }.forEach { entry ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(entry.substringBefore("::"), color = SettingsText, modifier = Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    customExtraKeys = customExtraKeys - entry
+                                    prefs.edit().putStringSet("terminal_custom_extra_keys", customExtraKeys).apply()
+                                }) { Text("Remove", color = SettingsAccent) }
                             }
                         }
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
