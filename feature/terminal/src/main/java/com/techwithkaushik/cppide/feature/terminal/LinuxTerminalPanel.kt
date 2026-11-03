@@ -387,11 +387,6 @@ fun LinuxTerminalPanel(
                                 }
                             }
                             when (event.key) {
-                                androidx.compose.ui.input.key.Key.Enter -> {
-                                    try { active.send("\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
-                                    command = ""
-                                    true
-                                }
                                 androidx.compose.ui.input.key.Key.DirectionUp -> { active.send("\u001b[A"); true }
                                 androidx.compose.ui.input.key.Key.DirectionDown -> { active.send("\u001b[B"); true }
                                 androidx.compose.ui.input.key.Key.DirectionRight -> { active.send("\u001b[C"); true }
