@@ -222,7 +222,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     // The tool panel is a bottom-anchored overlay. It must receive the
     // reduced window height when the IME opens so its terminal toolbar docks
     // directly above the keyboard instead of staying at its old screen position.
-    // ADJUST_NOTHING prevents both the sheet and its extra-key row from moving.
+    // ADJUST_RESIZE lets the bottom-anchored sheet follow the IME bounds.
     SideEffect {
         hostActivity?.window?.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
@@ -1571,7 +1571,7 @@ private fun WorkspaceScreen(
         }
     }
     if (showToolPanel) {
-        var sheetFraction by rememberSaveable { mutableStateOf(1f) }
+        var sheetFraction by rememberSaveable { mutableStateOf(0.72f) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val maxHeightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
@@ -1584,7 +1584,7 @@ private fun WorkspaceScreen(
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .fillMaxHeight(sheetFraction.coerceIn(minFraction, 1f))
+                    .fillMaxHeight(if (selectedPanel == ToolPanel.Terminal) 1f else sheetFraction.coerceIn(minFraction, 1f))
                     .background(Color(0xFF10151C), RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
             ) {
                 Box(
