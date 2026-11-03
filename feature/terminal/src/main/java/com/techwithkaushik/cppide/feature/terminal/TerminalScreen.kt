@@ -132,14 +132,16 @@ internal class TerminalScreen(
      */
     fun cursorTextOffset(): Int {
         var offset = 0
-        scrollback.forEach { line ->
-            val visibleLength = line.cells.indexOfLast { it != ' ' && it != '\u0000' } + 1
-            for (index in 0 until visibleLength) {
-                if (line.cells[index] != '\u0000') offset++
+        if (!alternateBuffer) {
+            scrollback.forEach { line ->
+                val visibleLength = line.cells.indexOfLast { it != ' ' && it != '\u0000' } + 1
+                for (index in 0 until visibleLength) {
+                    if (line.cells[index] != '\u0000') offset++
+                }
+                offset++ // newline between scrollback/live rows
             }
-            offset++ // newline between scrollback/live rows
+            if (scrollback.isNotEmpty()) offset--
         }
-        if (!alternateBuffer && scrollback.isNotEmpty()) offset--
         val last = lastVisibleRow()
         for (lineIndex in 0..last) {
             if (lineIndex > 0) offset++
