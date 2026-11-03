@@ -53,6 +53,7 @@ private val SettingsMuted = IdeDesignTokens.Color.TextSecondary
 private val SettingsText = IdeDesignTokens.Color.TextPrimary
 private val SettingsPreference = IdeDesignTokens.Preference
 private val DefaultTerminalExtraKeys = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~")
+private val DefaultTerminalExtraKeyOrder = listOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~")
 
 @Composable
 internal fun IdeSettingsScreen(
@@ -75,6 +76,7 @@ internal fun IdeSettingsScreen(
     var scrollbackLines by remember { mutableStateOf(prefs.getInt("terminal_scrollback_lines", 5000).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     var extraKeys by remember { mutableStateOf(prefs.getStringSet("terminal_extra_keys", DefaultTerminalExtraKeys)?.toSet() ?: DefaultTerminalExtraKeys) }
+    var extraKeyOrder by remember { mutableStateOf(prefs.getString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(","))?.split(",")?.filter { it in DefaultTerminalExtraKeyOrder }?.let { it + DefaultTerminalExtraKeyOrder.filterNot(it::contains) } ?: DefaultTerminalExtraKeyOrder) }
     var terminalConnectionMode by remember { mutableStateOf(prefs.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu") }
     var sshHost by remember { mutableStateOf(prefs.getString("terminal_ssh_host", "").orEmpty()) }
     var sshPort by remember { mutableStateOf(prefs.getInt("terminal_ssh_port", 22).toString()) }
@@ -137,7 +139,7 @@ internal fun IdeSettingsScreen(
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
-                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; terminalConnectionMode = "ubuntu"; extraKeys = DefaultTerminalExtraKeys; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "ubuntu").putStringSet("terminal_extra_keys", DefaultTerminalExtraKeys).apply() }
+                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; terminalConnectionMode = "ubuntu"; extraKeys = DefaultTerminalExtraKeys; extraKeyOrder = DefaultTerminalExtraKeyOrder; prefs.edit().putString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(",")).putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "ubuntu").putStringSet("terminal_extra_keys", DefaultTerminalExtraKeys).apply() }
                 }
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
@@ -241,14 +243,31 @@ internal fun IdeSettingsScreen(
                         Text("Password, private key and passphrase remain in memory only; they are never written to preferences or disk.", color = SettingsMuted, fontSize = 10.sp)
                         SettingsHeading("EXTRA KEYS · TERMUX STYLE")
                         Text("Choose which shortcut keys appear above the terminal. Changes are saved automatically.", color = SettingsMuted, fontSize = 11.sp)
-                        listOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~").forEach { key ->
-                            SettingsSwitch(
-                                when (key) { "PGUP" -> "Page Up"; "PGDN" -> "Page Down"; "-" -> "Hyphen"; "/" -> "Slash"; "|" -> "Pipe"; "~" -> "Tilde"; else -> key },
-                                "Show $key in the terminal extra-keys bar",
-                                key in extraKeys
-                            ) { enabled ->
-                                extraKeys = if (enabled) extraKeys + key else extraKeys - key
-                                prefs.edit().putStringSet("terminal_extra_keys", extraKeys).apply()
+                        Text("Use the arrows to arrange the key order. Toggle a key to show or hide it.", color = SettingsMuted, fontSize = 11.sp)
+                        extraKeyOrder.forEachIndexed { index, key ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Column {
+                                    TextButton(enabled = index > 0, onClick = {
+                                        val reordered = extraKeyOrder.toMutableList()
+                                        java.util.Collections.swap(reordered, index, index - 1)
+                                        extraKeyOrder = reordered
+                                        prefs.edit().putString("terminal_extra_key_order", reordered.joinToString(",")).apply()
+                                    }) { Text("↑", color = SettingsAccent) }
+                                    TextButton(enabled = index < extraKeyOrder.lastIndex, onClick = {
+                                        val reordered = extraKeyOrder.toMutableList()
+                                        java.util.Collections.swap(reordered, index, index + 1)
+                                        extraKeyOrder = reordered
+                                        prefs.edit().putString("terminal_extra_key_order", reordered.joinToString(",")).apply()
+                                    }) { Text("↓", color = SettingsAccent) }
+                                }
+                                SettingsSwitch(
+                                    when (key) { "PGUP" -> "Page Up"; "PGDN" -> "Page Down"; "-" -> "Hyphen"; "/" -> "Slash"; "|" -> "Pipe"; "~" -> "Tilde"; else -> key },
+                                    "Show $key in the terminal extra-keys bar",
+                                    key in extraKeys
+                                ) { enabled ->
+                                    extraKeys = if (enabled) extraKeys + key else extraKeys - key
+                                    prefs.edit().putStringSet("terminal_extra_keys", extraKeys).apply()
+                                }
                             }
                         }
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
