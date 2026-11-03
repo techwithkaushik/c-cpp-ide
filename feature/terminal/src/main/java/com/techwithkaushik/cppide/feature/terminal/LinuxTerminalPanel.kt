@@ -3,7 +3,7 @@ package com.techwithkaushik.cppide.feature.terminal
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.foundation.ScrollableDefaults
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
