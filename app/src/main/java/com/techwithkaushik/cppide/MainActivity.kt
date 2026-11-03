@@ -1,9 +1,12 @@
 package com.techwithkaushik.cppide
 
 import com.techwithkaushik.cppide.feature.terminal.LinuxTerminalPanel
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 
 import android.os.Bundle
+import android.view.WindowManager
 import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -95,6 +98,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -150,8 +155,31 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> Unit) {
-    val appContext = LocalContext.current
+    val appContext = LocalContext.current.applicationContext
     val projectStorage = remember(appContext) { ProjectStorage(appContext) }
+
+    // Validate the app-owned Ubuntu runtime once on every cold app launch.
+    // The result is cached for this launch so users do not need to open Settings.
+    LaunchedEffect(appContext) {
+        val runtimePrefs = appContext.getSharedPreferences("linux_runtime_validation", android.content.Context.MODE_PRIVATE)
+        val result = withContext(Dispatchers.IO) {
+            val paths = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
+            when {
+                !paths.hasRootfs() -> "Ubuntu rootfs is not installed."
+                !paths.hasProot() -> "Bundled Android PRoot is missing."
+                else -> {
+                    val smoke = LinuxRuntimeSmokeTest(paths).run()
+                    if (smoke.success) "Ubuntu runtime ready."
+                    else "Ubuntu shell validation failed: ${smoke.error ?: smoke.output}"
+                }
+            }
+        }
+        runtimePrefs.edit()
+            .putBoolean("ready", result == "Ubuntu runtime ready.")
+            .putString("message", result)
+            .putLong("checked_at", System.currentTimeMillis())
+            .apply()
+    }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
     val localView = LocalView.current
     val hostActivity = localView.context as? Activity
@@ -161,6 +189,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             val controller = WindowCompat.getInsetsController(window, localView)
             if (fullScreen) controller.hide(WindowInsetsCompat.Type.systemBars())
             else controller.show(WindowInsetsCompat.Type.systemBars())
+            // Keep the terminal sheet anchored while the IME overlays the bottom edge.
+            window.setSoftInputMode(
+                if (showToolPanel) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            )
         }
     }
     val onboardingPreferences = remember(appContext) { appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, android.content.Context.MODE_PRIVATE) }
