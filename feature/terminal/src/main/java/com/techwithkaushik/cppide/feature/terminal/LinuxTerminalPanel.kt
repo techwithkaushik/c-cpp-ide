@@ -374,9 +374,6 @@ fun LinuxTerminalPanel(
                         .horizontalScroll(rememberScrollState())
                     .verticalScroll(outputScrollState)
                 )
-                active.exited.value?.let { code ->
-                    Text("Process exited (code $code). Output is preserved; close this tab to dismiss.", color = Color(0xFFFFAB91), fontSize = 11.sp)
-                }
                 androidx.compose.foundation.text.BasicTextField(
                     value = command,
                     onValueChange = { updated ->
