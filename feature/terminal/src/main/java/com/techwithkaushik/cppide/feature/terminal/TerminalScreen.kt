@@ -172,7 +172,7 @@ internal class TerminalScreen(
         if (!alternateBuffer) lines.addAll(scrollback)
         val last = lastVisibleRow()
         for (index in 0..last) {
-            val line = String(cells[index]).trimEnd()
+            val line = buildString { cells[index].forEach { if (it != '\u0000') append(it) } }.trimEnd()
             lines.add(if (index == row && cursorVisible && cursorBlinkOn) insertCursor(line) else line)
         }
         return lines.joinToString("\n")
@@ -188,11 +188,11 @@ internal class TerminalScreen(
         val last = lastVisibleRow()
         for (lineIndex in 0..last) {
             if (lineIndex > 0) builder.append("\n")
-            val visibleLength = String(cells[lineIndex]).trimEnd().length
+            val visibleLength = cells[lineIndex].indexOfLast { it != ' ' && it != '\u0000' } + 1
             val cursorAt = if (lineIndex == row && cursorVisible && cursorBlinkOn) column.coerceAtMost(visibleLength) else -1
             for (cellIndex in 0..visibleLength) {
                 if (cellIndex == cursorAt) builder.append("▏")
-                if (cellIndex < visibleLength) {
+                if (cellIndex < visibleLength && cells[lineIndex][cellIndex] != '\u0000') {
                     val style = styles[lineIndex][cellIndex]
                     val foreground = if (style.inverse) style.background else style.foreground
                     val background = if (style.inverse) style.foreground else style.background
