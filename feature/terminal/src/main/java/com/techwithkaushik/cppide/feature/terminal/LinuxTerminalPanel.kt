@@ -104,6 +104,7 @@ private object LinuxTerminalSessions {
     fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, resize: (Int, Int) -> Unit = { _, _ -> }, initialOutput: String = "", maxScrollbackLines: Int = 5_000): LinuxTerminalTab {
         val screen = TerminalScreen(maxScrollbackLines = maxScrollbackLines)
         screen.append(initialOutput)
+        val ended = AtomicBoolean(false)
         val tab = LinuxTerminalTab(
             id = nextId++,
             title = mutableStateOf(title),
@@ -117,7 +118,8 @@ private object LinuxTerminalSessions {
             interrupt = { if (!ended.get()) interrupt() },
             session = session,
             resize = { columns, rows -> if (!ended.get()) resize(columns, rows) },
-            exited = mutableStateOf(null)
+            exited = mutableStateOf(null),
+            ended = ended
         )
         tabs.add(tab)
         selectedId = tab.id
