@@ -140,7 +140,7 @@ internal fun IdeSettingsScreen(
                     "Terminal" -> {
                         SettingsHeading("TERMINAL")
                         SettingsHeading("SESSION CONNECTION")
-                        Text("Choose which shell opens when you enter the Terminal panel. Session controls stay in this settings page.", color = SettingsMuted, fontSize = 11.sp)
+                        Text("Choose the shell that opens with the Terminal panel. Configure connection details here; long-press a session tab to rename or close it.", color = SettingsMuted, fontSize = 11.sp)
                         SettingsChoice("Ubuntu · Local shell", terminalConnectionMode == "ubuntu") {
                             terminalConnectionMode = "ubuntu"
                             prefs.edit().putString("terminal_connection_mode", "ubuntu").apply()
