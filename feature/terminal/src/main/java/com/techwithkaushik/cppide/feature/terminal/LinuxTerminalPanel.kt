@@ -231,6 +231,7 @@ fun LinuxTerminalPanel(
 
     fun startLocalSession() {
         if (busy) return
+        paths.ensureDirectories()
         if (!paths.ready()) {
             val validation = context.getSharedPreferences("linux_runtime_validation", Context.MODE_PRIVATE)
                 .getString("message", null)
