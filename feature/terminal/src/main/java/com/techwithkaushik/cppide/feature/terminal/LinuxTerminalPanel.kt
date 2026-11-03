@@ -68,6 +68,7 @@ import com.techwithkaushik.cppide.integration.linuxruntime.SshHost
 import com.techwithkaushik.cppide.integration.linuxruntime.SshShellSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.OutputStream
 import java.io.ByteArrayOutputStream
@@ -326,6 +327,17 @@ fun LinuxTerminalPanel(
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
             }
         } else {
+            // Blink the block cursor at a terminal-like cadence. DEC ?25l still
+            // suppresses it because visibility is controlled by the VT screen.
+            LaunchedEffect(active.id) {
+                var visible = true
+                while (true) {
+                    delay(530)
+                    visible = !visible
+                    active.screen.setCursorBlinkPhase(visible)
+                    active.output.value = active.screen.renderAnnotated()
+                }
+            }
             val outputScrollState = rememberScrollState()
             val density = LocalDensity.current
             LaunchedEffect(active.output.value) {
