@@ -100,7 +100,7 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
                 shell = shell,
                 tempDirectory = temp.absolutePath
             )
-            pty.resize(100, 30)
+            // Native PTY already received its initial 80x24 size before the shell exec.
             return LocalLinuxSession(pty)
         }
     }
