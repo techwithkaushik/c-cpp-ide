@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -342,7 +344,14 @@ fun LinuxTerminalPanel(
                     color = Color(0xFFE6EDF3),
                     fontFamily = FontFamily.Monospace,
                     fontSize = terminalFontSize.sp,
-                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(outputScrollState)
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                        .pointerInput(terminalInputFocusRequester) {
+                            detectTapGestures {
+                                terminalInputFocusRequester.requestFocus()
+                                keyboardController?.show()
+                            }
+                        }
+                        .verticalScroll(outputScrollState)
                 )
                 active.exited.value?.let { code ->
                     Text("Process exited (code $code). Output is preserved; close this tab to dismiss.", color = Color(0xFFFFAB91), fontSize = 11.sp)
