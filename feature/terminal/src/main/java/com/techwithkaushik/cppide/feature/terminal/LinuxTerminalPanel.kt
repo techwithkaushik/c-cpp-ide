@@ -6,7 +6,6 @@ import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
@@ -365,7 +365,7 @@ fun LinuxTerminalPanel(
                     modifier = Modifier.size(1.dp).focusRequester(terminalInputFocusRequester)
                         .onPreviewKeyEvent { event ->
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
-                            if (event.isCtrlPressed) {
+                            if (event.nativeKeyEvent.isCtrlPressed) {
                                 val control = when (event.key) {
                                     androidx.compose.ui.input.key.Key.C -> "\u0003"
                                     androidx.compose.ui.input.key.Key.D -> "\u0004"
