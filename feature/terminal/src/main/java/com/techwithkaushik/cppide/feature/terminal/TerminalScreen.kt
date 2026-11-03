@@ -122,6 +122,11 @@ internal class TerminalScreen(
         cursorBlinkOn = visible
     }
 
+    /** Advance only blinking DECSCUSR modes; steady cursor modes never disappear. */
+    fun advanceCursorBlinkPhase() {
+        cursorBlinkOn = if (cursorShape in setOf(0, 1, 3, 5)) !cursorBlinkOn else true
+    }
+
     fun append(chunk: String) {
         chunk.forEach { ch ->
             // Preserve UTF-16 surrogate pairs even when the PTY splits a
