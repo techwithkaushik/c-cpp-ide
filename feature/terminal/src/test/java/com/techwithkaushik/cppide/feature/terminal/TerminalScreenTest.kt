@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.feature.terminal
 
 import org.junit.Assert.assertFalse
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,6 +11,22 @@ class TerminalScreenTest {
         screen.append("\u001B[31merror\u001B[0m")
         assertTrue(screen.render().contains("error"))
         assertFalse(screen.render().contains("\u001B"))
+    }
+
+    @Test fun sgrColorsArePreservedInRenderedOutput() {
+        val screen = TerminalScreen()
+        screen.append("\u001B[31merror\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        assertTrue(rendered.text.contains("error"))
+        assertTrue(rendered.spanStyles.any { it.item.color != Color.Unspecified })
+    }
+
+    @Test fun insertAndDeleteCharacterSequencesUpdateTheGrid() {
+        val screen = TerminalScreen()
+        screen.append("abcd\u001B[1;2H\u001B[@X")
+        assertTrue(screen.render().contains("aXbcd"))
+        screen.append("\u001B[1;2H\u001B[P")
+        assertTrue(screen.render().contains("abcd"))
     }
 
     @Test fun clearScreenErasesPriorOutput() {
