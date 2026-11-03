@@ -108,7 +108,7 @@ internal class TerminalScreen(
 
     fun render(): String {
         val lines = ArrayList<String>(scrollback.size + rows)
-        lines.addAll(scrollback)
+        if (!alternateBuffer) lines.addAll(scrollback)
         val last = lastVisibleRow()
         for (index in 0..last) {
             val line = String(cells[index]).trimEnd()
@@ -119,7 +119,7 @@ internal class TerminalScreen(
 
     fun renderAnnotated(): AnnotatedString {
         val builder = AnnotatedString.Builder()
-        scrollback.forEachIndexed { index, line ->
+        if (!alternateBuffer) scrollback.forEachIndexed { index, line ->
             if (index > 0) builder.append("\n")
             builder.append(line)
         }
