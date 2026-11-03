@@ -392,6 +392,18 @@ fun LinuxTerminalPanel(
                     modifier = Modifier.size(1.dp).focusRequester(terminalInputFocusRequester)
                         .onPreviewKeyEvent { event ->
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
+                            if (event.isCtrlPressed) {
+                                val control = when (event.key) {
+                                    androidx.compose.ui.input.key.Key.C -> "\u0003"
+                                    androidx.compose.ui.input.key.Key.D -> "\u0004"
+                                    androidx.compose.ui.input.key.Key.Z -> "\u001A"
+                                    else -> null
+                                }
+                                if (control != null) {
+                                    try { active.send(control) } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                                    return@onPreviewKeyEvent true
+                                }
+                            }
                             when (event.key) {
                                 androidx.compose.ui.input.key.Key.Enter -> {
                                     try { active.send("\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
@@ -403,6 +415,8 @@ fun LinuxTerminalPanel(
                                 androidx.compose.ui.input.key.Key.DirectionRight -> { active.send("\u001b[C"); true }
                                 androidx.compose.ui.input.key.Key.DirectionLeft -> { active.send("\u001b[D"); true }
                                 androidx.compose.ui.input.key.Key.Tab -> { active.send("\t"); true }
+                                androidx.compose.ui.input.key.Key.Escape -> { active.send("\u001b"); true }
+                                androidx.compose.ui.input.key.Key.Backspace -> { active.send("\u007f"); true }
                                 else -> false
                             }
                         },
