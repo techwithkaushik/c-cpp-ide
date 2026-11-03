@@ -254,6 +254,18 @@ class TerminalScreenTest {
         assertTrue(visible.text == hidden.text)
     }
 
+
+    @Test fun ansiStylesSurviveWhenRowsMoveIntoScrollback() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("\u001B[31mRED\u001B[0m\r\nline1\r\nline2\r\nline3\r\nline4\r\nline5")
+        val rendered = screen.renderAnnotated()
+        val start = rendered.text.indexOf("RED")
+        assertTrue(start >= 0)
+        val style = rendered.spanStyles.first { start in it.start until it.end }.item
+        assertTrue(style.color == Color(0xFFCC3333))
+    }
+
+
 }
 
     @Test fun decscusrSelectsBlockUnderlineAndBarCursorShapes() {
