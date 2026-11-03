@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -46,6 +47,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -427,6 +431,8 @@ fun LinuxTerminalPanel(
                 }
             }
             val outputScrollState = rememberScrollState()
+            val outputHorizontalScrollState = rememberScrollState()
+            val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
             val terminalTextMeasurer = rememberTextMeasurer()
             var pinchFontSize by remember(active.id) { mutableFloatStateOf(terminalFontSize.toFloat()) }
             LaunchedEffect(active.id, active.outputRevision.value) {
@@ -493,6 +499,48 @@ fun LinuxTerminalPanel(
                             }
                         }
                 ) {
+                    // Draw the terminal cursor in a dedicated Canvas layer. The
+                    // terminal text itself contains only shell output, never a cursor glyph.
+                    Canvas(Modifier.matchParentSize()) {
+                        if (active.screen.isCursorDrawn()) {
+                            val layout = cursorTextLayout.value
+                            if (layout != null) {
+                                val offset = active.screen.cursorTextOffset()
+                                    .coerceIn(0, active.output.value.length)
+                                val rect = layout.getCursorRect(offset)
+                                val left = rect.left - outputHorizontalScrollState.value
+                                val top = rect.top - outputScrollState.value
+                                val right = left + rect.width.coerceAtLeast(2f)
+                                val bottom = top + rect.height.coerceAtLeast(2f)
+                                if (right >= 0f && left <= size.width && bottom >= 0f && top <= size.height) {
+                                    when (active.screen.cursorShapeCode()) {
+                                        0, 1, 2 -> drawRect(
+                                            color = Color(0xFF8AB4F8).copy(alpha = 0.38f),
+                                            topLeft = Offset(left, top),
+                                            size = androidx.compose.ui.geometry.Size(
+                                                rect.width.coerceAtLeast(2f),
+                                                rect.height.coerceAtLeast(2f)
+                                            )
+                                        )
+                                        3, 4 -> drawLine(
+                                            color = Color(0xFF8AB4F8),
+                                            start = Offset(left, bottom - 2f),
+                                            end = Offset(right, bottom - 2f),
+                                            strokeWidth = 2f,
+                                            cap = StrokeCap.Square
+                                        )
+                                        5, 6 -> drawLine(
+                                            color = Color(0xFF8AB4F8),
+                                            start = Offset(left + 1f, top),
+                                            end = Offset(left + 1f, bottom),
+                                            strokeWidth = 2f,
+                                            cap = StrokeCap.Square
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     SelectionContainer {
                         Text(
                             active.output.value,
@@ -501,6 +549,7 @@ fun LinuxTerminalPanel(
                             softWrap = false,
                             fontSize = terminalFontSize.sp,
                             lineHeight = (terminalFontSize * 1.28f).sp,
+                            onTextLayout = { cursorTextLayout.value = it },
                             modifier = Modifier.fillMaxWidth()
                                 .pointerInput(terminalInputFocusRequester) {
                                     detectTapGestures {
@@ -508,7 +557,7 @@ fun LinuxTerminalPanel(
                                         keyboardController?.show()
                                     }
                                 }
-                                .horizontalScroll(rememberScrollState())
+                                .horizontalScroll(outputHorizontalScrollState)
                                 .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
                         )
                     }
