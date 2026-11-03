@@ -225,7 +225,10 @@ fun LinuxTerminalPanel(
                 val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
-                    onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
+                    onExit = { code -> handler.post {
+                        tab.exited.value = code
+                        LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code — output is preserved. Close this tab to dismiss.]\n")
+                    } }
                 )
                 showSshDialog = false
                 password = ""
