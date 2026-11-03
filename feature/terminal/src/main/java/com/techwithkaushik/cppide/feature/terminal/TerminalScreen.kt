@@ -248,8 +248,11 @@ internal class TerminalScreen(
                 },
             )
             builder.pushStyle(span)
-            if (cellIndex < visibleLength) builder.append(if (cursorBar) "▏" else cell)
-            else if (isCursor) builder.append(if (cursorBar) "▏" else " ")
+            if (cellIndex < visibleLength) {
+                if (cursorBar) builder.append("▏") else builder.append(cell.toString())
+            } else if (isCursor) {
+                if (cursorBar) builder.append("▏") else builder.append(" ")
+            }
             builder.pop()
         }
     }
