@@ -164,6 +164,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         val runtimePrefs = appContext.getSharedPreferences("linux_runtime_validation", android.content.Context.MODE_PRIVATE)
         val result = withContext(Dispatchers.IO) {
             val paths = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
+            // Materialize APK-bundled PRoot aliases before checking readiness. The
+            // native executables live in nativeLibraryDir, not files/usr/bin.
+            paths.ensureDirectories()
             when {
                 !paths.hasRootfs() -> "Ubuntu rootfs is not installed."
                 !paths.hasProot() -> "Bundled Android PRoot is missing."
