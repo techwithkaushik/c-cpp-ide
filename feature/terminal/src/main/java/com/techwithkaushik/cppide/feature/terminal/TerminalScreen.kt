@@ -124,8 +124,8 @@ internal class TerminalScreen(
                     val foreground = if (style.inverse) style.background else style.foreground
                     val background = if (style.inverse) style.foreground else style.background
                     val span = SpanStyle(
-                        color = foreground?.let { Color(it.toLong()) } ?: Color.Unspecified,
-                        background = background?.let { Color(it.toLong()) } ?: Color.Unspecified,
+                        color = foreground?.let(::composeColor) ?: Color.Unspecified,
+                        background = background?.let(::composeColor) ?: Color.Unspecified,
                         fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                         fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
                         textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
@@ -302,6 +302,13 @@ internal class TerminalScreen(
         fun component(v: Int) = if (v == 0) 0 else 55 + v * 40
         return rgb(component(cube / 36), component((cube / 6) % 6), component(cube % 6))
     }
+
+    private fun composeColor(argb: Int): Color = Color(
+        red = ((argb shr 16) and 0xFF) / 255f,
+        green = ((argb shr 8) and 0xFF) / 255f,
+        blue = (argb and 0xFF) / 255f,
+        alpha = ((argb ushr 24) and 0xFF) / 255f,
+    )
 
     private fun rgb(red: Int, green: Int, blue: Int): Int =
         (0xFF shl 24) or (red.coerceIn(0, 255) shl 16) or (green.coerceIn(0, 255) shl 8) or blue.coerceIn(0, 255)
