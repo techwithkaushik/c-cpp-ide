@@ -657,6 +657,10 @@ fun LinuxTerminalPanel(
                                 terminalInputFocusRequester.requestFocus()
                             }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
                         }
+                        TextButton(onClick = {
+                            runCatching { clipboardManager.setText(active.output.value) }
+                                .onFailure { error = it.message ?: "Could not copy terminal output." }
+                        }) { Text("Copy all", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
                             val pasted = clipboardManager.getText()?.text.orEmpty()
                             if (pasted.isNotEmpty()) runCatching { active.send(active.screen.pasteSequence(pasted)) }.onFailure { error = it.message ?: "Could not paste into terminal." }
