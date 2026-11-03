@@ -288,7 +288,11 @@ internal class TerminalScreen(
         if (type == Character.NON_SPACING_MARK.toInt() ||
             type == Character.ENCLOSING_MARK.toInt() ||
             type == Character.COMBINING_SPACING_MARK.toInt() ||
-            codePoint == 0x200D || codePoint in 0xFE00..0xFE0F) return 0
+            codePoint == 0x200D ||
+            codePoint in 0xFE00..0xFE0F ||
+            codePoint in 0xE0100..0xE01EF ||
+            codePoint in 0x1F3FB..0x1F3FF ||
+            codePoint in 0xE0020..0xE007F) return 0
         return if (
             codePoint in 0x1100..0x115F || codePoint in 0x2329..0x232A ||
             codePoint in 0x2E80..0xA4CF || codePoint in 0xAC00..0xD7A3 ||
