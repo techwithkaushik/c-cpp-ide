@@ -427,7 +427,17 @@ fun LinuxTerminalPanel(
                 }
                 customTerminalKeys.forEach { (label, sequence) ->
                     TextButton(enabled = active.exited.value == null, onClick = {
-                        runCatching { active.send(sequence) }
+                        val payload = when (sequence.uppercase()) {
+                            "CTRL+C" -> 3.toChar().toString()
+                            "CTRL+D" -> 4.toChar().toString()
+                            "CTRL+Z" -> 26.toChar().toString()
+                            "CTRL+L" -> 12.toChar().toString()
+                            "ESC" -> 27.toChar().toString()
+                            "TAB" -> 9.toChar().toString()
+                            "ENTER" -> 13.toChar().toString()
+                            else -> sequence
+                        }
+                        runCatching { active.send(payload) }
                             .onFailure { error = it.message ?: "Custom key failed." }
                         terminalInputFocusRequester.requestFocus()
                     }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
