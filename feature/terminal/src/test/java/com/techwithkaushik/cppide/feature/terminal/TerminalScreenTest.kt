@@ -142,6 +142,33 @@ class TerminalScreenTest {
         assertFalse(rendered.text.contains("line1"))
     }
 
+    @Test fun applicationCursorModeChangesArrowKeySequences() {
+        val screen = TerminalScreen()
+        assertTrue(screen.cursorKeySequence("UP") == "\u001B[A")
+        screen.append("\u001B[?1h")
+        assertTrue(screen.cursorKeySequence("UP") == "\u001BOA")
+        assertTrue(screen.cursorKeySequence("LEFT") == "\u001BOD")
+        screen.append("\u001B[?1l")
+        assertTrue(screen.cursorKeySequence("UP") == "\u001B[A")
+    }
+
+    @Test fun bracketedPasteModeWrapsPastedText() {
+        val screen = TerminalScreen()
+        assertTrue(screen.pasteSequence("hello") == "hello")
+        screen.append("\u001B[?2004h")
+        assertTrue(screen.pasteSequence("hello") == "\u001B[200~hello\u001B[201~")
+        screen.append("\u001B[?2004l")
+        assertTrue(screen.pasteSequence("hello") == "hello")
+    }
+
+    @Test fun terminalResetRestoresCursorAndPasteModes() {
+        val screen = TerminalScreen()
+        screen.append("\u001B[?1h\u001B[?2004h")
+        screen.append("\u001Bc")
+        assertTrue(screen.cursorKeySequence("RIGHT") == "\u001B[C")
+        assertTrue(screen.pasteSequence("x") == "x")
+    }
+
     @Test fun cursorBlinkPhaseHidesAndRestoresCursorWithoutChangingText() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("prompt")
