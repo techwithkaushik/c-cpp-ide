@@ -54,6 +54,7 @@ internal class TerminalScreen(
     private var cursorBlinkOn = true
     private var applicationCursorKeys = false
     private var bracketedPasteEnabled = false
+    private var pendingHighSurrogate: Char? = null
 
     /** Return the correct cursor-key sequence for the active terminal mode. */
     fun cursorKeySequence(key: String): String {
@@ -120,6 +121,21 @@ internal class TerminalScreen(
 
     fun append(chunk: String) {
         chunk.forEach { ch ->
+            // Preserve UTF-16 surrogate pairs even when the PTY splits a
+            // supplementary Unicode character across two output chunks.
+            if (escapeState == 0 && pendingHighSurrogate != null) {
+                val high = pendingHighSurrogate!!
+                pendingHighSurrogate = null
+                if (Character.isLowSurrogate(ch)) {
+                    consumeCodePoint(Character.toCodePoint(high, ch))
+                    return@forEach
+                }
+                consumeCodePoint(high.code)
+            }
+            if (escapeState == 0 && Character.isHighSurrogate(ch)) {
+                pendingHighSurrogate = ch
+                return@forEach
+            }
             when (escapeState) {
                 1 -> {
                     escapeState = when (ch) {
@@ -146,7 +162,7 @@ internal class TerminalScreen(
                     else if (osc.length < 4096) osc.append(ch)
                 }
                 4 -> escapeState = if (ch == '\\') 0 else 3
-                else -> consume(ch)
+                else -> consumeCodePoint(ch.code)
             }
         }
     }
@@ -208,22 +224,69 @@ internal class TerminalScreen(
         return shown.toString()
     }
 
-    private fun consume(ch: Char) {
-        when (ch) {
-            '\u001B' -> escapeState = 1
-            '\r' -> column = 0
-            '\n' -> lineFeed()
-            '\b' -> column = (column - 1).coerceAtLeast(0)
-            '\u0007' -> Unit
-            '\t' -> column = (((column / 8) + 1) * 8).coerceAtMost(columns - 1)
-            else -> if (ch >= ' ' && ch != '\u007f') {
-                if (column >= columns) { column = 0; lineFeed() }
-                cells[row][column] = ch
+    private fun consumeCodePoint(codePoint: Int) {
+        when (codePoint) {
+            0x1B -> escapeState = 1
+            0x0D -> column = 0
+            0x0A -> lineFeed()
+            0x08 -> column = (column - 1).coerceAtLeast(0)
+            0x07 -> Unit
+            0x09 -> column = (((column / 8) + 1) * 8).coerceAtMost(columns - 1)
+            else -> if (codePoint >= 0x20 && codePoint != 0x7F) {
+                val type = Character.getType(codePoint)
+                val combining = type == Character.NON_SPACING_MARK.toInt() ||
+                    type == Character.COMBINING_SPACING_MARK.toInt() ||
+                    type == Character.ENCLOSING_MARK.toInt()
+                if (combining) {
+                    val previous = (column - 1).coerceAtLeast(0)
+                    val existing = cells[row][previous]
+                    if (existing != ' ' && existing != '\u0000') {
+                        val combined = StringBuilder().append(existing)
+                        if (previous > 0 && Character.isHighSurrogate(cells[row][previous - 1])) {
+                            combined.insert(0, cells[row][previous - 1])
+                        }
+                        combined.appendCodePoint(codePoint)
+                        val value = combined.toString()
+                        val start = if (previous > 0 && Character.isHighSurrogate(cells[row][previous - 1])) previous - 1 else previous
+                        value.forEachIndexed { index, ch -> if (start + index < columns) cells[row][start + index] = ch }
+                    }
+                    return
+                }
+                val width = unicodeCellWidth(codePoint)
+                if (width == 0) return
+                if (column + width > columns) { column = 0; lineFeed() }
+                val chars = Character.toChars(codePoint)
+                cells[row][column] = chars[0]
                 styles[row][column] = currentStyle
-                column++
+                if (chars.size == 2 && column + 1 < columns) {
+                    cells[row][column + 1] = chars[1]
+                    styles[row][column + 1] = currentStyle
+                }
+                if (width == 2 && column + chars.size < columns) {
+                    cells[row][column + chars.size] = '\u0000'
+                    styles[row][column + chars.size] = currentStyle
+                }
+                column += width
                 if (column >= columns) { column = 0; lineFeed() }
             }
         }
+    }
+
+    /** Approximate wcwidth: combining marks are zero cells; East Asian and emoji ranges are two. */
+    private fun unicodeCellWidth(codePoint: Int): Int {
+        val type = Character.getType(codePoint)
+        if (type == Character.NON_SPACING_MARK.toInt() ||
+            type == Character.ENCLOSING_MARK.toInt() ||
+            type == Character.COMBINING_SPACING_MARK.toInt() ||
+            codePoint == 0x200D || codePoint in 0xFE00..0xFE0F) return 0
+        return if (
+            codePoint in 0x1100..0x115F || codePoint in 0x2329..0x232A ||
+            codePoint in 0x2E80..0xA4CF || codePoint in 0xAC00..0xD7A3 ||
+            codePoint in 0xF900..0xFAFF || codePoint in 0xFE10..0xFE19 ||
+            codePoint in 0xFE30..0xFE6F || codePoint in 0xFF00..0xFF60 ||
+            codePoint in 0xFFE0..0xFFE6 || codePoint in 0x1F000..0x1FAFF ||
+            codePoint in 0x20000..0x3FFFD
+        ) 2 else 1
     }
 
     private fun lineFeed() {
@@ -469,6 +532,7 @@ internal class TerminalScreen(
         cursorVisible = true
         applicationCursorKeys = false
         bracketedPasteEnabled = false
+        pendingHighSurrogate = null
         scrollTop = 0
         scrollBottom = rows - 1
     }
