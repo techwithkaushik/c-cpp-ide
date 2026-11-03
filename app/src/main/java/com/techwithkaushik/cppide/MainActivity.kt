@@ -3,6 +3,7 @@ package com.techwithkaushik.cppide
 import com.techwithkaushik.cppide.feature.terminal.LinuxTerminalPanel
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
+import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 
 import android.os.Bundle
@@ -166,10 +167,13 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             val paths = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
             // Materialize APK-bundled PRoot aliases before checking readiness. The
             // native executables live in nativeLibraryDir, not files/usr/bin.
-            paths.ensureDirectories()
+            val prootCheck = runCatching {
+                // Also validates ELF format and device ABI, not just file presence.
+                ProotDownloader(paths).downloadAndInstall()
+            }
             when {
-                !paths.hasRootfs() -> "Ubuntu rootfs is not installed."
-                !paths.hasProot() -> "Bundled Android PRoot is missing."
+                !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
+                prootCheck.isFailure -> "Bundled Android PRoot validation failed: ${prootCheck.exceptionOrNull()?.message ?: "unknown error"}"
                 else -> {
                     val smoke = LinuxRuntimeSmokeTest(paths).run()
                     if (smoke.success) "Ubuntu runtime ready."
