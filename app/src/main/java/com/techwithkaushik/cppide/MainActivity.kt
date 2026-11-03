@@ -1571,7 +1571,7 @@ private fun WorkspaceScreen(
         }
     }
     if (showToolPanel) {
-        var sheetFraction by rememberSaveable { mutableStateOf(0.72f) }
+        var sheetFraction by rememberSaveable { mutableStateOf(1f) }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val maxHeightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
