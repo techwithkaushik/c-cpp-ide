@@ -45,9 +45,9 @@ class TerminalScreenTest {
         val screen = TerminalScreen()
         screen.append("prompt")
         screen.append("\u001B[?25l")
-        assertFalse(screen.render().contains("▏"))
+        assertFalse(screen.isCursorDrawn())
         screen.append("\u001B[?25h")
-        assertTrue(screen.render().contains("▏"))
+        assertTrue(screen.isCursorDrawn())
     }
 
     @Test fun clearScreenErasesPriorOutput() {
@@ -97,7 +97,7 @@ class TerminalScreenTest {
         screen.append("\u001B[2;4r")
         // CSI S scrolls only the configured region; row one is outside it.
         screen.append("\u001B[S")
-        val lines = screen.render().replace("▏", "").lines()
+        val lines = screen.render().lines()
         assertTrue(lines.first().contains("top"))
         assertTrue(lines.any { it.contains("two") || it.contains("three") || it.contains("four") })
     }
@@ -189,14 +189,14 @@ class TerminalScreenTest {
         assertTrue(rendered.contains("A界B"))
         assertFalse(rendered.contains("\u0000"))
         // A (1) + CJK (2) + B (1) leaves the cursor at terminal cell 4.
-        assertTrue(rendered.contains("▏"))
+        assertTrue(screen.cursorTextOffset() >= 0)
     }
 
     @Test fun combiningMarksAttachToPreviousCharacterWithoutAdvancingCursor() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("e")
         screen.append("\u0301")
-        val rendered = screen.render().replace("▏", "")
+        val rendered = screen.render()
         assertTrue(rendered.contains("e\u0301"))
     }
 
@@ -248,14 +248,15 @@ class TerminalScreenTest {
         val hidden = screen.renderAnnotated()
         screen.setCursorBlinkPhase(true)
         val restored = screen.renderAnnotated()
-        assertTrue(visible.text.contains("▏"))
-        assertFalse(hidden.text.contains("▏"))
-        assertTrue(restored.text.contains("▏"))
-        assertTrue(visible.text.replace("▏", "") == hidden.text)
+        assertTrue(screen.isCursorDrawn())
+        assertFalse(screen.isCursorDrawn())
+        assertTrue(screen.isCursorDrawn())
+        assertTrue(visible.text == hidden.text)
 
         screen.append("\u001B[6 q")
         screen.setCursorBlinkPhase(false)
-        assertTrue(screen.renderAnnotated().text.contains("▏"))
+        assertTrue(screen.isCursorDrawn())
+        assertFalse(screen.renderAnnotated().text.contains("▏"))
     }
 
 
@@ -286,7 +287,7 @@ class TerminalScreenTest {
 
         screen.append("\u001B[6 q")
         assertTrue(screen.cursorShapeCode() == 6)
-        assertTrue(screen.renderAnnotated().text.contains("▏"))
+        assertTrue(screen.cursorTextOffset() >= 0)
     }
 
     @Test fun ansiBoldUnderlineAndBackgroundColorsArePreserved() {
@@ -307,6 +308,6 @@ class TerminalScreenTest {
         screen.append("\u001B[2 q")
         assertFalse(screen.renderAnnotated().text.contains("▏"))
         screen.append("\u001B[6 q")
-        assertTrue(screen.renderAnnotated().text.contains("▏"))
+        assertFalse(screen.renderAnnotated().text.contains("▏"))
     }
 }
