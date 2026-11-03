@@ -420,9 +420,10 @@ fun LinuxTerminalPanel(
             LaunchedEffect(active.id) {
                 while (true) {
                     delay(530)
-                    active.screen.advanceCursorBlinkPhase()
-                    active.output.value = active.screen.renderAnnotated()
-                    active.outputRevision.value++
+                    if (active.screen.advanceCursorBlinkPhase()) {
+                        active.output.value = active.screen.renderAnnotated()
+                        active.outputRevision.value++
+                    }
                 }
             }
             val outputScrollState = rememberScrollState()
