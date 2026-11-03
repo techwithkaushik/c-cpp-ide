@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -82,7 +83,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN")
-private val TERMINAL_EXTRA_KEY_ORDER = listOf("ESC", "TAB", "HOME", "UP", "END", "PGUP", "CTRL", "ALT", "LEFT", "DOWN", "RIGHT", "PGDN")
+private val TERMINAL_EXTRA_KEY_ORDER = listOf("ESC", "HOME", "UP", "END", "PGUP", "TAB", "CTRL", "ALT", "LEFT", "DOWN", "RIGHT", "PGDN")
 
 private data class LinuxTerminalTab(
     val id: Int,
@@ -558,7 +559,7 @@ fun LinuxTerminalPanel(
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
                     decorationBox = { inner -> inner() }
                 )
-            Column(Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 4.dp, vertical = 1.dp)) {
+            Column(Modifier.fillMaxWidth().imePadding().background(Color(0xFF101820)).padding(horizontal = 4.dp, vertical = 1.dp)) {
                 if (extraKeysEnabled) {
                     val activeKeys = extraKeyOrder.filter { it in visibleExtraKeys }
                     val firstRowCount = (activeKeys.size + 1) / 2
