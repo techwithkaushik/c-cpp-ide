@@ -9,7 +9,7 @@ package com.techwithkaushik.cppide.feature.terminal
 internal class TerminalScreen(
     private val columns: Int = 100,
     private val rows: Int = 30,
-    private val maxScrollbackLines: Int = 1_000,
+    private val maxScrollbackLines: Int = 5_000,
 ) {
     private var cells = Array(rows) { CharArray(columns) { ' ' } }
     private val scrollback = ArrayDeque<String>()
