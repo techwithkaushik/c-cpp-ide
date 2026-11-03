@@ -27,6 +27,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -76,6 +78,34 @@ internal fun IdeSettingsScreen(
     var sshPort by remember { mutableStateOf(prefs.getInt("terminal_ssh_port", 22).toString()) }
     var sshUser by remember { mutableStateOf(prefs.getString("terminal_ssh_user", "").orEmpty()) }
     var sshPassword by remember { mutableStateOf(TerminalConnectionConfig.sshPassword) }
+    var sshKeyLabel by remember { mutableStateOf(if (TerminalConnectionConfig.sshPrivateKey != null) "Private key loaded in memory" else "No private key selected") }
+    var sshKeyPassphrase by remember { mutableStateOf(TerminalConnectionConfig.sshPrivateKeyPassphrase) }
+    var sshKeyError by remember { mutableStateOf<String?>(null) }
+    val sshPrivateKeyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8 * 1024)
+                    var total = 0
+                    while (true) {
+                        val count = stream.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 128 * 1024) { "Private key file must be at most 128 KiB." }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Could not read the selected private key.")
+                require(bytes.isNotEmpty()) { "The selected private key is empty." }
+                TerminalConnectionConfig.sshPrivateKey = bytes
+                sshKeyLabel = "Private key loaded in memory"
+                sshKeyError = null
+            } catch (error: Exception) {
+                sshKeyError = error.message ?: "Could not load private key."
+            }
+        }
+    }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -184,7 +214,29 @@ internal fun IdeSettingsScreen(
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true
                         )
-                        Text("The password is kept in memory only and is never written to preferences or disk. Private keys can be selected at connection time.", color = SettingsMuted, fontSize = 10.sp)
+                        OutlinedButton(
+                            onClick = { sshPrivateKeyPicker.launch(arrayOf("application/octet-stream", "text/plain", "*/*")) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(if (TerminalConnectionConfig.sshPrivateKey == null) "Select private key" else "Replace private key") }
+                        Text(sshKeyLabel, color = SettingsMuted, fontSize = 10.sp)
+                        if (TerminalConnectionConfig.sshPrivateKey != null) {
+                            OutlinedTextField(
+                                value = sshKeyPassphrase,
+                                onValueChange = { sshKeyPassphrase = it; TerminalConnectionConfig.sshPrivateKeyPassphrase = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Private key passphrase (optional)") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true
+                            )
+                            TextButton(onClick = {
+                                TerminalConnectionConfig.sshPrivateKey = null
+                                TerminalConnectionConfig.sshPrivateKeyPassphrase = ""
+                                sshKeyPassphrase = ""
+                                sshKeyLabel = "No private key selected"
+                            }) { Text("Clear private key", color = SettingsAccent) }
+                        }
+                        sshKeyError?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 10.sp) }
+                        Text("Password, private key and passphrase remain in memory only; they are never written to preferences or disk.", color = SettingsMuted, fontSize = 10.sp)
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
