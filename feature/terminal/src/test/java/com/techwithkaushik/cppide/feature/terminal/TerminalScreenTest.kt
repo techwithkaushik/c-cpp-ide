@@ -91,4 +91,23 @@ class TerminalScreenTest {
         assertFalse(screen.render().contains("downloading"))
     }
 
+    @Test fun scrollingRegionKeepsRowsOutsideTheRegionInPlace() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("top\\r\\n")
+        screen.append("one\\r\\ntwo\\r\\nthree\\r\\nfour")
+        screen.append("\u001B[2;4r")
+        screen.append("\u001B[4;1Hbottom-scroll\\r\\n")
+        val lines = screen.render().replace("▏", "").lines()
+        assertTrue(lines.first().contains("top"))
+        assertTrue(lines.any { it.contains("bottom-scroll") })
+    }
+
+    @Test fun resetRestoresFullScreenScrollingRegion() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("\u001B[2;4r")
+        screen.append("\u001Bc")
+        screen.append("fresh")
+        assertTrue(screen.render().contains("fresh"))
+    }
+
 }
