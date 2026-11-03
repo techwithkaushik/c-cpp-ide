@@ -1831,12 +1831,6 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
     // Give the open tool panel an explicit Back handler so it always dismisses.
     BackHandler(onBack = onClose)
 
-    val title = when (selected) {
-        ToolPanel.Terminal -> "Terminal"
-        ToolPanel.Build -> "Build"
-        ToolPanel.Problems -> "Problems"
-        ToolPanel.Output -> "Output"
-    }
     Column(
         Modifier.fillMaxWidth().fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(3.dp)
