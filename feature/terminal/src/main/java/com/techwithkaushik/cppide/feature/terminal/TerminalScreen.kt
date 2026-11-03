@@ -16,6 +16,15 @@ internal class TerminalScreen(
     rows: Int = 30,
     private val maxScrollbackLines: Int = 5_000,
 ) {
+    private data class BufferState(
+        val cells: Array<CharArray>,
+        val styles: Array<Array<CellStyle>>,
+        val row: Int,
+        val column: Int,
+        val savedRow: Int,
+        val savedColumn: Int,
+    )
+
     private data class CellStyle(
         val foreground: Int? = null,
         val background: Int? = null,
@@ -38,6 +47,9 @@ internal class TerminalScreen(
     private val csi = StringBuilder()
     private val osc = StringBuilder()
     private var currentStyle = CellStyle()
+    private var primaryBuffer: BufferState? = null
+    private var alternateBuffer = false
+    private var cursorVisible = true
 
     fun resize(newColumns: Int, newRows: Int) {
         val width = newColumns.coerceIn(20, 300)
@@ -100,7 +112,7 @@ internal class TerminalScreen(
         val last = lastVisibleRow()
         for (index in 0..last) {
             val line = String(cells[index]).trimEnd()
-            lines.add(if (index == row) insertCursor(line) else line)
+            lines.add(if (index == row && cursorVisible) insertCursor(line) else line)
         }
         return lines.joinToString("\n")
     }
@@ -116,7 +128,7 @@ internal class TerminalScreen(
         for (lineIndex in 0..last) {
             if (lineIndex > 0) builder.append("\n")
             val visibleLength = String(cells[lineIndex]).trimEnd().length
-            val cursorAt = if (lineIndex == row) column.coerceAtMost(visibleLength) else -1
+            val cursorAt = if (lineIndex == row && cursorVisible) column.coerceAtMost(visibleLength) else -1
             for (cellIndex in 0..visibleLength) {
                 if (cellIndex == cursorAt) builder.append("▏")
                 if (cellIndex < visibleLength) {
@@ -173,8 +185,10 @@ internal class TerminalScreen(
         if (row < rows - 1) {
             row++
         } else {
-            scrollback.addLast(String(cells[0]).trimEnd())
-            while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
+            if (!alternateBuffer) {
+                scrollback.addLast(String(cells[0]).trimEnd())
+                while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
+            }
             for (index in 0 until rows - 1) {
                 cells[index] = cells[index + 1]
                 styles[index] = styles[index + 1]
@@ -242,7 +256,16 @@ internal class TerminalScreen(
             's' -> { savedRow = row; savedColumn = column }
             'u' -> { row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1) }
             'm' -> applySgr(parameters)
-            'h', 'l' -> Unit
+            'h', 'l' -> {
+                if (raw.startsWith("?")) {
+                    parameters.forEach { mode ->
+                        when (mode) {
+                            25 -> cursorVisible = final == 'h'
+                            47, 1047, 1049 -> if (final == 'h') enterAlternateBuffer() else leaveAlternateBuffer()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -375,5 +398,32 @@ internal class TerminalScreen(
         savedRow = 0
         savedColumn = 0
         currentStyle = CellStyle()
+        primaryBuffer = null
+        alternateBuffer = false
+        cursorVisible = true
+    }
+
+    private fun enterAlternateBuffer() {
+        if (alternateBuffer) return
+        primaryBuffer = BufferState(cells, styles, row, column, savedRow, savedColumn)
+        cells = Array(rows) { CharArray(columns) { ' ' } }
+        styles = Array(rows) { Array(columns) { CellStyle() } }
+        row = 0
+        column = 0
+        savedRow = 0
+        savedColumn = 0
+        alternateBuffer = true
+    }
+
+    private fun leaveAlternateBuffer() {
+        val primary = primaryBuffer ?: return
+        cells = primary.cells
+        styles = primary.styles
+        row = primary.row.coerceIn(0, rows - 1)
+        column = primary.column.coerceIn(0, columns - 1)
+        savedRow = primary.savedRow.coerceIn(0, rows - 1)
+        savedColumn = primary.savedColumn.coerceIn(0, columns - 1)
+        primaryBuffer = null
+        alternateBuffer = false
     }
 }
