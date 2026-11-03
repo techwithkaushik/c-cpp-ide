@@ -160,7 +160,7 @@ void throw_state(JNIEnv* env, const std::string& message) {
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
     JNIEnv* env, jobject /* thiz */, jstring proot_value, jstring rootfs_value,
-    jstring shell_value, jstring temp_value) {
+    jstring shell_value, jstring temp_value, jint columns, jint rows) {
     const std::string proot = to_utf8(env, proot_value);
     const std::string rootfs = to_utf8(env, rootfs_value);
     const std::string shell = to_utf8(env, shell_value);
@@ -177,6 +177,19 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         throw_state(env, std::string("Could not allocate PTY: ") + std::strerror(error));
         return 0;
     }
+
+    // Set the initial window size before the child shell starts. Resizing after
+    // exec sends SIGWINCH to the shell and makes interactive prompts redraw.
+    struct winsize initial_size {};
+    initial_size.ws_col = static_cast<unsigned short>(std::clamp(columns, 20, 400));
+    initial_size.ws_row = static_cast<unsigned short>(std::clamp(rows, 5, 200));
+    if (ioctl(master, TIOCSWINSZ, &initial_size) != 0) {
+        const int error = errno;
+        close(master);
+        throw_state(env, std::string("Could not set initial PTY size: ") + std::strerror(error));
+        return 0;
+    }
+
     char* slave_name = ptsname(master);
     if (slave_name == nullptr) {
         const int error = errno;
