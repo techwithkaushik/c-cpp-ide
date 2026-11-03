@@ -63,6 +63,22 @@ internal class TerminalScreen(
             cells[index].copyInto(resizedCells[index], endIndex = columnsToCopy)
             styles[index].copyInto(resizedStyles[index], endIndex = columnsToCopy)
         }
+        primaryBuffer = primaryBuffer?.let { primary ->
+            val primaryCells = Array(height) { CharArray(width) { ' ' } }
+            val primaryStyles = Array(height) { Array(width) { CellStyle() } }
+            for (index in 0 until minOf(primary.cells.size, height)) {
+                primary.cells[index].copyInto(primaryCells[index], endIndex = minOf(primary.cells[index].size, width))
+                primary.styles[index].copyInto(primaryStyles[index], endIndex = minOf(primary.styles[index].size, width))
+            }
+            primary.copy(
+                cells = primaryCells,
+                styles = primaryStyles,
+                row = primary.row.coerceIn(0, height - 1),
+                column = primary.column.coerceIn(0, width - 1),
+                savedRow = primary.savedRow.coerceIn(0, height - 1),
+                savedColumn = primary.savedColumn.coerceIn(0, width - 1),
+            )
+        }
         cells = resizedCells
         styles = resizedStyles
         columns = width
