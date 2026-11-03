@@ -149,7 +149,7 @@ fun LinuxTerminalPanel(
         LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir)
     }
     val terminalPreferences = remember(context) { context.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE) }
-    var terminalFontSize by remember { mutableIntStateOf(terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 22)) }
+    var terminalFontSize by remember { mutableIntStateOf(terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 28)) }
     val scrollbackLines = terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)
     val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
     val connectionMode = terminalPreferences.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu"
@@ -299,8 +299,8 @@ fun LinuxTerminalPanel(
                     }
                 }
                 }
-                Text("−", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
-                Text("+", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize + 1).coerceAtMost(28); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
+                Text("A−", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
+                Text("A+", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize + 1).coerceAtMost(28); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
                 Text("+", modifier = Modifier.background(Color(0xFF173D5C), RoundedCornerShape(7.dp)).clickable {
                     if (connectionMode == "ssh") onOpenSettings() else startLocalSession()
                 }.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, fontSize = 16.sp)
