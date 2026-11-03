@@ -51,6 +51,8 @@ internal class TerminalScreen(
     private var primaryBuffer: BufferState? = null
     private var alternateBuffer = false
     private var cursorVisible = true
+    private var scrollTop = 0
+    private var scrollBottom = rows - 1
 
     fun resize(newColumns: Int, newRows: Int) {
         val width = newColumns.coerceIn(20, 300)
@@ -84,6 +86,8 @@ internal class TerminalScreen(
         styles = resizedStyles
         columns = width
         rows = height
+        scrollTop = scrollTop.coerceIn(0, rows - 1)
+        scrollBottom = scrollBottom.coerceIn(scrollTop, rows - 1)
         row = row.coerceIn(0, rows - 1)
         column = column.coerceIn(0, columns - 1)
         savedRow = savedRow.coerceIn(0, rows - 1)
@@ -199,33 +203,42 @@ internal class TerminalScreen(
     }
 
     private fun lineFeed() {
-        if (row < rows - 1) {
+        if (row == scrollBottom) {
+            scrollRegionUp(1)
+        } else if (row < rows - 1) {
             row++
-        } else {
-            if (!alternateBuffer) {
-                scrollback.addLast(String(cells[0]).trimEnd())
-                while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
-            }
-            for (index in 0 until rows - 1) {
-                cells[index] = cells[index + 1]
-                styles[index] = styles[index + 1]
-            }
-            cells[rows - 1] = CharArray(columns) { ' ' }
-            styles[rows - 1] = Array(columns) { CellStyle() }
-            row = rows - 1
         }
     }
 
     private fun reverseIndex() {
-        if (row > 0) {
+        if (row == scrollTop) {
+            scrollRegionDown(1)
+        } else if (row > 0) {
             row--
-        } else {
-            for (index in rows - 1 downTo 1) {
+        }
+    }
+
+    private fun scrollRegionUp(count: Int) {
+        repeat(count.coerceAtMost(scrollBottom - scrollTop + 1)) {
+            if (scrollTop == 0 && scrollBottom == rows - 1 && !alternateBuffer) {
+                scrollback.addLast(String(cells[scrollTop]).trimEnd())
+                while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
+            }
+            for (index in scrollTop until scrollBottom) {
+                cells[index] = cells[index + 1]
+                styles[index] = styles[index + 1]
+            }
+            eraseRow(scrollBottom)
+        }
+    }
+
+    private fun scrollRegionDown(count: Int) {
+        repeat(count.coerceAtMost(scrollBottom - scrollTop + 1)) {
+            for (index in scrollBottom downTo scrollTop + 1) {
                 cells[index] = cells[index - 1]
                 styles[index] = styles[index - 1]
             }
-            cells[0] = CharArray(columns) { ' ' }
-            styles[0] = Array(columns) { CellStyle() }
+            eraseRow(scrollTop)
         }
     }
 
@@ -233,8 +246,8 @@ internal class TerminalScreen(
         val parameters = raw.removePrefix("?").split(';').map { it.toIntOrNull() ?: 0 }
         fun param(index: Int, fallback: Int = 1) = parameters.getOrNull(index)?.takeIf { it > 0 } ?: fallback
         when (final) {
-            'A' -> row = (row - param(0)).coerceAtLeast(0)
-            'B' -> row = (row + param(0)).coerceAtMost(rows - 1)
+            'A' -> row = (row - param(0)).coerceAtLeast(if (row in scrollTop..scrollBottom) scrollTop else 0)
+            'B' -> row = (row + param(0)).coerceAtMost(if (row in scrollTop..scrollBottom) scrollBottom else rows - 1)
             'C' -> column = (column + param(0)).coerceAtMost(columns - 1)
             'D' -> column = (column - param(0)).coerceAtLeast(0)
             'E' -> { row = (row + param(0)).coerceAtMost(rows - 1); column = 0 }
@@ -266,10 +279,20 @@ internal class TerminalScreen(
             'X' -> repeat(param(0).coerceAtMost(columns)) { if (column + it < columns) eraseCell(row, column + it) }
             '@' -> insertCharacters(param(0))
             'P' -> deleteCharacters(param(0))
-            'L' -> insertLines(param(0))
-            'M' -> deleteLines(param(0))
-            'S' -> repeat(param(0)) { lineFeed() }
-            'T' -> repeat(param(0)) { reverseIndex() }
+            'L' -> if (row in scrollTop..scrollBottom) insertLines(param(0))
+            'M' -> if (row in scrollTop..scrollBottom) deleteLines(param(0))
+            'S' -> scrollRegionUp(param(0))
+            'T' -> scrollRegionDown(param(0))
+            'r' -> {
+                val top = (parameters.getOrNull(0) ?: 1).coerceAtLeast(1) - 1
+                val bottom = (parameters.getOrNull(1) ?: rows).coerceIn(1, rows) - 1
+                if (top < bottom) {
+                    scrollTop = top
+                    scrollBottom = bottom
+                    row = 0
+                    column = 0
+                }
+            }
             's' -> { savedRow = row; savedColumn = column }
             'u' -> { row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1) }
             'm' -> applySgr(parameters)
@@ -374,8 +397,8 @@ internal class TerminalScreen(
     }
 
     private fun insertLines(count: Int) {
-        repeat(count.coerceAtMost(rows)) {
-            for (index in rows - 1 downTo row + 1) {
+        repeat(count.coerceAtMost(scrollBottom - row + 1)) {
+            for (index in scrollBottom downTo row + 1) {
                 cells[index] = cells[index - 1]
                 styles[index] = styles[index - 1]
             }
@@ -384,12 +407,12 @@ internal class TerminalScreen(
     }
 
     private fun deleteLines(count: Int) {
-        repeat(count.coerceAtMost(rows)) {
-            for (index in row until rows - 1) {
+        repeat(count.coerceAtMost(scrollBottom - row + 1)) {
+            for (index in row until scrollBottom) {
                 cells[index] = cells[index + 1]
                 styles[index] = styles[index + 1]
             }
-            eraseRow(rows - 1)
+            eraseRow(scrollBottom)
         }
     }
 
