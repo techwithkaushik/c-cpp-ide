@@ -130,7 +130,10 @@ internal class TerminalScreen(
                     consumeCodePoint(Character.toCodePoint(high, ch))
                     return@forEach
                 }
-                consumeCodePoint(high.code)
+                // A dangling high surrogate is malformed UTF-16. Render the
+                // Unicode replacement character instead of passing a surrogate
+                // code unit into the code-point path.
+                consumeCodePoint(0xFFFD)
             }
             if (escapeState == 0 && Character.isHighSurrogate(ch)) {
                 pendingHighSurrogate = ch
@@ -172,7 +175,7 @@ internal class TerminalScreen(
         if (!alternateBuffer) lines.addAll(scrollback)
         val last = lastVisibleRow()
         for (index in 0..last) {
-            val line = buildString { cells[index].forEach { if (it != '\u0000') append(it) } }.trimEnd()
+            val line = visibleLine(index).trimEnd()
             lines.add(if (index == row && cursorVisible && cursorBlinkOn) insertCursor(line) else line)
         }
         return lines.joinToString("\n")
@@ -210,6 +213,13 @@ internal class TerminalScreen(
             }
         }
         return builder.toAnnotatedString()
+    }
+
+    /** Build a display string without the internal continuation-cell markers. */
+    private fun visibleLine(lineIndex: Int): String = buildString {
+        cells[lineIndex].forEach { cell ->
+            if (cell != '\u0000') append(cell)
+        }
     }
 
     private fun lastVisibleRow(): Int {
@@ -308,7 +318,13 @@ internal class TerminalScreen(
     private fun scrollRegionUp(count: Int) {
         repeat(count.coerceAtMost(scrollBottom - scrollTop + 1)) {
             if (scrollTop == 0 && scrollBottom == rows - 1 && !alternateBuffer) {
-                scrollback.addLast(String(cells[scrollTop]).trimEnd())
+                scrollback.addLast(
+                    buildString {
+                        cells[scrollTop].forEach { cell ->
+                            if (cell != '\u0000') append(cell)
+                        }
+                    }.trimEnd(),
+                )
                 while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
             }
             for (index in scrollTop until scrollBottom) {
