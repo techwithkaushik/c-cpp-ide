@@ -430,16 +430,24 @@ fun LinuxTerminalPanel(
                     }
                 }
             }
-            val outputScrollState = rememberScrollState()
-            val outputHorizontalScrollState = rememberScrollState()
+            // Each terminal tab owns its own scroll position.
+            val outputScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
+            val outputHorizontalScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
             val terminalTextMeasurer = rememberTextMeasurer()
             var pinchFontSize by remember(active.id) { mutableFloatStateOf(terminalFontSize.toFloat()) }
             LaunchedEffect(active.id, active.outputRevision.value) {
-                val wasFollowingOutput = outputScrollState.maxValue - outputScrollState.value <= 48
+                val previousScrollValue = outputScrollState.value
+                val wasFollowingOutput = outputScrollState.maxValue - previousScrollValue <= 48
                 if (wasFollowingOutput) {
                     delay(16)
-                    outputScrollState.scrollTo(outputScrollState.maxValue)
+                    // Do not yank the viewport back to the bottom if the user
+                    // starts scrolling into history while new output arrives.
+                    if (outputScrollState.value == previousScrollValue &&
+                        !outputScrollState.isScrollInProgress
+                    ) {
+                        outputScrollState.scrollTo(outputScrollState.maxValue)
+                    }
                 }
             }
             Column(
