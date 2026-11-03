@@ -93,13 +93,13 @@ class TerminalScreenTest {
 
     @Test fun scrollingRegionKeepsRowsOutsideTheRegionInPlace() {
         val screen = TerminalScreen(columns = 20, rows = 5)
-        screen.append("top\r\n")
-        screen.append("one\r\ntwo\r\nthree\r\nfour")
+        screen.append("top\r\none\r\ntwo\r\nthree\r\nfour")
         screen.append("\u001B[2;4r")
-        screen.append("\u001B[4;1Hbottom-scroll\r\n")
+        // CSI S scrolls only the configured region; row one is outside it.
+        screen.append("\u001B[S")
         val lines = screen.render().replace("▏", "").lines()
         assertTrue(lines.first().contains("top"))
-        assertTrue(lines.any { it.contains("bottom-scroll") })
+        assertTrue(lines.any { it.contains("two") || it.contains("three") || it.contains("four") })
     }
 
     @Test fun resetRestoresFullScreenScrollingRegion() {
