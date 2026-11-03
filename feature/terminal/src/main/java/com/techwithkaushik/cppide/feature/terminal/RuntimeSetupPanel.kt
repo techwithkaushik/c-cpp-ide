@@ -86,12 +86,13 @@ fun RuntimeSetupPanel(
     ) { rootfsUri = it }
     LaunchedEffect(context) {
         status = withContext(Dispatchers.IO) {
-            // Ensure bundled PRoot and its loader are linked into the runtime
-            // directory before reporting either component as missing.
-            paths.ensureDirectories()
+            val prootCheck = runCatching {
+                // Materializes APK native-library links and validates the ELF ABI.
+                ProotDownloader(paths).downloadAndInstall()
+            }
             when {
-                !paths.hasRootfs() -> "Ubuntu rootfs is not installed."
-                !paths.hasProot() -> "Ubuntu rootfs is present; PRoot is missing."
+                !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
+                prootCheck.isFailure -> "Ubuntu rootfs is present; bundled Android PRoot validation failed: ${prootCheck.exceptionOrNull()?.message ?: "unknown error"}"
                 else -> {
                     val smoke = LinuxRuntimeSmokeTest(paths).run()
                     if (smoke.success) "Ubuntu shell smoke test passed."
