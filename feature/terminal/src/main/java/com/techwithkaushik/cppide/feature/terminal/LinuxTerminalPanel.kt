@@ -58,6 +58,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -78,7 +79,7 @@ import java.io.ByteArrayOutputStream
 private data class LinuxTerminalTab(
     val id: Int,
     val title: MutableState<String>,
-    val output: MutableState<String>,
+    val output: MutableState<AnnotatedString>,
     val screen: TerminalScreen,
     val send: (String) -> Unit,
     val interrupt: () -> Unit,
@@ -102,7 +103,7 @@ private object LinuxTerminalSessions {
         val tab = LinuxTerminalTab(
             id = nextId++,
             title = mutableStateOf(title),
-            output = mutableStateOf(screen.render()),
+            output = mutableStateOf(screen.renderAnnotated()),
             screen = screen,
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
             interrupt = interrupt,
@@ -118,7 +119,7 @@ private object LinuxTerminalSessions {
     fun append(tab: LinuxTerminalTab, text: String) {
         if (tabs.none { it.id == tab.id }) return
         tab.screen.append(text)
-        tab.output.value = tab.screen.render()
+        tab.output.value = tab.screen.renderAnnotated()
     }
 
     fun finish(tab: LinuxTerminalTab) {
