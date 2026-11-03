@@ -6,6 +6,7 @@ import android.os.Looper
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -67,7 +70,7 @@ import java.io.ByteArrayOutputStream
 
 private data class LinuxTerminalTab(
     val id: Int,
-    val title: String,
+    val title: MutableState<String>,
     val output: MutableState<String>,
     val screen: TerminalScreen,
     val send: (String) -> Unit,
@@ -90,7 +93,7 @@ private object LinuxTerminalSessions {
         screen.append(initialOutput)
         val tab = LinuxTerminalTab(
             id = nextId++,
-            title = title,
+            title = mutableStateOf(title),
             output = mutableStateOf(screen.render()),
             screen = screen,
             send = { text -> input.write(text.toByteArray(Charsets.UTF_8)); input.flush() },
@@ -149,6 +152,9 @@ fun LinuxTerminalPanel(
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
     var command by remember { mutableStateOf("") }
+    var sessionMenuId by remember { mutableIntStateOf(0) }
+    var renameTabId by remember { mutableIntStateOf(0) }
+    var renameValue by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showSshDialog by remember { mutableStateOf(false) }
@@ -245,47 +251,35 @@ fun LinuxTerminalPanel(
     }
 
     Column(modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = !busy, onClick = {
-                if (!paths.ready()) {
-                    error = if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime Settings."
-                    else "The app-owned PRoot binary is missing or invalid. Open Runtime Settings."
-                    return@Button
-                }
-                busy = true
-                error = null
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        try { Result.success(LocalLinuxSession.start(paths)) }
-                        catch (e: Exception) { Result.failure<LocalLinuxSession>(e) }
-                    }
-                    busy = false
-                    result.onSuccess { session ->
-                        val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\n", maxScrollbackLines = scrollbackLines)
-                        session.readOutput(
-                            onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
-                            onExit = { code -> handler.post {
-                    tab.exited.value = code
-                    LinuxTerminalSessions.append(tab, "\r\n[Shell exited: $code — output preserved. Close this tab to dismiss.]\r\n")
-                } }
-                        )
-                    }.onFailure { error = it.message ?: "Could not start Ubuntu shell." }
-                }
-            }) { Text("Local Ubuntu") }
-            OutlinedButton(enabled = !busy, onClick = { showSshDialog = true }) { Text("Connect SSH") }
-            if (busy) Text("Connecting…", color = Color(0xFF9AA7B5), modifier = Modifier.padding(top = 12.dp))
-        }
+        if (busy) Text("Starting session…", color = Color(0xFF9AA7B5), modifier = Modifier.padding(8.dp))
 
         if (LinuxTerminalSessions.tabs.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 LinuxTerminalSessions.tabs.forEach { tab ->
-                    Row(
-                        Modifier.background(if (tab.id == LinuxTerminalSessions.selectedId) Color(0xFF173D5C) else Color(0xFF151B23), RoundedCornerShape(8.dp))
-                            .clickable { LinuxTerminalSessions.select(tab.id) }.padding(horizontal = 10.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(tab.title, color = Color(0xFFE8EDF5))
-                        Text("×", color = Color(0xFF9AA7B5), modifier = Modifier.clickable { LinuxTerminalSessions.closeTab(tab.id) })
+                    Row {
+                        Row(
+                            Modifier.background(if (tab.id == LinuxTerminalSessions.selectedId) Color(0xFF173D5C) else Color(0xFF151B23), RoundedCornerShape(8.dp))
+                                .combinedClickable(
+                                    onClick = { LinuxTerminalSessions.select(tab.id) },
+                                    onLongClick = { sessionMenuId = tab.id }
+                                )
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(tab.title.value, color = Color(0xFFE8EDF5), maxLines = 1)
+                            Text("×", color = Color(0xFF9AA7B5), modifier = Modifier.clickable { LinuxTerminalSessions.closeTab(tab.id) })
+                        }
+                        DropdownMenu(expanded = sessionMenuId == tab.id, onDismissRequest = { sessionMenuId = 0 }) {
+                            DropdownMenuItem(text = { Text("Rename session") }, onClick = {
+                                renameTabId = tab.id
+                                renameValue = tab.title.value
+                                sessionMenuId = 0
+                            })
+                            DropdownMenuItem(text = { Text("Close session") }, onClick = {
+                                sessionMenuId = 0
+                                LinuxTerminalSessions.closeTab(tab.id)
+                            })
+                        }
                     }
                 }
             }
@@ -302,8 +296,7 @@ fun LinuxTerminalPanel(
         if (active == null) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Linux terminal", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Text("Choose Local Ubuntu to open a persistent shell in the app-owned rootfs, or Connect SSH to open a remote shell directly. No setup shell is required before SSH.", color = Color(0xFF9AA7B5), fontSize = 12.sp)
-                Button(onClick = onOpenSettings) { Text("Ubuntu runtime setup") }
+                Text("No active terminal session. Choose the connection type and start a session from Terminal Settings.", color = Color(0xFF9AA7B5), fontSize = 12.sp)
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
             }
         } else {
@@ -312,36 +305,6 @@ fun LinuxTerminalPanel(
                 outputScrollState.scrollTo(outputScrollState.maxValue)
             }
             Column(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF080B10), RoundedCornerShape(8.dp)).padding(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    listOf(
-                        "CTRL+C" to "\u0003",
-                        "CTRL+D" to "\u0004",
-                        "CTRL+Z" to "\u001A",
-                        "ESC" to "\u001B",
-                        "TAB" to "\t",
-                        "↑" to "\u001B[A",
-                        "↓" to "\u001B[B",
-                        "←" to "\u001B[D",
-                        "→" to "\u001B[C"
-                    ).forEach { (label, sequence) ->
-                        Text(
-                            label,
-                            color = if (active.exited.value == null) Color(0xFFD7E2F0) else Color(0xFF657080),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier
-                                .background(Color(0xFF202A36), RoundedCornerShape(6.dp))
-                                .clickable(enabled = active.exited.value == null) {
-                                    try { active.send(sequence) }
-                                    catch (e: Exception) { error = e.message ?: "Terminal input failed." }
-                                }
-                                .padding(horizontal = 9.dp, vertical = 6.dp)
-                        )
-                    }
-                }
                 Text(
                     active.output.value,
                     color = Color(0xFFE6EDF3),
@@ -374,8 +337,7 @@ fun LinuxTerminalPanel(
                         }
                         command = updated
                     },
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFF151B23), RoundedCornerShape(6.dp)).padding(12.dp)
-                        .focusRequester(terminalInputFocusRequester)
+                    modifier = Modifier.size(1.dp).focusRequester(terminalInputFocusRequester)
                         .onPreviewKeyEvent { event ->
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
                             when (event.key) {
@@ -393,17 +355,37 @@ fun LinuxTerminalPanel(
                             }
                         },
                     singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFFE6EDF3), fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp),
-                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF6EA8E0)),
-                    decorationBox = { inner ->
-                        if (command.isEmpty()) Text(if (active.exited.value == null) "Type directly into terminal…" else "Shell has exited", color = Color(0xFF9AA7B5), fontSize = 12.sp)
-                        inner()
-                    }
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.Transparent, fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
+                    decorationBox = { inner -> inner() }
                 )
 
             }
             error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
         }
+    }
+
+    if (renameTabId != 0) {
+        AlertDialog(
+            onDismissRequest = { renameTabId = 0 },
+            title = { Text("Rename session") },
+            text = {
+                OutlinedTextField(
+                    value = renameValue,
+                    onValueChange = { renameValue = it.take(48) },
+                    singleLine = true,
+                    label = { Text("Session name") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    LinuxTerminalSessions.tabs.firstOrNull { it.id == renameTabId }?.title?.value =
+                        renameValue.trim().ifBlank { "Terminal" }
+                    renameTabId = 0
+                }) { Text("Rename") }
+            },
+            dismissButton = { TextButton(onClick = { renameTabId = 0 }) { Text("Cancel") } }
+        )
     }
 
     if (showSshDialog) {
