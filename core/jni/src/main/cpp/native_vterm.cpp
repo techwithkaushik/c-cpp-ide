@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <vterm.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
