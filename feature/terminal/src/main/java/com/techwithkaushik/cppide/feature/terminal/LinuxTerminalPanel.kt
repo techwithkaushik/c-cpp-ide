@@ -416,6 +416,14 @@ fun LinuxTerminalPanel(
             // 530ms caused visible text flicker; Termux blinks only the cursor
             // in its Canvas renderer, not the terminal text buffer.
             active.screen.setCursorBlinkPhase(true)
+            LaunchedEffect(active.id) {
+                while (true) {
+                    delay(530)
+                    active.screen.advanceCursorBlinkPhase()
+                    active.output.value = active.screen.renderAnnotated()
+                    active.outputRevision.value++
+                }
+            }
             val outputScrollState = rememberScrollState()
             val terminalTextMeasurer = rememberTextMeasurer()
             var pinchFontSize by remember(active.id) { mutableFloatStateOf(terminalFontSize.toFloat()) }
