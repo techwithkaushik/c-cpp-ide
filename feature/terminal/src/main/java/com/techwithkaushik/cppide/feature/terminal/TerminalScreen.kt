@@ -123,7 +123,7 @@ internal class TerminalScreen(
             if (index > 0) builder.append("\n")
             builder.append(line)
         }
-        if (scrollback.isNotEmpty()) builder.append("\n")
+        if (!alternateBuffer && scrollback.isNotEmpty()) builder.append("\n")
         val last = lastVisibleRow()
         for (lineIndex in 0..last) {
             if (lineIndex > 0) builder.append("\n")
