@@ -60,6 +60,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -415,6 +417,7 @@ fun LinuxTerminalPanel(
             }
             val outputScrollState = rememberScrollState()
             val density = LocalDensity.current
+            val terminalTextMeasurer = rememberTextMeasurer()
             LaunchedEffect(active.output.value) {
                 // Follow live output only when the user was already at the bottom.
                 // This keeps scrollback readable while a command is producing output.
@@ -425,8 +428,19 @@ fun LinuxTerminalPanel(
                 Modifier.weight(1f).fillMaxWidth()
                     .background(Color(0xFF0B0F14))
                     .onSizeChanged { size ->
-                        val cellWidth = with(density) { (terminalFontSize.sp.toPx() * 0.62f).coerceAtLeast(1f) }
-                        val cellHeight = with(density) { (terminalFontSize.sp.toPx() * 1.35f).coerceAtLeast(1f) }
+                        // Measure the same monospace glyph and line height used by
+                        // the renderer instead of estimating terminal cells with
+                        // a hard-coded 0.62/1.35 multiplier.
+                        val cellMetrics = terminalTextMeasurer.measure(
+                            AnnotatedString("M"),
+                            style = TextStyle(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = terminalFontSize.sp,
+                                lineHeight = (terminalFontSize * 1.28f).sp
+                            )
+                        )
+                        val cellWidth = cellMetrics.size.width.toFloat().coerceAtLeast(1f)
+                        val cellHeight = cellMetrics.size.height.toFloat().coerceAtLeast(1f)
                         val columns = (size.width / cellWidth).toInt().coerceIn(20, 300)
                         val rows = (size.height / cellHeight).toInt().coerceIn(5, 120)
                         active.screen.resize(columns, rows)
