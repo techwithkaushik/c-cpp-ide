@@ -172,7 +172,7 @@ fun LinuxTerminalPanel(
     var host by remember { mutableStateOf(terminalPreferences.getString("terminal_ssh_host", "").orEmpty()) }
     var port by remember { mutableStateOf(terminalPreferences.getInt("terminal_ssh_port", 22).toString()) }
     var username by remember { mutableStateOf(terminalPreferences.getString("terminal_ssh_user", "").orEmpty()) }
-    var password by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf(TerminalConnectionConfig.sshPassword) }
     var privateKeyUri by remember { mutableStateOf<Uri?>(null) }
     var privateKeyBytes by remember { mutableStateOf<ByteArray?>(null) }
     var privateKeyPassphrase by remember { mutableStateOf("") }
@@ -249,6 +249,7 @@ fun LinuxTerminalPanel(
                 )
                 showSshDialog = false
                 password = ""
+                TerminalConnectionConfig.sshPassword = ""
                 privateKeyBytes = null
                 privateKeyUri = null
                 privateKeyPassphrase = ""
@@ -290,7 +291,12 @@ fun LinuxTerminalPanel(
     }
 
     LaunchedEffect(connectionMode) {
-        if (connectionMode == "ssh") showSshDialog = true else startLocalSession()
+        if (connectionMode == "ssh") {
+            if (host.isNotBlank() && username.isNotBlank() && password.isNotBlank()) connectSsh(null)
+            else showSshDialog = true
+        } else {
+            startLocalSession()
+        }
     }
 
     Column(modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -465,11 +471,17 @@ fun LinuxTerminalPanel(
             title = { Text("Connect directly over SSH") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("SSH opens a remote shell directly; local Ubuntu setup is not required.", fontSize = 12.sp)
-                    OutlinedTextField(host, { host = it; expectedFingerprint = "" }, label = { Text("Host / IP") }, singleLine = true)
-                    OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5); expectedFingerprint = "" }, label = { Text("Port") }, singleLine = true)
-                    OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true)
-                    OutlinedTextField(password, { password = it }, label = { Text("Password (optional if using key)") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
+                    Text("SSH endpoint is managed in Terminal Settings: $username@$host:$port. Enter a password here or select a private key.", fontSize = 12.sp)
+                    if (host.isBlank() || username.isBlank()) {
+                        Text("Set the SSH host and username in Settings → Terminal before connecting.", color = Color(0xFFFFAB91), fontSize = 11.sp)
+                    }
+                    OutlinedTextField(
+                        password,
+                        { password = it; TerminalConnectionConfig.sshPassword = it },
+                        label = { Text("Password (optional if using key)") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true
+                    )
                     OutlinedButton(onClick = { privateKeyPicker.launch(arrayOf("application/octet-stream", "text/plain", "*/*")) }) {
                         Text(if (privateKeyUri == null) "Select private key (optional)" else "Change private key")
                     }
@@ -483,7 +495,7 @@ fun LinuxTerminalPanel(
                     error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 11.sp) }
                 }
             },
-            confirmButton = { Button(enabled = !busy, onClick = { connectSsh(expectedFingerprint.ifBlank { null }) }) { Text(if (busy) "Connecting…" else "Connect") } },
+            confirmButton = { Button(enabled = !busy && host.isNotBlank() && username.isNotBlank() && (password.isNotBlank() || privateKeyBytes != null), onClick = { connectSsh(expectedFingerprint.ifBlank { null }) }) { Text(if (busy) "Connecting…" else "Connect") } },
             dismissButton = { TextButton(onClick = { showSshDialog = false }) { Text("Cancel") } }
         )
     }
