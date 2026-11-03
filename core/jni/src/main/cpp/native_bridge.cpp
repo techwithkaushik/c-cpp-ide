@@ -266,6 +266,12 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
             dprintf(STDERR_FILENO, "Could not enter distro directory: %s\\r\\n", std::strerror(errno));
             _exit(126);
         }
+        // A login + interactive Bash session follows Bash's native startup
+        // contract: /etc/profile, then the first readable of ~/.bash_profile,
+        // ~/.bash_login or ~/.profile. Ubuntu's default ~/.profile sources
+        // ~/.bashrc for interactive shells; custom login profiles can do the
+        // same explicitly. Do not force-source ~/.bashrc here: that would run
+        // user startup scripts twice when their profile already sources it.
         std::vector<std::string> arguments = {
             proot, "-0", "-v", "0", "-r", rootfs, "-w", "/root",
             "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
