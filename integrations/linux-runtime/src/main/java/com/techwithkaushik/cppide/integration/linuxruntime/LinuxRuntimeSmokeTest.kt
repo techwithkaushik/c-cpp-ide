@@ -39,7 +39,9 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
                 "-b", "${resolver.absolutePath}:/etc/resolv.conf",
-                shell, "--login", "-c",
+                // Match the interactive login mode used by the terminal so the
+                // startup path is exercised during the runtime readiness check.
+                shell, "--login", "-i", "-c",
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
                     "echo '=== libc ==='; /usr/bin/ldd --version; " +
                     "echo '=== apt ==='; /usr/bin/apt --version; " +
@@ -102,7 +104,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val failure = listOf(
             "Ubuntu shell exited with code $exit.",
             androidExecBlocker,
-            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --noprofile --norc -c <smoke-test>",
+            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --login -i -c <smoke-test>",
             err.takeIf { it.isNotBlank() }?.let { "PRoot stderr (tail): ${it.takeLast(6000)}" }
                 ?: "PRoot stderr was empty.",
             out.takeIf { it.isNotBlank() }?.let { "PRoot stdout (tail): ${it.takeLast(2000)}" }
