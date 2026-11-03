@@ -389,75 +389,6 @@ fun LinuxTerminalPanel(
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
             }
         } else {
-            Row(
-                Modifier.fillMaxWidth().background(Color(0xFF101820))
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 5.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                extraKeyOrder.filter { it in visibleExtraKeys }.forEach { key ->
-                    TextButton(enabled = active.exited.value == null, onClick = {
-                        val sequence = when (key) {
-                            "ESC" -> "\u001b"
-                            "TAB" -> "\t"
-                            "HOME" -> "\u001b[H"
-                            "END" -> "\u001b[F"
-                            "UP" -> "\u001b[A"
-                            "DOWN" -> "\u001b[B"
-                            "LEFT" -> "\u001b[D"
-                            "RIGHT" -> "\u001b[C"
-                            "PGUP" -> "\u001b[5~"
-                            "PGDN" -> "\u001b[6~"
-                            else -> key
-                        }
-                        when (key) {
-                            "CTRL" -> ctrlMode = !ctrlMode
-                            "ALT" -> altMode = !altMode
-                            else -> runCatching { active.send(sequence) }
-                                .onFailure { error = it.message ?: "Terminal input failed." }
-                        }
-                        terminalInputFocusRequester.requestFocus()
-                    }) {
-                        Text(when (key) { "PGUP" -> "PgUp"; "PGDN" -> "PgDn"; else -> key },
-                            color = when (key) {
-                                "CTRL" -> if (ctrlMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
-                                "ALT" -> if (altMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
-                                else -> Color(0xFFD5E3F0)
-                            }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                    }
-                }
-                customTerminalKeys.forEach { (label, sequence) ->
-                    TextButton(enabled = active.exited.value == null, onClick = {
-                        val payload = when (sequence.uppercase()) {
-                            "CTRL+C" -> 3.toChar().toString()
-                            "CTRL+D" -> 4.toChar().toString()
-                            "CTRL+Z" -> 26.toChar().toString()
-                            "CTRL+L" -> 12.toChar().toString()
-                            "ESC" -> 27.toChar().toString()
-                            "TAB" -> 9.toChar().toString()
-                            "ENTER" -> 13.toChar().toString()
-                            else -> sequence
-                        }
-                        runCatching { active.send(payload) }
-                            .onFailure { error = it.message ?: "Custom key failed." }
-                        terminalInputFocusRequester.requestFocus()
-                    }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
-                }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    val pasted = clipboardManager.getText()?.text.orEmpty()
-                    if (pasted.isNotEmpty()) runCatching { active.send(pasted) }
-                        .onFailure { error = it.message ?: "Could not paste into terminal." }
-                    terminalInputFocusRequester.requestFocus()
-                }) { Text("Paste", fontSize = 11.sp) }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    runCatching { active.send("\u000c") }.onFailure { error = it.message ?: "Could not clear terminal." }
-                }) { Text("Clear", fontSize = 11.sp) }
-                TextButton(enabled = active.exited.value == null, onClick = {
-                    terminalInputFocusRequester.requestFocus()
-                    keyboardController?.show()
-                }) { Text("⌨", fontSize = 13.sp) }
-            }
             // Blink the block cursor at a terminal-like cadence. DEC ?25l still
             // suppresses it because visibility is controlled by the VT screen.
             LaunchedEffect(active.id) {
@@ -588,6 +519,83 @@ fun LinuxTerminalPanel(
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
                     decorationBox = { inner -> inner() }
                 )
+            Row(
+                Modifier.fillMaxWidth().background(Color(0xFF101820))
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                TextButton(enabled = terminalFontSize > 10, onClick = {
+                    terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10)
+                    terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
+                }) { Text("A−", fontSize = 11.sp) }
+                TextButton(enabled = terminalFontSize < 28, onClick = {
+                    terminalFontSize = (terminalFontSize + 1).coerceAtMost(28)
+                    terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
+                }) { Text("A+", fontSize = 11.sp) }
+                extraKeyOrder.filter { it in visibleExtraKeys }.forEach { key ->
+                    TextButton(enabled = active.exited.value == null, onClick = {
+                        val sequence = when (key) {
+                            "ESC" -> "\u001b"
+                            "TAB" -> "\t"
+                            "HOME" -> "\u001b[H"
+                            "END" -> "\u001b[F"
+                            "UP" -> "\u001b[A"
+                            "DOWN" -> "\u001b[B"
+                            "LEFT" -> "\u001b[D"
+                            "RIGHT" -> "\u001b[C"
+                            "PGUP" -> "\u001b[5~"
+                            "PGDN" -> "\u001b[6~"
+                            else -> key
+                        }
+                        when (key) {
+                            "CTRL" -> ctrlMode = !ctrlMode
+                            "ALT" -> altMode = !altMode
+                            else -> runCatching { active.send(sequence) }
+                                .onFailure { error = it.message ?: "Terminal input failed." }
+                        }
+                        terminalInputFocusRequester.requestFocus()
+                    }) {
+                        Text(when (key) { "PGUP" -> "PgUp"; "PGDN" -> "PgDn"; else -> key },
+                            color = when (key) {
+                                "CTRL" -> if (ctrlMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
+                                "ALT" -> if (altMode) Color(0xFF80C7FF) else Color(0xFFD5E3F0)
+                                else -> Color(0xFFD5E3F0)
+                            }, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    }
+                }
+                customTerminalKeys.forEach { (label, sequence) ->
+                    TextButton(enabled = active.exited.value == null, onClick = {
+                        val payload = when (sequence.uppercase()) {
+                            "CTRL+C" -> 3.toChar().toString()
+                            "CTRL+D" -> 4.toChar().toString()
+                            "CTRL+Z" -> 26.toChar().toString()
+                            "CTRL+L" -> 12.toChar().toString()
+                            "ESC" -> 27.toChar().toString()
+                            "TAB" -> 9.toChar().toString()
+                            "ENTER" -> 13.toChar().toString()
+                            else -> sequence
+                        }
+                        runCatching { active.send(payload) }
+                            .onFailure { error = it.message ?: "Custom key failed." }
+                        terminalInputFocusRequester.requestFocus()
+                    }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
+                }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    val pasted = clipboardManager.getText()?.text.orEmpty()
+                    if (pasted.isNotEmpty()) runCatching { active.send(pasted) }
+                        .onFailure { error = it.message ?: "Could not paste into terminal." }
+                    terminalInputFocusRequester.requestFocus()
+                }) { Text("Paste", fontSize = 11.sp) }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    runCatching { active.send("\u000c") }.onFailure { error = it.message ?: "Could not clear terminal." }
+                }) { Text("Clear", fontSize = 11.sp) }
+                TextButton(enabled = active.exited.value == null, onClick = {
+                    terminalInputFocusRequester.requestFocus()
+                    keyboardController?.show()
+                }) { Text("⌨", fontSize = 13.sp) }
+            }
 
             }
             error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
