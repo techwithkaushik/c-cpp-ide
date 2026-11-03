@@ -51,6 +51,7 @@ internal class TerminalScreen(
     private var primaryBuffer: BufferState? = null
     private var alternateBuffer = false
     private var cursorVisible = true
+    private var cursorBlinkOn = true
     private var scrollTop = 0
     private var scrollBottom = rows - 1
 
@@ -94,6 +95,11 @@ internal class TerminalScreen(
         savedColumn = savedColumn.coerceIn(0, columns - 1)
     }
 
+    fun setCursorBlinkPhase(visible: Boolean) {
+        if (cursorBlinkOn == visible) return
+        cursorBlinkOn = visible
+    }
+
     fun append(chunk: String) {
         chunk.forEach { ch ->
             when (escapeState) {
@@ -133,7 +139,7 @@ internal class TerminalScreen(
         val last = lastVisibleRow()
         for (index in 0..last) {
             val line = String(cells[index]).trimEnd()
-            lines.add(if (index == row && cursorVisible) insertCursor(line) else line)
+            lines.add(if (index == row && cursorVisible && cursorBlinkOn) insertCursor(line) else line)
         }
         return lines.joinToString("\n")
     }
@@ -149,7 +155,7 @@ internal class TerminalScreen(
         for (lineIndex in 0..last) {
             if (lineIndex > 0) builder.append("\n")
             val visibleLength = String(cells[lineIndex]).trimEnd().length
-            val cursorAt = if (lineIndex == row && cursorVisible) column.coerceAtMost(visibleLength) else -1
+            val cursorAt = if (lineIndex == row && cursorVisible && cursorBlinkOn) column.coerceAtMost(visibleLength) else -1
             for (cellIndex in 0..visibleLength) {
                 if (cellIndex == cursorAt) builder.append("▏")
                 if (cellIndex < visibleLength) {
