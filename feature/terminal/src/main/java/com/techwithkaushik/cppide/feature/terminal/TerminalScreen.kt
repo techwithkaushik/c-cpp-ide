@@ -140,7 +140,6 @@ internal class TerminalScreen(
                 }
                 offset++ // newline between scrollback/live rows
             }
-            if (scrollback.isNotEmpty()) offset--
         }
         val last = lastVisibleRow()
         for (lineIndex in 0..last) {
