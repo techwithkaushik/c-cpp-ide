@@ -52,6 +52,24 @@ internal class TerminalScreen(
     private var alternateBuffer = false
     private var cursorVisible = true
     private var cursorBlinkOn = true
+    private var applicationCursorKeys = false
+    private var bracketedPasteEnabled = false
+
+    /** Return the correct cursor-key sequence for the active terminal mode. */
+    fun cursorKeySequence(key: String): String {
+        val final = when (key) {
+            "UP" -> "A"
+            "DOWN" -> "B"
+            "RIGHT" -> "C"
+            "LEFT" -> "D"
+            else -> return key
+        }
+        return if (applicationCursorKeys) "\u001BO$final" else "\u001B[$final"
+    }
+
+    /** Applications can request bracketed paste using DEC private mode 2004. */
+    fun pasteSequence(text: String): String =
+        if (bracketedPasteEnabled) "\u001B[200~$text\u001B[201~" else text
     private var scrollTop = 0
     private var scrollBottom = rows - 1
 
@@ -306,7 +324,9 @@ internal class TerminalScreen(
                 if (raw.startsWith("?")) {
                     parameters.forEach { mode ->
                         when (mode) {
+                            1 -> applicationCursorKeys = final == 'h'
                             25 -> cursorVisible = final == 'h'
+                            2004 -> bracketedPasteEnabled = final == 'h'
                             47, 1047, 1049 -> if (final == 'h') enterAlternateBuffer() else leaveAlternateBuffer()
                         }
                     }
@@ -447,6 +467,8 @@ internal class TerminalScreen(
         primaryBuffer = null
         alternateBuffer = false
         cursorVisible = true
+        applicationCursorKeys = false
+        bracketedPasteEnabled = false
         scrollTop = 0
         scrollBottom = rows - 1
     }
