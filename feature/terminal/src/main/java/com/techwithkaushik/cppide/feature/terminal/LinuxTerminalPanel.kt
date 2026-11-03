@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -368,23 +369,25 @@ fun LinuxTerminalPanel(
                         }
                     }
             ) {
-                Text(
-                    active.output.value,
-                    color = Color(0xFFD8DEE9),
-                    fontFamily = FontFamily.Monospace,
-                    softWrap = false,
-                    fontSize = terminalFontSize.sp,
-                    lineHeight = (terminalFontSize * 1.28f).sp,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                        .pointerInput(terminalInputFocusRequester) {
-                            detectTapGestures {
-                                terminalInputFocusRequester.requestFocus()
-                                keyboardController?.show()
+                SelectionContainer {
+                    Text(
+                        active.output.value,
+                        color = Color(0xFFD8DEE9),
+                        fontFamily = FontFamily.Monospace,
+                        softWrap = false,
+                        fontSize = terminalFontSize.sp,
+                        lineHeight = (terminalFontSize * 1.28f).sp,
+                        modifier = Modifier.fillMaxWidth()
+                            .pointerInput(terminalInputFocusRequester) {
+                                detectTapGestures {
+                                    terminalInputFocusRequester.requestFocus()
+                                    keyboardController?.show()
+                                }
                             }
-                        }
-                        .horizontalScroll(rememberScrollState())
-                    .verticalScroll(outputScrollState)
-                )
+                            .horizontalScroll(rememberScrollState())
+                            .verticalScroll(outputScrollState)
+                    )
+                }
                 androidx.compose.foundation.text.BasicTextField(
                     value = command,
                     onValueChange = { updated ->
