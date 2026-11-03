@@ -125,8 +125,10 @@ internal class TerminalScreen(
     }
 
     /** Advance only blinking DECSCUSR modes; steady cursor modes never disappear. */
-    fun advanceCursorBlinkPhase() {
+    fun advanceCursorBlinkPhase(): Boolean {
+        val previous = cursorBlinkOn
         cursorBlinkOn = if (cursorShape in setOf(0, 1, 3, 5)) !cursorBlinkOn else true
+        return previous != cursorBlinkOn
     }
 
     fun append(chunk: String) {
