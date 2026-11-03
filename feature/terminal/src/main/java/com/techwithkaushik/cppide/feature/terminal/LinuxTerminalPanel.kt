@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -416,7 +415,6 @@ fun LinuxTerminalPanel(
                 }
             }
             val outputScrollState = rememberScrollState()
-            val density = LocalDensity.current
             val terminalTextMeasurer = rememberTextMeasurer()
             LaunchedEffect(active.output.value) {
                 // Follow live output only when the user was already at the bottom.
