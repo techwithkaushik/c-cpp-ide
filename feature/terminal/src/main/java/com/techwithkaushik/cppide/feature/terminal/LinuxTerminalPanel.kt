@@ -189,6 +189,8 @@ fun LinuxTerminalPanel(
     var ctrlMode by remember { mutableStateOf(false) }
     var altMode by remember { mutableStateOf(false) }
     val visibleExtraKeys = terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS
+    val savedKeyOrder = terminalPreferences.getString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(",")) ?: TERMINAL_EXTRA_KEY_ORDER.joinToString(",")
+    val extraKeyOrder = savedKeyOrder.split(",").filter { it in TERMINAL_EXTRA_KEY_ORDER }.let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
     var sessionMenuId by remember { mutableIntStateOf(0) }
     var renameTabId by remember { mutableIntStateOf(0) }
     var renameValue by remember { mutableStateOf("") }
@@ -388,7 +390,7 @@ fun LinuxTerminalPanel(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                TERMINAL_EXTRA_KEY_ORDER.filter { it in visibleExtraKeys }.forEach { key ->
+                extraKeyOrder.filter { it in visibleExtraKeys }.forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
                         val sequence = when (key) {
                             "ESC" -> "\u001b"
