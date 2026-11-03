@@ -150,9 +150,9 @@ fun LinuxTerminalPanel(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showSshDialog by remember { mutableStateOf(false) }
-    var host by remember { mutableStateOf("") }
-    var port by remember { mutableStateOf("22") }
-    var username by remember { mutableStateOf("") }
+    var host by remember { mutableStateOf(terminalPreferences.getString("terminal_ssh_host", "").orEmpty()) }
+    var port by remember { mutableStateOf(terminalPreferences.getInt("terminal_ssh_port", 22).toString()) }
+    var username by remember { mutableStateOf(terminalPreferences.getString("terminal_ssh_user", "").orEmpty()) }
     var password by remember { mutableStateOf("") }
     var privateKeyUri by remember { mutableStateOf<Uri?>(null) }
     var privateKeyBytes by remember { mutableStateOf<ByteArray?>(null) }
@@ -204,6 +204,12 @@ fun LinuxTerminalPanel(
             error = e.message ?: "Invalid SSH settings."
             return
         }
+        // Persist only non-secret connection coordinates; passwords and private keys stay in memory.
+        terminalPreferences.edit()
+            .putString("terminal_ssh_host", sshHost.host)
+            .putInt("terminal_ssh_port", sshHost.port)
+            .putString("terminal_ssh_user", sshHost.username)
+            .apply()
         busy = true
         error = null
         scope.launch {
