@@ -27,6 +27,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.feature.terminal.RuntimeSetupPanel
+import com.techwithkaushik.cppide.feature.terminal.TerminalConnectionConfig
 
 private val SettingsBg = IdeDesignTokens.Color.Background
 private val SettingsCard = IdeDesignTokens.Color.Surface
@@ -73,6 +75,7 @@ internal fun IdeSettingsScreen(
     var sshHost by remember { mutableStateOf(prefs.getString("terminal_ssh_host", "").orEmpty()) }
     var sshPort by remember { mutableStateOf(prefs.getInt("terminal_ssh_port", 22).toString()) }
     var sshUser by remember { mutableStateOf(prefs.getString("terminal_ssh_user", "").orEmpty()) }
+    var sshPassword by remember { mutableStateOf(TerminalConnectionConfig.sshPassword) }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -173,7 +176,15 @@ internal fun IdeSettingsScreen(
                                 singleLine = true
                             )
                         }
-                        Text("Password and private-key material are requested only when connecting and are not saved in preferences.", color = SettingsMuted, fontSize = 10.sp)
+                        OutlinedTextField(
+                            value = sshPassword,
+                            onValueChange = { sshPassword = it; TerminalConnectionConfig.sshPassword = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("SSH password (optional if using a key)") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true
+                        )
+                        Text("The password is kept in memory only and is never written to preferences or disk. Private keys can be selected at connection time.", color = SettingsMuted, fontSize = 10.sp)
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
