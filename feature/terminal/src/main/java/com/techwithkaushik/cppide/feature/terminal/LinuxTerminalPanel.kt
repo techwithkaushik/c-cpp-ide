@@ -499,6 +499,26 @@ fun LinuxTerminalPanel(
                             }
                         }
                 ) {
+                    SelectionContainer {
+                        Text(
+                            active.output.value,
+                            color = Color(0xFFD8DEE9),
+                            fontFamily = FontFamily.Monospace,
+                            softWrap = false,
+                            fontSize = terminalFontSize.sp,
+                            lineHeight = (terminalFontSize * 1.28f).sp,
+                            onTextLayout = { cursorTextLayout.value = it },
+                            modifier = Modifier.fillMaxWidth()
+                                .pointerInput(terminalInputFocusRequester) {
+                                    detectTapGestures {
+                                        terminalInputFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    }
+                                }
+                                .horizontalScroll(outputHorizontalScrollState)
+                                .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
+                        )
+                    }
                     // Draw the terminal cursor in a dedicated Canvas layer. The
                     // terminal text itself contains only shell output, never a cursor glyph.
                     Canvas(Modifier.matchParentSize()) {
@@ -540,26 +560,6 @@ fun LinuxTerminalPanel(
                                 }
                             }
                         }
-                    }
-                    SelectionContainer {
-                        Text(
-                            active.output.value,
-                            color = Color(0xFFD8DEE9),
-                            fontFamily = FontFamily.Monospace,
-                            softWrap = false,
-                            fontSize = terminalFontSize.sp,
-                            lineHeight = (terminalFontSize * 1.28f).sp,
-                            onTextLayout = { cursorTextLayout.value = it },
-                            modifier = Modifier.fillMaxWidth()
-                                .pointerInput(terminalInputFocusRequester) {
-                                    detectTapGestures {
-                                        terminalInputFocusRequester.requestFocus()
-                                        keyboardController?.show()
-                                    }
-                                }
-                                .horizontalScroll(outputHorizontalScrollState)
-                                .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
-                        )
                     }
                 }
                 androidx.compose.foundation.text.BasicTextField(
