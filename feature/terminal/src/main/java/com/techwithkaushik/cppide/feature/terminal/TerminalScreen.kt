@@ -119,8 +119,44 @@ internal class TerminalScreen(
         savedColumn = savedColumn.coerceIn(0, columns - 1)
     }
 
-    /** Exposes the active DECSCUSR mode for deterministic tests. */
+    /** Exposes the active DECSCUSR mode for deterministic tests and the renderer. */
     fun cursorShapeCode(): Int = cursorShape
+
+    /** True only while DEC cursor visibility and blink phase both allow drawing. */
+    fun isCursorDrawn(): Boolean = cursorVisible && cursorBlinkOn
+
+    /**
+     * UTF-16 offset of the active terminal cell in renderAnnotated().
+     * Continuation cells for wide glyphs are excluded, while surrogate pairs
+     * contribute their two UTF-16 code units exactly as Compose text layout expects.
+     */
+    fun cursorTextOffset(): Int {
+        var offset = 0
+        scrollback.forEach { line ->
+            val visibleLength = line.cells.indexOfLast { it != ' ' && it != '\u0000' } + 1
+            for (index in 0 until visibleLength) {
+                if (line.cells[index] != '\u0000') offset++
+            }
+            offset++ // newline between scrollback/live rows
+        }
+        if (!alternateBuffer && scrollback.isNotEmpty()) offset--
+        val last = lastVisibleRow()
+        for (lineIndex in 0..last) {
+            if (lineIndex > 0) offset++
+            if (lineIndex < row) {
+                val visibleLength = cells[lineIndex].indexOfLast { it != ' ' && it != '\u0000' } + 1
+                for (index in 0 until visibleLength) {
+                    if (cells[lineIndex][index] != '\u0000') offset++
+                }
+            } else if (lineIndex == row) {
+                for (index in 0 until column.coerceAtMost(columns)) {
+                    if (index < columns && cells[lineIndex][index] != '\u0000') offset++
+                }
+                return offset
+            }
+        }
+        return offset
+    }
 
     fun setCursorBlinkPhase(visible: Boolean) {
         val blinkingMode = cursorShape == 0 || cursorShape == 1 ||
@@ -194,7 +230,7 @@ internal class TerminalScreen(
         val last = lastVisibleRow()
         for (index in 0..last) {
             val line = visibleLine(index).trimEnd()
-            lines.add(if (index == row && cursorVisible && cursorBlinkOn) insertCursor(line) else line)
+            lines.add(line)
         }
         return lines.joinToString("\n")
     }
@@ -241,7 +277,6 @@ internal class TerminalScreen(
             val span = SpanStyle(
                 color = when {
                     cursorBlock -> Color(0xFF0B0F14)
-                    cursorBar -> Color(0xFF8AB4F8)
                     else -> foreground?.let(::composeColor) ?: Color.Unspecified
                 },
                 background = if (cursorBlock) Color(0xFFD8DEE9) else background?.let(::composeColor) ?: Color.Unspecified,
@@ -255,9 +290,9 @@ internal class TerminalScreen(
             )
             builder.pushStyle(span)
             if (cellIndex < visibleLength) {
-                if (cursorBar) builder.append("▏") else builder.append(cell.toString())
+                builder.append(cell.toString())
             } else if (isCursor) {
-                if (cursorBar) builder.append("▏") else builder.append(" ")
+                builder.append(" ")
             }
             builder.pop()
         }
@@ -274,12 +309,6 @@ internal class TerminalScreen(
         var last = rows - 1
         while (last > row && cells[last].all { it == ' ' }) last--
         return last
-    }
-
-    private fun insertCursor(line: String): String {
-        val shown = StringBuilder(line)
-        shown.insert(column.coerceAtMost(shown.length), '▏')
-        return shown.toString()
     }
 
     private fun consumeCodePoint(codePoint: Int) {
