@@ -38,6 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -79,8 +83,8 @@ private object LinuxTerminalSessions {
 
     fun select(id: Int) { if (tabs.any { it.id == id }) selectedId = id }
 
-    fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, initialOutput: String = ""): LinuxTerminalTab {
-        val screen = TerminalScreen()
+    fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, initialOutput: String = "", maxScrollbackLines: Int = 5_000): LinuxTerminalTab {
+        val screen = TerminalScreen(maxScrollbackLines = maxScrollbackLines)
         screen.append(initialOutput)
         val tab = LinuxTerminalTab(
             id = nextId++,
@@ -133,6 +137,12 @@ fun LinuxTerminalPanel(
         // Use the same authoritative APK native-library path as Runtime Settings.
         LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir)
     }
+    val terminalPreferences = remember(context) { context.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE) }
+    val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 22)
+    val scrollbackLines = terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)
+    val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
+    val terminalInputFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
@@ -204,7 +214,7 @@ fun LinuxTerminalPanel(
             busy = false
             result.onSuccess { session ->
                 val title = "SSH ${sshHost.username}@${sshHost.host}"
-                val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, initialOutput = "Connected to ${sshHost.host}:\n")
+                val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                     onExit = { code -> handler.post { LinuxTerminalSessions.append(tab, "\n[SSH session exited: $code]\n"); LinuxTerminalSessions.finish(tab) } }
@@ -240,7 +250,7 @@ fun LinuxTerminalPanel(
                     }
                     busy = false
                     result.onSuccess { session ->
-                        val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\n")
+                        val tab = LinuxTerminalSessions.add("Ubuntu ${LinuxTerminalSessions.tabs.size + 1}", session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\n", maxScrollbackLines = scrollbackLines)
                         session.readOutput(
                             onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
                             onExit = { code -> handler.post {
@@ -271,6 +281,13 @@ fun LinuxTerminalPanel(
         }
 
         val active = LinuxTerminalSessions.tabs.firstOrNull { it.id == LinuxTerminalSessions.selectedId }
+        LaunchedEffect(active?.id, autoShowKeyboard) {
+            if (active != null && autoShowKeyboard && active.exited.value == null) {
+                kotlinx.coroutines.delay(180)
+                terminalInputFocusRequester.requestFocus()
+                keyboardController?.show()
+            }
+        }
         if (active == null) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Linux terminal", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
@@ -318,7 +335,7 @@ fun LinuxTerminalPanel(
                     active.output.value,
                     color = Color(0xFFE6EDF3),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
+                    fontSize = terminalFontSize.sp,
                     modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(outputScrollState)
                 )
                 active.exited.value?.let { code ->
@@ -340,6 +357,7 @@ fun LinuxTerminalPanel(
                         command = updated
                     },
                     modifier = Modifier.fillMaxWidth().background(Color(0xFF151B23), RoundedCornerShape(6.dp)).padding(12.dp)
+                        .focusRequester(terminalInputFocusRequester)
                         .onPreviewKeyEvent { event ->
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
                             when (event.key) {
@@ -357,7 +375,7 @@ fun LinuxTerminalPanel(
                             }
                         },
                     singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFFE6EDF3), fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFFE6EDF3), fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF6EA8E0)),
                     decorationBox = { inner ->
                         if (command.isEmpty()) Text(if (active.exited.value == null) "Type directly into terminal…" else "Shell has exited", color = Color(0xFF9AA7B5), fontSize = 12.sp)
