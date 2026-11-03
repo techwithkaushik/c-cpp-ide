@@ -276,16 +276,16 @@ fun LinuxTerminalPanel(
         }
     }
 
-    Column(modifier.fillMaxSize().background(Color(0xFF080B10))) {
+    Column(modifier.fillMaxSize().background(Color(0xFF0B0F14))) {
         if (busy) Text("Starting session…", color = Color(0xFF9AA7B5), modifier = Modifier.padding(8.dp))
 
         if (LinuxTerminalSessions.tabs.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().background(Color(0xFF0F151D)).padding(start = 8.dp, end = 8.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 LinuxTerminalSessions.tabs.forEach { tab ->
                     Row {
                         Row(
-                            Modifier.background(if (tab.id == LinuxTerminalSessions.selectedId) Color(0xFF173D5C) else Color(0xFF151B23), RoundedCornerShape(8.dp))
+                            Modifier.background(if (tab.id == LinuxTerminalSessions.selectedId) Color(0xFF1D3548) else Color(0xFF111820), RoundedCornerShape(6.dp))
                                 .combinedClickable(
                                     onClick = { LinuxTerminalSessions.select(tab.id) },
                                     onLongClick = { sessionMenuId = tab.id }
@@ -293,7 +293,7 @@ fun LinuxTerminalPanel(
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(tab.title.value, color = Color(0xFFE8EDF5), maxLines = 1, fontSize = 12.sp)
+                            Text(tab.title.value, color = if (tab.id == LinuxTerminalSessions.selectedId) Color(0xFFE6EDF3) else Color(0xFF9AA7B5), maxLines = 1, fontSize = 12.sp)
                         }
                         DropdownMenu(expanded = sessionMenuId == tab.id, onDismissRequest = { sessionMenuId = 0 }) {
                             DropdownMenuItem(text = { Text("Rename session") }, onClick = {
@@ -309,9 +309,7 @@ fun LinuxTerminalPanel(
                     }
                 }
                 }
-                Text("A−", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize - 1).coerceAtLeast(10); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
-                Text("A+", modifier = Modifier.clickable { terminalFontSize = (terminalFontSize + 1).coerceAtMost(28); terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply() }.padding(horizontal = 7.dp, vertical = 4.dp), color = Color(0xFF9AA7B5), fontSize = 18.sp)
-                Text("+", modifier = Modifier.background(Color(0xFF173D5C), RoundedCornerShape(7.dp)).clickable {
+                Text("+", modifier = Modifier.background(Color(0xFF263746), RoundedCornerShape(6.dp)).clickable {
                     if (connectionMode == "ssh") onOpenSettings() else startLocalSession()
                 }.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, fontSize = 16.sp)
             }
@@ -353,7 +351,7 @@ fun LinuxTerminalPanel(
             }
             Column(
                 Modifier.weight(1f).fillMaxWidth()
-                    .background(Color(0xFF080B10))
+                    .background(Color(0xFF0B0F14))
                     .onSizeChanged { size ->
                         val cellWidth = with(density) { (terminalFontSize.sp.toPx() * 0.62f).coerceAtLeast(1f) }
                         val cellHeight = with(density) { (terminalFontSize.sp.toPx() * 1.35f).coerceAtLeast(1f) }
@@ -372,10 +370,11 @@ fun LinuxTerminalPanel(
             ) {
                 Text(
                     active.output.value,
-                    color = Color(0xFFE6EDF3),
+                    color = Color(0xFFD8DEE9),
                     fontFamily = FontFamily.Monospace,
                     softWrap = false,
                     fontSize = terminalFontSize.sp,
+                    lineHeight = (terminalFontSize * 1.28f).sp,
                     modifier = Modifier.weight(1f).fillMaxWidth()
                         .pointerInput(terminalInputFocusRequester) {
                             detectTapGestures {
