@@ -81,8 +81,8 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
-private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN", "-", "/", "|", "~")
-private val TERMINAL_EXTRA_KEY_ORDER = listOf("ESC", "-", "HOME", "UP", "END", "PGUP", "TAB", "CTRL", "ALT", "LEFT", "DOWN", "RIGHT", "PGDN", "/", "|", "~")
+private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN")
+private val TERMINAL_EXTRA_KEY_ORDER = listOf("ESC", "TAB", "HOME", "UP", "END", "PGUP", "CTRL", "ALT", "LEFT", "DOWN", "RIGHT", "PGDN")
 
 private data class LinuxTerminalTab(
     val id: Int,
