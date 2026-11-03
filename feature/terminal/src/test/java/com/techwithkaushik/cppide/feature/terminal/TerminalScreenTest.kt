@@ -188,8 +188,8 @@ class TerminalScreenTest {
         val rendered = screen.render()
         assertTrue(rendered.contains("A界B"))
         assertFalse(rendered.contains("\u0000"))
-        // A (1) + CJK (2) + B (1) leaves the cursor at terminal cell 4.
-        assertTrue(screen.cursorTextOffset() >= 0)
+        // The cursor is after A + 界 + B in UTF-16 text coordinates.
+        assertTrue(screen.cursorTextOffset() == 3)
     }
 
     @Test fun combiningMarksAttachToPreviousCharacterWithoutAdvancingCursor() {
@@ -249,9 +249,12 @@ class TerminalScreenTest {
         screen.setCursorBlinkPhase(true)
         val restored = screen.renderAnnotated()
         assertTrue(screen.isCursorDrawn())
+        screen.setCursorBlinkPhase(false)
         assertFalse(screen.isCursorDrawn())
-        assertTrue(screen.isCursorDrawn())
         assertTrue(visible.text == hidden.text)
+        screen.setCursorBlinkPhase(true)
+        assertTrue(screen.isCursorDrawn())
+        assertTrue(restored.text == visible.text)
 
         screen.append("\u001B[6 q")
         screen.setCursorBlinkPhase(false)
@@ -287,7 +290,8 @@ class TerminalScreenTest {
 
         screen.append("\u001B[6 q")
         assertTrue(screen.cursorShapeCode() == 6)
-        assertTrue(screen.cursorTextOffset() >= 0)
+        assertFalse(screen.renderAnnotated().text.contains("▏"))
+        assertTrue(screen.cursorTextOffset() == screen.renderAnnotated().text.length)
     }
 
     @Test fun ansiBoldUnderlineAndBackgroundColorsArePreserved() {
@@ -306,8 +310,12 @@ class TerminalScreenTest {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("prompt")
         screen.append("\u001B[2 q")
-        assertFalse(screen.renderAnnotated().text.contains("▏"))
+        val block = screen.renderAnnotated()
+        assertFalse(block.text.contains("▏"))
+        assertTrue(block.spanStyles.any { it.item.background != Color.Unspecified })
         screen.append("\u001B[6 q")
-        assertFalse(screen.renderAnnotated().text.contains("▏"))
+        val bar = screen.renderAnnotated()
+        assertFalse(bar.text.contains("▏"))
+        assertTrue(screen.cursorTextOffset() == bar.text.length)
     }
 }
