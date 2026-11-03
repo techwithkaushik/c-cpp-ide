@@ -69,7 +69,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativeVTermScreen_nativeRender(
     auto* state = from_handle(handle);
     if (state == nullptr) return env->NewStringUTF("");
     const size_t capacity = static_cast<size_t>(state->rows) *
-        (static_cast<size_t>(state->columns) * 4U + 1U) + 1U;
+        (static_cast<size_t>(state->columns) * 24U + 1U) + 1U;
     std::vector<char> buffer(capacity, '\0');
     const VTermRect rect{0, state->rows, 0, state->columns};
     const size_t length = vterm_screen_get_text(state->screen, buffer.data(), capacity - 1, rect);
