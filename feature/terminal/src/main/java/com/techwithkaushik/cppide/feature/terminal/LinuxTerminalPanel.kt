@@ -146,6 +146,7 @@ fun LinuxTerminalPanel(
     val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 22)
     val scrollbackLines = terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)
     val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
+    val connectionMode = terminalPreferences.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu"
     val terminalInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
@@ -248,6 +249,38 @@ fun LinuxTerminalPanel(
                 } else error = e.message ?: e.javaClass.simpleName
             }
         }
+    }
+
+    fun startLocalSession() {
+        if (busy || LinuxTerminalSessions.tabs.isNotEmpty()) return
+        if (!paths.ready()) {
+            error = if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime & Bootstrap in Settings."
+            else "The app-owned PRoot binary is missing or invalid. Open Runtime & Bootstrap in Settings."
+            return
+        }
+        busy = true
+        error = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try { Result.success(LocalLinuxSession.start(paths)) }
+                catch (e: Exception) { Result.failure<LocalLinuxSession>(e) }
+            }
+            busy = false
+            result.onSuccess { session ->
+                val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, initialOutput = "Ubuntu shell started.\r\n", maxScrollbackLines = scrollbackLines)
+                session.readOutput(
+                    onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
+                    onExit = { code -> handler.post {
+                        tab.exited.value = code
+                        LinuxTerminalSessions.append(tab, "\r\n[Shell exited: " + code + " — output preserved. Close this tab to dismiss.]\r\n")
+                    } }
+                )
+            }.onFailure { error = it.message ?: "Could not start Ubuntu shell." }
+        }
+    }
+
+    LaunchedEffect(connectionMode) {
+        if (connectionMode == "ssh") showSshDialog = true else startLocalSession()
     }
 
     Column(modifier.fillMaxSize().background(Color(0xFF0D1117)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
