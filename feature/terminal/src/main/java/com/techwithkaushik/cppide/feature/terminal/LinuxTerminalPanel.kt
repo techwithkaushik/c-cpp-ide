@@ -188,6 +188,8 @@ fun LinuxTerminalPanel(
     var command by remember { mutableStateOf("") }
     var ctrlMode by remember { mutableStateOf(false) }
     var altMode by remember { mutableStateOf(false) }
+    var extraKeysEnabled by remember { mutableStateOf(terminalPreferences.getBoolean("terminal_extra_keys_enabled", true)) }
+    var showExtraKeysSetup by remember { mutableStateOf(false) }
     val visibleExtraKeys = terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS
     val savedKeyOrder = terminalPreferences.getString("terminal_extra_key_order", TERMINAL_EXTRA_KEY_ORDER.joinToString(",")) ?: TERMINAL_EXTRA_KEY_ORDER.joinToString(",")
     val extraKeyOrder = savedKeyOrder.split(",").filter { it in TERMINAL_EXTRA_KEY_ORDER }.let { it + TERMINAL_EXTRA_KEY_ORDER.filterNot(it::contains) }
@@ -534,7 +536,12 @@ fun LinuxTerminalPanel(
                     terminalFontSize = (terminalFontSize + 1).coerceAtMost(28)
                     terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
                 }) { Text("A+", fontSize = 11.sp) }
-                extraKeyOrder.filter { it in visibleExtraKeys }.forEach { key ->
+                TextButton(onClick = {
+                    extraKeysEnabled = !extraKeysEnabled
+                    terminalPreferences.edit().putBoolean("terminal_extra_keys_enabled", extraKeysEnabled).apply()
+                }) { Text(if (extraKeysEnabled) "Keys: ON" else "Keys: OFF", fontSize = 11.sp) }
+                TextButton(onClick = { showExtraKeysSetup = true }) { Text("⚙", fontSize = 13.sp) }
+                if (extraKeysEnabled) extraKeyOrder.filter { it in visibleExtraKeys }.forEach { key ->
                     TextButton(enabled = active.exited.value == null, onClick = {
                         val sequence = when (key) {
                             "ESC" -> "\u001b"
@@ -600,6 +607,64 @@ fun LinuxTerminalPanel(
             }
             error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
         }
+    }
+
+    if (showExtraKeysSetup) {
+        val presets = mapOf(
+            "Termux default" to setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN"),
+            "Vim / Neovim" to setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "LEFT", "DOWN", "RIGHT"),
+            "Navigation" to setOf("HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN"),
+            "Minimal" to setOf("ESC", "TAB", "CTRL", "ALT")
+        )
+        AlertDialog(
+            onDismissRequest = { showExtraKeysSetup = false },
+            title = { Text("Extra keys setup") },
+            text = {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Choose a Termux-style preset or select the keys you need. Changes are saved automatically.", fontSize = 12.sp, color = Color(0xFF9AA7B5))
+                    presets.forEach { (name, keys) ->
+                        OutlinedButton(
+                            onClick = {
+                                terminalPreferences.edit().putStringSet("terminal_extra_keys", keys).apply()
+                                showExtraKeysSetup = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(name) }
+                    }
+                    Text("Custom keys", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                    TERMINAL_EXTRA_KEY_ORDER.forEach { key ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                val updated = visibleExtraKeys.toMutableSet()
+                                if (key in updated) updated.remove(key) else updated.add(key)
+                                terminalPreferences.edit().putStringSet("terminal_extra_keys", updated).apply()
+                                // Trigger recomposition after changing the selected key set.
+                                showExtraKeysSetup = false
+                                showExtraKeysSetup = true
+                            }.padding(vertical = 2.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(
+                                checked = key in (terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS) ?: DEFAULT_TERMINAL_EXTRA_KEYS),
+                                onCheckedChange = { checked ->
+                                    val updated = (terminalPreferences.getStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS)?.toSet() ?: DEFAULT_TERMINAL_EXTRA_KEYS).toMutableSet()
+                                    if (checked) updated.add(key) else updated.remove(key)
+                                    terminalPreferences.edit().putStringSet("terminal_extra_keys", updated).apply()
+                                    showExtraKeysSetup = false
+                                    showExtraKeysSetup = true
+                                }
+                            )
+                            Text(key, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                    TextButton(onClick = {
+                        terminalPreferences.edit().putStringSet("terminal_extra_keys", DEFAULT_TERMINAL_EXTRA_KEYS).apply()
+                        showExtraKeysSetup = false
+                    }) { Text("Reset to default") }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showExtraKeysSetup = false }) { Text("Done") } }
+        )
     }
 
     if (renameTabId != 0) {
