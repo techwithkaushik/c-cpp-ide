@@ -24,9 +24,9 @@ class TerminalScreenTest {
     @Test fun insertAndDeleteCharacterSequencesUpdateTheGrid() {
         val screen = TerminalScreen()
         screen.append("abcd\u001B[1;2H\u001B[@X")
-        assertTrue(screen.render().contains("aXbcd"))
+        assertTrue(screen.render().replace("▏", "").contains("aXbcd"))
         screen.append("\u001B[1;2H\u001B[P")
-        assertTrue(screen.render().contains("abcd"))
+        assertTrue(screen.render().replace("▏", "").contains("abcd"))
     }
 
     @Test fun alternateScreenDoesNotDestroyPrimaryTerminalOutput() {
