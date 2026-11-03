@@ -6,6 +6,8 @@ import com.jcraft.jsch.HostKeyRepository
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
 import java.io.OutputStream
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.Properties
@@ -45,12 +47,16 @@ class SshShellSession private constructor(private val session: Session, private 
     fun readOutput(onChunk: (String) -> Unit, onExit: (Int) -> Unit) {
         Thread({
             val reader = Thread {
-                val buffer = ByteArray(4096)
+                // Preserve UTF-8 decoder state when a multibyte character is split
+                // across SSH packet reads.
                 try {
-                    while (true) {
-                        val n = channel.inputStream.read(buffer)
-                        if (n < 0) break
-                        onChunk(String(buffer, 0, n, Charsets.UTF_8))
+                    InputStreamReader(channel.inputStream, StandardCharsets.UTF_8).use { input ->
+                        val chars = CharArray(2048)
+                        while (true) {
+                            val count = input.read(chars)
+                            if (count < 0) break
+                            if (count > 0) onChunk(String(chars, 0, count))
+                        }
                     }
                 } catch (_: Exception) {}
             }.apply { isDaemon = true; start() }
