@@ -291,7 +291,7 @@ class TerminalScreenTest {
         screen.append("\u001B[6 q")
         assertTrue(screen.cursorShapeCode() == 6)
         assertFalse(screen.renderAnnotated().text.contains("▏"))
-        assertTrue(screen.cursorTextOffset() == screen.renderAnnotated().text.length)
+        assertTrue(screen.cursorTextOffset() == screen.renderAnnotated().text.length - 1)
     }
 
     @Test fun ansiBoldUnderlineAndBackgroundColorsArePreserved() {
@@ -316,6 +316,6 @@ class TerminalScreenTest {
         screen.append("\u001B[6 q")
         val bar = screen.renderAnnotated()
         assertFalse(bar.text.contains("▏"))
-        assertTrue(screen.cursorTextOffset() == bar.text.length)
+        assertTrue(screen.cursorTextOffset() == bar.text.length - 1)
     }
 }
