@@ -82,6 +82,8 @@ private data class LinuxTerminalTab(
     val session: AutoCloseable,
     val resize: (Int, Int) -> Unit,
     val exited: MutableState<Int?>,
+    var lastPtyColumns: Int = 0,
+    var lastPtyRows: Int = 0,
 )
 
 private object LinuxTerminalSessions {
@@ -229,7 +231,9 @@ fun LinuxTerminalPanel(
     fun startLocalSession() {
         if (busy) return
         if (!paths.ready()) {
-            error = if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime & Bootstrap in Settings."
+            val validation = context.getSharedPreferences("linux_runtime_validation", Context.MODE_PRIVATE)
+                .getString("message", null)
+            error = validation ?: if (!paths.hasRootfs()) "Ubuntu rootfs is not installed. Open Runtime & Bootstrap in Settings."
             else "The app-owned PRoot binary is missing or invalid. Open Runtime & Bootstrap in Settings."
             return
         }
@@ -336,8 +340,17 @@ fun LinuxTerminalPanel(
                     .onSizeChanged { size ->
                         val cellWidth = with(density) { (terminalFontSize.sp.toPx() * 0.62f).coerceAtLeast(1f) }
                         val cellHeight = with(density) { (terminalFontSize.sp.toPx() * 1.35f).coerceAtLeast(1f) }
-                        active.screen.resize((size.width / cellWidth).toInt().coerceAtLeast(20), (size.height / cellHeight).toInt().coerceAtLeast(5))
-                        active.resize((size.width / cellWidth).toInt().coerceIn(20, 300), (size.height / cellHeight).toInt().coerceIn(5, 120))
+                        val columns = (size.width / cellWidth).toInt().coerceIn(20, 300)
+                        val rows = (size.height / cellHeight).toInt().coerceIn(5, 120)
+                        active.screen.resize(columns, rows)
+                        // Avoid redundant PTY size updates; interactive shells redraw
+                        // their prompt on every SIGWINCH.
+                        if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
+                            active.lastPtyColumns = columns
+                            active.lastPtyRows = rows
+                            active.resize(columns, rows)
+                            active.output.value = active.screen.renderAnnotated()
+                        }
                     }
             ) {
                 Text(
