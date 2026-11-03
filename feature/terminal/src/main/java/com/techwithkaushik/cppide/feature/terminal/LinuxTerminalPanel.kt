@@ -389,9 +389,16 @@ fun LinuxTerminalPanel(
                             if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || active.exited.value != null) return@onPreviewKeyEvent false
                             if (event.isCtrlPressed) {
                                 val control = when (event.key) {
-                                    androidx.compose.ui.input.key.Key.C -> "\u0003"
-                                    androidx.compose.ui.input.key.Key.D -> "\u0004"
-                                    androidx.compose.ui.input.key.Key.Z -> "\u001A"
+                                    androidx.compose.ui.input.key.Key.A -> "\u0001" // beginning of line
+                                    androidx.compose.ui.input.key.Key.C -> "\u0003" // interrupt
+                                    androidx.compose.ui.input.key.Key.D -> "\u0004" // EOF
+                                    androidx.compose.ui.input.key.Key.E -> "\u0005" // end of line
+                                    androidx.compose.ui.input.key.Key.K -> "\u000b" // kill to end of line
+                                    androidx.compose.ui.input.key.Key.L -> "\u000c" // clear screen
+                                    androidx.compose.ui.input.key.Key.R -> "\u0012" // reverse history search
+                                    androidx.compose.ui.input.key.Key.U -> "\u0015" // kill to beginning of line
+                                    androidx.compose.ui.input.key.Key.W -> "\u0017" // erase previous word
+                                    androidx.compose.ui.input.key.Key.Z -> "\u001a" // suspend foreground job
                                     else -> null
                                 }
                                 if (control != null) {
@@ -404,6 +411,11 @@ fun LinuxTerminalPanel(
                                 androidx.compose.ui.input.key.Key.DirectionDown -> { active.send("\u001b[B"); true }
                                 androidx.compose.ui.input.key.Key.DirectionRight -> { active.send("\u001b[C"); true }
                                 androidx.compose.ui.input.key.Key.DirectionLeft -> { active.send("\u001b[D"); true }
+                                androidx.compose.ui.input.key.Key.MoveHome -> { active.send("\u001b[H"); true }
+                                androidx.compose.ui.input.key.Key.MoveEnd -> { active.send("\u001b[F"); true }
+                                androidx.compose.ui.input.key.Key.PageUp -> { active.send("\u001b[5~"); true }
+                                androidx.compose.ui.input.key.Key.PageDown -> { active.send("\u001b[6~"); true }
+                                androidx.compose.ui.input.key.Key.ForwardDelete -> { active.send("\u001b[3~"); true }
                                 androidx.compose.ui.input.key.Key.Tab -> { active.send("\t"); true }
                                 androidx.compose.ui.input.key.Key.Escape -> { active.send("\u001b"); true }
                                 androidx.compose.ui.input.key.Key.Backspace -> { active.send("\u007f"); true }
