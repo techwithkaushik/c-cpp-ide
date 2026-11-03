@@ -57,7 +57,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.awaitPointerEvent
+import androidx.compose.ui.input.pointer.calculateZoom
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -456,17 +459,28 @@ fun LinuxTerminalPanel(
                             }
                         }
                         .pointerInput(active.id) {
-                            detectTransformGestures { _, _, zoom, _ ->
-                                if (zoom.isFinite() && zoom > 0f && kotlin.math.abs(zoom - 1f) > 0.001f) {
-                                    pinchFontSize = (pinchFontSize * zoom).coerceIn(10f, 28f)
-                                    val updatedSize = pinchFontSize.roundToInt().coerceIn(10, 28)
-                                    if (updatedSize != terminalFontSize) {
-                                        terminalFontSize = updatedSize
-                                        terminalPreferences.edit()
-                                            .putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, updatedSize)
-                                            .apply()
+                            // Unlike detectTransformGestures, this recognizer does
+                            // not consume one-finger drags. Scrolling therefore stays
+                            // available while pinch zoom is handled only for 2+ fingers.
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                do {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.count { it.pressed } >= 2) {
+                                        val zoom = event.calculateZoom()
+                                        if (zoom.isFinite() && zoom > 0f && kotlin.math.abs(zoom - 1f) > 0.001f) {
+                                            pinchFontSize = (pinchFontSize * zoom).coerceIn(10f, 28f)
+                                            val updatedSize = pinchFontSize.roundToInt().coerceIn(10, 28)
+                                            if (updatedSize != terminalFontSize) {
+                                                terminalFontSize = updatedSize
+                                                terminalPreferences.edit()
+                                                    .putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, updatedSize)
+                                                    .apply()
+                                            }
+                                        }
+                                        event.changes.forEach { it.consume() }
                                     }
-                                }
+                                } while (event.changes.any { it.pressed })
                             }
                         }
                 ) {
