@@ -29,6 +29,27 @@ class TerminalScreenTest {
         assertTrue(screen.render().contains("abcd"))
     }
 
+    @Test fun alternateScreenDoesNotDestroyPrimaryTerminalOutput() {
+        val screen = TerminalScreen()
+        screen.append("shell prompt")
+        screen.append("\u001B[?1049h")
+        screen.append("full screen app")
+        assertTrue(screen.render().contains("full screen app"))
+        assertFalse(screen.render().contains("shell prompt"))
+        screen.append("\u001B[?1049l")
+        assertTrue(screen.render().contains("shell prompt"))
+        assertFalse(screen.render().contains("full screen app"))
+    }
+
+    @Test fun cursorVisibilityModeHidesAndRestoresCursor() {
+        val screen = TerminalScreen()
+        screen.append("prompt")
+        screen.append("\u001B[?25l")
+        assertFalse(screen.render().contains("▏"))
+        screen.append("\u001B[?25h")
+        assertTrue(screen.render().contains("▏"))
+    }
+
     @Test fun clearScreenErasesPriorOutput() {
         val screen = TerminalScreen()
         screen.append("previous output")
