@@ -68,6 +68,7 @@ internal fun IdeSettingsScreen(
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var scrollbackLines by remember { mutableStateOf(prefs.getInt("terminal_scrollback_lines", 5000).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
+    var terminalConnectionMode by remember { mutableStateOf(prefs.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu") }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
@@ -97,7 +98,7 @@ internal fun IdeSettingsScreen(
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
-                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).apply() }
+                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; terminalConnectionMode = "ubuntu"; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "ubuntu").apply() }
                 }
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
@@ -134,6 +135,16 @@ internal fun IdeSettingsScreen(
                                     }
                     "Terminal" -> {
                         SettingsHeading("TERMINAL")
+                        SettingsHeading("SESSION CONNECTION")
+                        Text("Choose which shell opens when you enter the Terminal panel. Session controls stay in this settings page.", color = SettingsMuted, fontSize = 11.sp)
+                        SettingsChoice("Ubuntu · Local shell", terminalConnectionMode == "ubuntu") {
+                            terminalConnectionMode = "ubuntu"
+                            prefs.edit().putString("terminal_connection_mode", "ubuntu").apply()
+                        }
+                        SettingsChoice("SSH · Remote shell", terminalConnectionMode == "ssh") {
+                            terminalConnectionMode = "ssh"
+                            prefs.edit().putString("terminal_connection_mode", "ssh").apply()
+                        }
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
