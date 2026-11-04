@@ -12,8 +12,8 @@ import androidx.compose.ui.text.style.TextDecoration
  * styling instead of treating the PTY stream as a plain append-only log.
  */
 internal class TerminalScreen(
-    columns: Int = 100,
-    rows: Int = 30,
+    columns: Int = 80,
+    rows: Int = 24,
     private val maxScrollbackLines: Int = 5_000,
 ) {
     private data class BufferState(
