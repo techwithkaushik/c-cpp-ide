@@ -344,9 +344,9 @@ class TerminalScreenTest {
 
     @Test fun ansiBasicColorsMatchTermuxXtermPalette() {
         val screen = TerminalScreen(columns = 30, rows = 5)
-        screen.append("\\u001B[31mred\\u001B[0m ")
-        screen.append("\\u001B[32mgreen\\u001B[0m ")
-        screen.append("\\u001B[91mbright-red\\u001B[0m")
+        screen.append("\u001B[31mred\u001B[0m ")
+        screen.append("\u001B[32mgreen\u001B[0m ")
+        screen.append("\u001B[91mbright-red\u001B[0m")
         val rendered = screen.renderAnnotated()
         fun colorOf(label: String): Color {
             val start = rendered.text.indexOf(label)
