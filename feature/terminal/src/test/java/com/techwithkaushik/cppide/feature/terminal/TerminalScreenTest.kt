@@ -366,4 +366,41 @@ class TerminalScreenTest {
         assertFalse(bar.text.contains("▏"))
         assertTrue(screen.cursorTextOffset() == bar.text.length - 1)
     }
+
+    @Test fun zwjFamilyEmojiRemainsOneWideGraphemeAcrossOutputChunks() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        val family = "👨‍👩‍👧‍👦"
+        screen.append(family.substring(0, 3))
+        screen.append(family.substring(3))
+        assertTrue(screen.render().contains(family))
+        assertTrue(screen.renderAnnotated().text.contains(family))
+        assertTrue(screen.cursorTextOffset() == family.length)
+    }
+
+    @Test fun skinToneAndVariationSelectorArePreservedWithoutExtraCells() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        val emoji = "✊🏽"
+        screen.append(emoji)
+        assertTrue(screen.render().contains(emoji))
+        assertTrue(screen.cursorTextOffset() == emoji.length)
+    }
+
+    @Test fun regionalIndicatorFlagPairIsKeptTogether() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        val flag = "🇮🇳"
+        screen.append(flag)
+        assertTrue(screen.render().contains(flag))
+        assertTrue(screen.cursorTextOffset() == flag.length)
+    }
+
+    @Test fun graphemeSuffixSurvivesScrollbackAndAlternateBufferSwitch() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        val family = "👨‍👩‍👧‍👦"
+        screen.append(family + "\\r\\nrow1\\r\\nrow2\\r\\nrow3\\r\\nrow4\\r\\nrow5")
+        assertTrue(screen.render().contains(family))
+        screen.append("\\u001B[?1049h")
+        screen.append("editor")
+        screen.append("\\u001B[?1049l")
+        assertTrue(screen.render().contains(family))
+    }
 }
