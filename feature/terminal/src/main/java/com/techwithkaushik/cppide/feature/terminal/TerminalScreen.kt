@@ -482,7 +482,7 @@ internal class TerminalScreen(
             }
             's' -> { savedRow = row; savedColumn = column }
             'u' -> { row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1) }
-            'm' -> applySgr(parameters)
+            'm' -> applySgr(raw)
             // DECSCUSR uses CSI Ps SP q. Accept both omitted and explicit Ps.
             'q' -> if (raw.contains(' ')) cursorShape = (raw.substringBefore(' ').trim().toIntOrNull() ?: 0).coerceIn(0, 6)
             'h', 'l' -> {
@@ -500,39 +500,75 @@ internal class TerminalScreen(
         }
     }
 
-    private fun applySgr(parameters: List<Int>) {
-        val values = if (parameters.isEmpty()) listOf(0) else parameters
+    /**
+     * Parses both semicolon and colon SGR color forms. Colon notation is used
+     * by modern terminals (for example 38:2::R:G:B); semicolon notation may
+     * include an optional color-space identifier after the mode.
+     */
+    private fun applySgr(raw: String) {
+        val tokens = if (raw.isEmpty()) listOf("0") else raw.split(';')
         var index = 0
-        while (index < values.size) {
-            when (val code = values[index]) {
-                0 -> currentStyle = CellStyle()
-                1 -> currentStyle = currentStyle.copy(bold = true, dim = false)
-                2 -> currentStyle = currentStyle.copy(dim = true)
-                3 -> currentStyle = currentStyle.copy(italic = true)
-                4 -> currentStyle = currentStyle.copy(underline = true)
-                7 -> currentStyle = currentStyle.copy(inverse = true)
-                22 -> currentStyle = currentStyle.copy(bold = false, dim = false)
-                23 -> currentStyle = currentStyle.copy(italic = false)
-                24 -> currentStyle = currentStyle.copy(underline = false)
-                27 -> currentStyle = currentStyle.copy(inverse = false)
-                39 -> currentStyle = currentStyle.copy(foreground = null)
-                49 -> currentStyle = currentStyle.copy(background = null)
-                in 30..37 -> currentStyle = currentStyle.copy(foreground = ansiColor(code - 30, false))
-                in 90..97 -> currentStyle = currentStyle.copy(foreground = ansiColor(code - 90, true))
-                in 40..47 -> currentStyle = currentStyle.copy(background = ansiColor(code - 40, false))
-                in 100..107 -> currentStyle = currentStyle.copy(background = ansiColor(code - 100, true))
-                38, 48 -> {
-                    val isForeground = code == 38
-                    val mode = values.getOrNull(index + 1)
-                    if (mode == 5) {
-                        val color = indexedColor(values.getOrNull(index + 2) ?: 7)
-                        currentStyle = if (isForeground) currentStyle.copy(foreground = color) else currentStyle.copy(background = color)
-                        index += 2
-                    } else if (mode == 2 && index + 4 < values.size) {
-                        val color = rgb(values[index + 2], values[index + 3], values[index + 4])
-                        currentStyle = if (isForeground) currentStyle.copy(foreground = color) else currentStyle.copy(background = color)
-                        index += 4
+        while (index < tokens.size) {
+            val parts = tokens[index].split(':')
+            val code = parts.firstOrNull()?.toIntOrNull() ?: 0
+            if (code == 38 || code == 48) {
+                val foreground = code == 38
+                val mode = parts.getOrNull(1)?.toIntOrNull()
+                    ?: tokens.getOrNull(index + 1)?.toIntOrNull()
+                if (parts.size > 1) {
+                    when (mode) {
+                        5 -> {
+                            val color = indexedColor(parts.getOrNull(2)?.toIntOrNull() ?: 7)
+                            currentStyle = if (foreground) currentStyle.copy(foreground = color)
+                                else currentStyle.copy(background = color)
+                        }
+                        2 -> {
+                            val components = parts.drop(2).filter { it.isNotEmpty() }.mapNotNull(String::toIntOrNull)
+                            if (components.size >= 3) {
+                                val color = rgb(components[components.size - 3], components[components.size - 2], components.last())
+                                currentStyle = if (foreground) currentStyle.copy(foreground = color)
+                                    else currentStyle.copy(background = color)
+                            }
+                        }
                     }
+                } else if (mode == 5) {
+                    val color = indexedColor(tokens.getOrNull(index + 2)?.toIntOrNull() ?: 7)
+                    currentStyle = if (foreground) currentStyle.copy(foreground = color)
+                        else currentStyle.copy(background = color)
+                    index += 2
+                } else if (mode == 2 && index + 4 < tokens.size) {
+                    var componentStart = index + 2
+                    // ISO 8613-6 color-space identifier is optional.
+                    if (tokens.getOrNull(componentStart) == "0" && index + 5 < tokens.size) componentStart++
+                    if (componentStart + 2 < tokens.size) {
+                        val color = rgb(
+                            tokens[componentStart].toIntOrNull() ?: 0,
+                            tokens[componentStart + 1].toIntOrNull() ?: 0,
+                            tokens[componentStart + 2].toIntOrNull() ?: 0,
+                        )
+                        currentStyle = if (foreground) currentStyle.copy(foreground = color)
+                            else currentStyle.copy(background = color)
+                        index = componentStart + 2
+                    }
+                }
+            } else {
+                when (code) {
+                    0 -> currentStyle = CellStyle()
+                    1 -> currentStyle = currentStyle.copy(bold = true, dim = false)
+                    2 -> currentStyle = currentStyle.copy(dim = true)
+                    3 -> currentStyle = currentStyle.copy(italic = true)
+                    4 -> currentStyle = currentStyle.copy(underline = true)
+                    7 -> currentStyle = currentStyle.copy(inverse = true)
+                    22 -> currentStyle = currentStyle.copy(bold = false, dim = false)
+                    23 -> currentStyle = currentStyle.copy(italic = false)
+                    24 -> currentStyle = currentStyle.copy(underline = false)
+                    27 -> currentStyle = currentStyle.copy(inverse = false)
+                    39 -> currentStyle = currentStyle.copy(foreground = null)
+                    49 -> currentStyle = currentStyle.copy(background = null)
+                    in 30..37 -> currentStyle = currentStyle.copy(foreground = ansiColor(code - 30, false))
+                    in 90..97 -> currentStyle = currentStyle.copy(foreground = ansiColor(code - 90, true))
+                    in 40..47 -> currentStyle = currentStyle.copy(background = ansiColor(code - 40, false))
+                    in 100..107 -> currentStyle = currentStyle.copy(background = ansiColor(code - 100, true))
                 }
             }
             index++
