@@ -657,8 +657,17 @@ internal class TerminalScreen(
     }
 
     private fun ansiColor(index: Int, bright: Boolean): Int {
-        val normal = intArrayOf(0xFF1C1C1C.toInt(), 0xFFCC3333.toInt(), 0xFF33AA55.toInt(), 0xFFCCAA33.toInt(), 0xFF4477CC.toInt(), 0xFFAA55AA.toInt(), 0xFF33AAAA.toInt(), 0xFFCCCCCC.toInt())
-        val vivid = intArrayOf(0xFF666666.toInt(), 0xFFFF6666.toInt(), 0xFF66DD88.toInt(), 0xFFFFDD66.toInt(), 0xFF77AAFF.toInt(), 0xFFDD88DD.toInt(), 0xFF66DDDD.toInt(), 0xFFFFFFFF.toInt())
+        // Match Termux's xterm-compatible 16-colour palette. Keep the
+        // low-intensity and bright entries distinct instead of using the
+        // previous muted custom palette (which made ANSI output look washed out).
+        val normal = intArrayOf(
+            0xFF000000.toInt(), 0xFFCD0000.toInt(), 0xFF00CD00.toInt(), 0xFFCDCD00.toInt(),
+            0xFF6495ED.toInt(), 0xFFCD00CD.toInt(), 0xFF00CDCD.toInt(), 0xFFE5E5E5.toInt()
+        )
+        val vivid = intArrayOf(
+            0xFF7F7F7F.toInt(), 0xFFFF0000.toInt(), 0xFF00FF00.toInt(), 0xFFFFFF00.toInt(),
+            0xFF5C5CFF.toInt(), 0xFFFF00FF.toInt(), 0xFF00FFFF.toInt(), 0xFFFFFFFF.toInt()
+        )
         return (if (bright) vivid else normal)[index.coerceIn(0, 7)]
     }
 
