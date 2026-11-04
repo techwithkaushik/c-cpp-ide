@@ -439,6 +439,11 @@ fun LinuxTerminalPanel(
             val outputScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val outputHorizontalScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
+            val terminalTextMeasurer = rememberTextMeasurer()
+            val cursorCellWidth = terminalTextMeasurer.measure(
+                AnnotatedString("M"),
+                style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp)
+            ).size.width.toFloat().coerceAtLeast(1f)
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
             var terminalVisualScale by remember(active.id) { mutableFloatStateOf(1f) }
             LaunchedEffect(active.id, active.outputRevision.value) {
@@ -521,21 +526,22 @@ fun LinuxTerminalPanel(
                         if (cursorBlinkTick >= 0 && active.screen.isCursorDrawn()) {
                             val layout = cursorTextLayout.value
                             if (layout != null) {
-                                val offset = active.screen.cursorTextOffset()
-                                    .coerceIn(0, active.output.value.length)
-                                val rect = layout.getCursorRect(offset)
-                                val left = rect.left - outputHorizontalScrollState.value
-                                val top = rect.top - outputScrollState.value
-                                val right = left + rect.width.coerceAtLeast(2f)
-                                val bottom = top + rect.height.coerceAtLeast(2f)
+                                val (cursorColumn, cursorLine) = active.screen.cursorGridPosition()
+                                if (cursorLine !in 0 until layout.lineCount) return@Canvas
+                                // Position the cursor from terminal cell coordinates, not UTF-16
+                                // text offsets. Wide glyphs and grapheme suffixes cannot skew it.
+                                val left = cursorColumn * cursorCellWidth - outputHorizontalScrollState.value
+                                val top = layout.getLineTop(cursorLine) - outputScrollState.value
+                                val bottom = layout.getLineBottom(cursorLine) - outputScrollState.value
+                                val right = left + cursorCellWidth
                                 if (right >= 0f && left <= size.width && bottom >= 0f && top <= size.height) {
                                     when (active.screen.cursorShapeCode()) {
                                         0, 1, 2 -> drawRect(
                                             color = Color(0xFF8AB4F8).copy(alpha = 0.38f),
                                             topLeft = Offset(left, top),
                                             size = androidx.compose.ui.geometry.Size(
-                                                rect.width.coerceAtLeast(2f),
-                                                rect.height.coerceAtLeast(2f)
+                                                cursorCellWidth.coerceAtLeast(2f),
+                                                (bottom - top).coerceAtLeast(2f)
                                             )
                                         )
                                         3, 4 -> drawLine(
