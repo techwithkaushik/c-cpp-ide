@@ -525,7 +525,10 @@ fun LinuxTerminalPanel(
                                 .pointerInput(terminalInputFocusRequester) {
                                     detectTapGestures {
                                         terminalInputFocusRequester.requestFocus()
-                                        keyboardController?.show()
+                                        scope.launch {
+                                            delay(80)
+                                            keyboardController?.show()
+                                        }
                                     }
                                 }
                                 .horizontalScroll(outputHorizontalScrollState)
