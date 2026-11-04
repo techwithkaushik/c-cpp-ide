@@ -139,6 +139,10 @@ internal class TerminalScreen(
      * Continuation cells for wide glyphs are excluded, while surrogate pairs
      * contribute their two UTF-16 code units exactly as Compose text layout expects.
      */
+    /** Zero-based terminal cell coordinates, including transcript rows in the primary buffer. */
+    fun cursorGridPosition(): Pair<Int, Int> =
+        column to (if (alternateBuffer) row else scrollback.size + row)
+
     fun cursorTextOffset(): Int {
         var offset = 0
         if (!alternateBuffer) {
