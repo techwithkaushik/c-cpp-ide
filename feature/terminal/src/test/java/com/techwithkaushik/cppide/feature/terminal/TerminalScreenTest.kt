@@ -281,6 +281,25 @@ class TerminalScreenTest {
         assertTrue(screen.cursorTextOffset() == rendered.text.length - 1)
     }
 
+    @Test fun ansiColonTruecolorAndIndexedBackgroundAreParsed() {
+        val screen = TerminalScreen(columns = 40, rows = 5)
+        screen.append("\u001B[38:2::12:34:56;48:5:196mCOLON\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        val start = rendered.text.indexOf("COLON")
+        val style = rendered.spanStyles.first { it.start <= start && it.end >= start + 5 }.item
+        assertTrue(style.color == Color(0xFF0C2238))
+        assertTrue(style.background == Color(0xFFFF0000))
+    }
+
+    @Test fun ansiSemicolonTruecolorAcceptsOptionalColorSpaceId() {
+        val screen = TerminalScreen(columns = 40, rows = 5)
+        screen.append("\u001B[38;2;0;12;34;56mRGB\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        val start = rendered.text.indexOf("RGB")
+        val style = rendered.spanStyles.first { it.start <= start && it.end >= start + 3 }.item
+        assertTrue(style.color == Color(0xFF0C2238))
+    }
+
     @Test fun ansiStylesSurviveWhenRowsMoveIntoScrollback() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("\u001B[31mRED\u001B[0m\r\nline1\r\nline2\r\nline3\r\nline4\r\nline5")
