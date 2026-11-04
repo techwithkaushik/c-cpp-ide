@@ -425,6 +425,7 @@ fun LinuxTerminalPanel(
             // Keep the cursor steady. Re-rendering the entire scrollback every
             // 530ms caused visible text flicker; Termux blinks only the cursor
             // in its Canvas renderer, not the terminal text buffer.
+            var cursorBlinkTick by remember(active.id) { mutableIntStateOf(0) }
             LaunchedEffect(active.id) {
                 active.screen.setCursorBlinkPhase(true)
                 while (true) {
@@ -440,7 +441,6 @@ fun LinuxTerminalPanel(
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
             var terminalVisualScale by remember(active.id) { mutableFloatStateOf(1f) }
-            var cursorBlinkTick by remember(active.id) { mutableIntStateOf(0) }
             LaunchedEffect(active.id, active.outputRevision.value) {
                 val previousScrollValue = outputScrollState.value
                 val wasFollowingOutput = outputScrollState.maxValue - previousScrollValue <= 48
@@ -490,6 +490,14 @@ fun LinuxTerminalPanel(
                             lineHeight = (terminalFontSize * 1.28f).sp,
                             onTextLayout = { cursorTextLayout.value = it },
                             modifier = Modifier
+                                .pointerInput(active.id) {
+                                    detectTapGestures {
+                                        // The IME may be dismissed by Back while this field retains focus.
+                                        // Re-request focus and explicitly show the keyboard on the next tap.
+                                        terminalInputFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    }
+                                }
                                 .graphicsLayer(
                                     scaleX = terminalVisualScale,
                                     scaleY = terminalVisualScale,
@@ -510,8 +518,7 @@ fun LinuxTerminalPanel(
                         clip = false
                     )) {
                         // Reading this Compose state invalidates the Canvas on every blink phase.
-                        @Suppress("UNUSED_EXPRESSION") cursorBlinkTick
-                        if (active.screen.isCursorDrawn()) {
+                        if (cursorBlinkTick >= 0 && active.screen.isCursorDrawn()) {
                             val layout = cursorTextLayout.value
                             if (layout != null) {
                                 val offset = active.screen.cursorTextOffset()
