@@ -439,6 +439,7 @@ fun LinuxTerminalPanel(
             val outputScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val outputHorizontalScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
+            var terminalVisualScale by remember(active.id) { mutableFloatStateOf(1f) }
             val terminalTextMeasurer = rememberTextMeasurer()
             // Change the actual glyph/cell layout size. A graphics-only scale leaves
             // the text layout and horizontal scroll extent at the old width.
@@ -448,7 +449,6 @@ fun LinuxTerminalPanel(
                 style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = displayFontSize.sp)
             ).size.width.toFloat().coerceAtLeast(1f)
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
-            var terminalVisualScale by remember(active.id) { mutableFloatStateOf(1f) }
             LaunchedEffect(active.id, active.outputRevision.value) {
                 val previousScrollValue = outputScrollState.value
                 val wasFollowingOutput = outputScrollState.maxValue - previousScrollValue <= 48
