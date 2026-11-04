@@ -49,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -428,8 +430,7 @@ fun LinuxTerminalPanel(
                 while (true) {
                     delay(530)
                     if (active.screen.advanceCursorBlinkPhase()) {
-                        active.output.value = active.screen.renderAnnotated()
-                        active.outputRevision.value++
+                        cursorBlinkTick++
                     }
                 }
             }
@@ -438,8 +439,8 @@ fun LinuxTerminalPanel(
             val outputHorizontalScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
-            val terminalTextMeasurer = rememberTextMeasurer()
-            var pinchFontSize by remember(active.id) { mutableFloatStateOf(terminalFontSize.toFloat()) }
+            var terminalVisualScale by remember(active.id) { mutableFloatStateOf(1f) }
+            var cursorBlinkTick by remember(active.id) { mutableIntStateOf(0) }
             LaunchedEffect(active.id, active.outputRevision.value) {
                 val previousScrollValue = outputScrollState.value
                 val wasFollowingOutput = outputScrollState.maxValue - previousScrollValue <= 48
@@ -454,40 +455,12 @@ fun LinuxTerminalPanel(
                     }
                 }
             }
-            // Recalculate PTY geometry whenever the font changes, not only when
-            // the viewport bounds change. Pinch zoom otherwise leaves stale columns.
-            LaunchedEffect(terminalViewportSize, terminalFontSize) {
-                val size = terminalViewportSize
-                if (size.width > 0 && size.height > 0) {
-                    val cellMetrics = terminalTextMeasurer.measure(
-                        AnnotatedString("M"),
-                        style = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = terminalFontSize.sp,
-                            lineHeight = (terminalFontSize * 1.28f).sp
-                        )
-                    )
-                    val cellWidth = cellMetrics.size.width.toFloat().coerceAtLeast(1f)
-                    val cellHeight = cellMetrics.size.height.toFloat().coerceAtLeast(1f)
-                    val columns = (size.width / cellWidth).toInt().coerceIn(20, 300)
-                    val rows = (size.height / cellHeight).toInt().coerceIn(5, 120)
-                    active.screen.resize(columns, rows)
-                    if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
-                        active.lastPtyColumns = columns
-                        active.lastPtyRows = rows
-                        active.resize(columns, rows)
-                        active.output.value = active.screen.renderAnnotated()
-                        active.outputRevision.value++
-                    }
-                }
-            }
             Column(
                 Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0B0F14))
             ) {
                 Box(
                     Modifier.weight(1f).fillMaxWidth()
                         .background(Color(0xFF0B0F14))
-                        .onSizeChanged { terminalViewportSize = it }
                         .pointerInput(active.id) {
                             // Unlike detectTransformGestures, this recognizer does
                             // not consume one-finger drags. Scrolling therefore stays
@@ -499,14 +472,7 @@ fun LinuxTerminalPanel(
                                     if (event.changes.count { it.pressed } >= 2) {
                                         val zoom = event.calculateZoom()
                                         if (zoom.isFinite() && zoom > 0f && kotlin.math.abs(zoom - 1f) > 0.001f) {
-                                            pinchFontSize = (pinchFontSize * zoom).coerceIn(10f, 28f)
-                                            val updatedSize = pinchFontSize.roundToInt().coerceIn(10, 28)
-                                            if (updatedSize != terminalFontSize) {
-                                                terminalFontSize = updatedSize
-                                                terminalPreferences.edit()
-                                                    .putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, updatedSize)
-                                                    .apply()
-                                            }
+                                            terminalVisualScale = (terminalVisualScale * zoom).coerceIn(0.65f, 2.0f)
                                         }
                                         event.changes.forEach { it.consume() }
                                     }
@@ -524,20 +490,12 @@ fun LinuxTerminalPanel(
                             lineHeight = (terminalFontSize * 1.28f).sp,
                             onTextLayout = { cursorTextLayout.value = it },
                             modifier = Modifier
-                                .pointerInput(terminalInputFocusRequester) {
-                                    detectTapGestures {
-                                        // Back can leave the 1dp input focused while the IME is
-                                        // hidden. Clear and reacquire focus so a second tap always
-                                        // reopens the software keyboard.
-                                        focusManager.clearFocus(force = true)
-                                        scope.launch {
-                                            delay(40)
-                                            terminalInputFocusRequester.requestFocus()
-                                            delay(80)
-                                            keyboardController?.show()
-                                        }
-                                    }
-                                }
+                                .graphicsLayer(
+                                    scaleX = terminalVisualScale,
+                                    scaleY = terminalVisualScale,
+                                    transformOrigin = TransformOrigin(0f, 0f),
+                                    clip = false
+                                )
                                 .horizontalScroll(outputHorizontalScrollState)
                                 .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
                                 .fillMaxWidth()
@@ -545,7 +503,14 @@ fun LinuxTerminalPanel(
                     }
                     // Draw the terminal cursor in a dedicated Canvas layer. The
                     // terminal text itself contains only shell output, never a cursor glyph.
-                    Canvas(Modifier.matchParentSize()) {
+                    Canvas(Modifier.matchParentSize().graphicsLayer(
+                        scaleX = terminalVisualScale,
+                        scaleY = terminalVisualScale,
+                        transformOrigin = TransformOrigin(0f, 0f),
+                        clip = false
+                    )) {
+                        // Reading this Compose state invalidates the Canvas on every blink phase.
+                        @Suppress("UNUSED_EXPRESSION") cursorBlinkTick
                         if (active.screen.isCursorDrawn()) {
                             val layout = cursorTextLayout.value
                             if (layout != null) {
