@@ -19,13 +19,14 @@ internal class TerminalScreen(
     private data class BufferState(
         val cells: Array<CharArray>,
         val styles: Array<Array<CellStyle>>,
+        val clusterSuffixes: Array<Array<String?>>, 
         val row: Int,
         val column: Int,
         val savedRow: Int,
         val savedColumn: Int,
     )
 
-    private data class ScrollbackLine(val cells: CharArray, val styles: Array<CellStyle>)
+    private data class ScrollbackLine(val cells: CharArray, val styles: Array<CellStyle>, val clusterSuffixes: Array<String?>)
 
     private data class CellStyle(
         val foreground: Int? = null,
@@ -41,6 +42,8 @@ internal class TerminalScreen(
     private var rows = rows.coerceIn(5, 120)
     private var cells = Array(this.rows) { CharArray(this.columns) { ' ' } }
     private var styles = Array(this.rows) { Array(this.columns) { CellStyle() } }
+    private var clusterSuffixes = Array(this.rows) { arrayOfNulls<String>(this.columns) }
+    private var joinNextCodePoint = false
     private val scrollback = ArrayDeque<ScrollbackLine>()
     private var row = 0
     private var column = 0
@@ -85,22 +88,27 @@ internal class TerminalScreen(
         if (width == columns && height == rows) return
         val resizedCells = Array(height) { CharArray(width) { ' ' } }
         val resizedStyles = Array(height) { Array(width) { CellStyle() } }
+        val resizedSuffixes = Array(height) { arrayOfNulls<String>(width) }
         val rowsToCopy = minOf(rows, height)
         val columnsToCopy = minOf(columns, width)
         for (index in 0 until rowsToCopy) {
             cells[index].copyInto(resizedCells[index], endIndex = columnsToCopy)
             styles[index].copyInto(resizedStyles[index], endIndex = columnsToCopy)
+            clusterSuffixes[index].copyInto(resizedSuffixes[index], endIndex = columnsToCopy)
         }
         primaryBuffer = primaryBuffer?.let { primary ->
             val primaryCells = Array(height) { CharArray(width) { ' ' } }
             val primaryStyles = Array(height) { Array(width) { CellStyle() } }
+            val primarySuffixes = Array(height) { arrayOfNulls<String>(width) }
             for (index in 0 until minOf(primary.cells.size, height)) {
                 primary.cells[index].copyInto(primaryCells[index], endIndex = minOf(primary.cells[index].size, width))
                 primary.styles[index].copyInto(primaryStyles[index], endIndex = minOf(primary.styles[index].size, width))
+                primary.clusterSuffixes[index].copyInto(primarySuffixes[index], endIndex = minOf(primary.clusterSuffixes[index].size, width))
             }
             primary.copy(
                 cells = primaryCells,
                 styles = primaryStyles,
+                clusterSuffixes = primarySuffixes,
                 row = primary.row.coerceIn(0, height - 1),
                 column = primary.column.coerceIn(0, width - 1),
                 savedRow = primary.savedRow.coerceIn(0, height - 1),
@@ -109,6 +117,7 @@ internal class TerminalScreen(
         }
         cells = resizedCells
         styles = resizedStyles
+        clusterSuffixes = resizedSuffixes
         columns = width
         rows = height
         scrollTop = scrollTop.coerceIn(0, rows - 1)
@@ -240,7 +249,7 @@ internal class TerminalScreen(
         val builder = AnnotatedString.Builder()
         if (!alternateBuffer) scrollback.forEachIndexed { lineIndex, line ->
             if (lineIndex > 0) builder.append("\n")
-            appendStyledLine(builder, line.cells, line.styles, includeCursor = false)
+            appendStyledLine(builder, line.cells, line.styles, line.clusterSuffixes, includeCursor = false)
         }
         if (!alternateBuffer && scrollback.isNotEmpty()) builder.append("\n")
         val last = lastVisibleRow()
@@ -250,6 +259,7 @@ internal class TerminalScreen(
                 builder,
                 cells[lineIndex],
                 styles[lineIndex],
+                clusterSuffixes[lineIndex],
                 // Keep terminal-cell padding stable during blink-off phases so
                 // the text layout and cursor coordinates never jump.
                 includeCursor = lineIndex == row,
@@ -262,6 +272,7 @@ internal class TerminalScreen(
         builder: AnnotatedString.Builder,
         lineCells: CharArray,
         lineStyles: Array<CellStyle>,
+        lineSuffixes: Array<String?>,
         includeCursor: Boolean,
     ) {
         val visibleLength = lineCells.indexOfLast { it != ' ' && it != '\u0000' } + 1
@@ -285,6 +296,7 @@ internal class TerminalScreen(
             builder.pushStyle(span)
             if (cellIndex < visibleLength) {
                 builder.append(cell.toString())
+                if (!Character.isHighSurrogate(cell)) lineSuffixes[cellIndex]?.let(builder::append)
             } else if (includeCursor && cellIndex <= cursorAt) {
                 // Materialize blank terminal cells before the cursor. Without
                 // this padding, a cursor addressed to column N would be drawn
@@ -297,8 +309,11 @@ internal class TerminalScreen(
 
     /** Build a display string without the internal continuation-cell markers. */
     private fun visibleLine(lineIndex: Int): String = buildString {
-        cells[lineIndex].forEach { cell ->
-            if (cell != '\u0000') append(cell)
+        cells[lineIndex].forEachIndexed { index, cell ->
+            if (cell != '\u0000') {
+                append(cell)
+                if (!Character.isHighSurrogate(cell)) clusterSuffixes[lineIndex][index]?.let(::append)
+            }
         }
     }
 
@@ -325,19 +340,18 @@ internal class TerminalScreen(
                 val combining = type == Character.NON_SPACING_MARK.toInt() ||
                     type == Character.COMBINING_SPACING_MARK.toInt() ||
                     type == Character.ENCLOSING_MARK.toInt()
-                if (combining) {
-                    val previous = (column - 1).coerceAtLeast(0)
-                    val existing = cells[row][previous]
-                    if (existing != ' ' && existing != '\u0000') {
-                        val combined = StringBuilder().append(existing)
-                        if (previous > 0 && Character.isHighSurrogate(cells[row][previous - 1])) {
-                            combined.insert(0, cells[row][previous - 1])
-                        }
-                        combined.appendCodePoint(codePoint)
-                        val value = combined.toString()
-                        val start = if (previous > 0 && Character.isHighSurrogate(cells[row][previous - 1])) previous - 1 else previous
-                        value.forEachIndexed { index, ch -> if (start + index < columns) cells[row][start + index] = ch }
-                    }
+                val extender = combining || codePoint == 0x200D ||
+                    codePoint in 0xFE00..0xFE0F || codePoint in 0xE0100..0xE01EF ||
+                    codePoint in 0x1F3FB..0x1F3FF || codePoint in 0xE0020..0xE007F
+                if (extender) {
+                    appendToPreviousGrapheme(codePoint)
+                    if (codePoint == 0x200D) joinNextCodePoint = true
+                    return
+                }
+                val regionalIndicator = codePoint in 0x1F1E6..0x1F1FF
+                if (joinNextCodePoint || (regionalIndicator && previousGraphemeIsRegionalIndicator())) {
+                    appendToPreviousGrapheme(codePoint)
+                    joinNextCodePoint = false
                     return
                 }
                 val width = unicodeCellWidth(codePoint)
@@ -358,6 +372,29 @@ internal class TerminalScreen(
                 if (column >= columns) { column = 0; lineFeed() }
             }
         }
+    }
+
+    private fun appendToPreviousGrapheme(codePoint: Int) {
+        val lead = previousGraphemeLeadColumn() ?: return
+        clusterSuffixes[row][lead] = (clusterSuffixes[row][lead] ?: "") + String(Character.toChars(codePoint))
+    }
+
+    private fun previousGraphemeLeadColumn(): Int? {
+        if (column <= 0) return null
+        var candidate = column - 1
+        if (cells[row][candidate] == '\u0000') candidate--
+        if (candidate > 0 && Character.isLowSurrogate(cells[row][candidate]) &&
+            Character.isHighSurrogate(cells[row][candidate - 1])) candidate--
+        return candidate.takeIf { it >= 0 && cells[row][it] != ' ' && cells[row][it] != '\u0000' }
+    }
+
+    private fun previousGraphemeIsRegionalIndicator(): Boolean {
+        val lead = previousGraphemeLeadColumn() ?: return false
+        val base = buildString {
+            append(cells[row][lead])
+            if (lead + 1 < columns && Character.isLowSurrogate(cells[row][lead + 1])) append(cells[row][lead + 1])
+        } + (clusterSuffixes[row][lead] ?: "")
+        return base.codePoints().toArray().any { it in 0x1F1E6..0x1F1FF }
     }
 
     /** Approximate wcwidth: combining marks are zero cells; East Asian and emoji ranges are two. */
@@ -403,12 +440,13 @@ internal class TerminalScreen(
                 // Keep both glyph cells and their SGR attributes in scrollback.
                 // Storing only Strings silently discarded ANSI colors/styles once
                 // a styled row scrolled off the live screen.
-                scrollback.addLast(ScrollbackLine(cells[scrollTop].copyOf(), styles[scrollTop].copyOf()))
+                scrollback.addLast(ScrollbackLine(cells[scrollTop].copyOf(), styles[scrollTop].copyOf(), clusterSuffixes[scrollTop].copyOf()))
                 while (scrollback.size > maxScrollbackLines) scrollback.removeFirst()
             }
             for (index in scrollTop until scrollBottom) {
                 cells[index] = cells[index + 1]
                 styles[index] = styles[index + 1]
+                clusterSuffixes[index] = clusterSuffixes[index + 1]
             }
             eraseRow(scrollBottom)
         }
@@ -419,6 +457,7 @@ internal class TerminalScreen(
             for (index in scrollBottom downTo scrollTop + 1) {
                 cells[index] = cells[index - 1]
                 styles[index] = styles[index - 1]
+                clusterSuffixes[index] = clusterSuffixes[index - 1]
             }
             eraseRow(scrollTop)
         }
@@ -605,6 +644,7 @@ internal class TerminalScreen(
             for (index in columns - 1 downTo column + 1) {
                 cells[row][index] = cells[row][index - 1]
                 styles[row][index] = styles[row][index - 1]
+                clusterSuffixes[row][index] = clusterSuffixes[row][index - 1]
             }
             eraseCell(row, column)
         }
@@ -615,6 +655,7 @@ internal class TerminalScreen(
             for (index in column until columns - 1) {
                 cells[row][index] = cells[row][index + 1]
                 styles[row][index] = styles[row][index + 1]
+                clusterSuffixes[row][index] = clusterSuffixes[row][index + 1]
             }
             eraseCell(row, columns - 1)
         }
@@ -643,11 +684,13 @@ internal class TerminalScreen(
     private fun eraseCell(targetRow: Int, targetColumn: Int) {
         cells[targetRow][targetColumn] = ' '
         styles[targetRow][targetColumn] = CellStyle()
+        clusterSuffixes[targetRow][targetColumn] = null
     }
 
     private fun eraseRow(targetRow: Int) {
         cells[targetRow].fill(' ')
         styles[targetRow] = Array(columns) { CellStyle() }
+        clusterSuffixes[targetRow] = arrayOfNulls(columns)
     }
 
     private fun eraseLineFromCursor() {
@@ -670,15 +713,17 @@ internal class TerminalScreen(
         applicationCursorKeys = false
         bracketedPasteEnabled = false
         pendingHighSurrogate = null
+        joinNextCodePoint = false
         scrollTop = 0
         scrollBottom = rows - 1
     }
 
     private fun enterAlternateBuffer() {
         if (alternateBuffer) return
-        primaryBuffer = BufferState(cells, styles, row, column, savedRow, savedColumn)
+        primaryBuffer = BufferState(cells, styles, clusterSuffixes, row, column, savedRow, savedColumn)
         cells = Array(rows) { CharArray(columns) { ' ' } }
         styles = Array(rows) { Array(columns) { CellStyle() } }
+        clusterSuffixes = Array(rows) { arrayOfNulls<String>(columns) }
         row = 0
         column = 0
         savedRow = 0
@@ -690,6 +735,7 @@ internal class TerminalScreen(
         val primary = primaryBuffer ?: return
         cells = primary.cells
         styles = primary.styles
+        clusterSuffixes = primary.clusterSuffixes
         row = primary.row.coerceIn(0, rows - 1)
         column = primary.column.coerceIn(0, columns - 1)
         savedRow = primary.savedRow.coerceIn(0, rows - 1)
