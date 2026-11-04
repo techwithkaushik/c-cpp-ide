@@ -430,7 +430,7 @@ internal class TerminalScreen(
             codePoint in 0x2E80..0xA4CF || codePoint in 0xAC00..0xD7A3 ||
             codePoint in 0xF900..0xFAFF || codePoint in 0xFE10..0xFE19 ||
             codePoint in 0xFE30..0xFE6F || codePoint in 0xFF00..0xFF60 ||
-            codePoint in 0xFFE0..0xFFE6 || codePoint in 0x1F000..0x1FAFF ||
+            codePoint in 0xFFE0..0xFFE6 || codePoint in 0x2600..0x27BF || codePoint in 0x1F000..0x1FAFF ||
             codePoint in 0x20000..0x3FFFD
         ) 2 else 1
     }
