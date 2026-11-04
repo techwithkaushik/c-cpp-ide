@@ -396,11 +396,11 @@ class TerminalScreenTest {
     @Test fun graphemeSuffixSurvivesScrollbackAndAlternateBufferSwitch() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         val family = "👨‍👩‍👧‍👦"
-        screen.append(family + "\\r\\nrow1\\r\\nrow2\\r\\nrow3\\r\\nrow4\\r\\nrow5")
+        screen.append(family + "\r\nrow1\r\nrow2\r\nrow3\r\nrow4\r\nrow5")
         assertTrue(screen.render().contains(family))
-        screen.append("\\u001B[?1049h")
+        screen.append("\u001B[?1049h")
         screen.append("editor")
-        screen.append("\\u001B[?1049l")
+        screen.append("\u001B[?1049l")
         assertTrue(screen.render().contains(family))
     }
 }
