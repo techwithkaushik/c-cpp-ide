@@ -506,50 +506,52 @@ internal class TerminalScreen(
      * include an optional color-space identifier after the mode.
      */
     private fun applySgr(raw: String) {
-        val tokens = if (raw.isEmpty()) listOf("0") else raw.split(';')
+        // Parse each semicolon group independently. Colon groups preserve empty
+        // ISO 8613-6 color-space fields (for example 38:2::R:G:B).
+        val groups = if (raw.isEmpty()) listOf("0") else raw.split(';')
         var index = 0
-        while (index < tokens.size) {
-            val parts = tokens[index].split(':')
-            val code = parts.firstOrNull()?.toIntOrNull() ?: 0
+        while (index < groups.size) {
+            val group = groups[index]
+            val fields = group.split(':')
+            val code = fields.firstOrNull()?.toIntOrNull() ?: 0
             if (code == 38 || code == 48) {
                 val foreground = code == 38
-                val mode = parts.getOrNull(1)?.toIntOrNull()
-                    ?: tokens.getOrNull(index + 1)?.toIntOrNull()
-                if (parts.size > 1) {
+                val mode = fields.getOrNull(1)?.toIntOrNull()
+                    ?: groups.getOrNull(index + 1)?.toIntOrNull()
+                var color: Int? = null
+                if (fields.size > 1) {
                     when (mode) {
-                        5 -> {
-                            val color = indexedColor(parts.getOrNull(2)?.toIntOrNull() ?: 7)
-                            currentStyle = if (foreground) currentStyle.copy(foreground = color)
-                                else currentStyle.copy(background = color)
-                        }
+                        5 -> color = indexedColor(fields.getOrNull(2)?.toIntOrNull() ?: 7)
                         2 -> {
-                            val components = parts.drop(2).filter { it.isNotEmpty() }.mapNotNull(String::toIntOrNull)
-                            if (components.size >= 3) {
-                                val color = rgb(components[components.size - 3], components[components.size - 2], components.last())
-                                currentStyle = if (foreground) currentStyle.copy(foreground = color)
-                                    else currentStyle.copy(background = color)
+                            val rgbFields = fields.drop(2).mapNotNull { it.toIntOrNull() }
+                            if (rgbFields.size >= 3) {
+                                color = rgb(rgbFields[rgbFields.size - 3], rgbFields[rgbFields.size - 2], rgbFields.last())
                             }
                         }
                     }
-                } else if (mode == 5) {
-                    val color = indexedColor(tokens.getOrNull(index + 2)?.toIntOrNull() ?: 7)
+                } else {
+                    when (mode) {
+                        5 -> {
+                            color = indexedColor(groups.getOrNull(index + 2)?.toIntOrNull() ?: 7)
+                            index += 2
+                        }
+                        2 -> {
+                            var componentStart = index + 2
+                            // Accept an optional color-space identifier before RGB.
+                            if (groups.getOrNull(componentStart) == "0" && index + 5 < groups.size) componentStart++
+                            if (componentStart + 2 < groups.size) {
+                                val red = groups[componentStart].toIntOrNull()
+                                val green = groups[componentStart + 1].toIntOrNull()
+                                val blue = groups[componentStart + 2].toIntOrNull()
+                                if (red != null && green != null && blue != null) color = rgb(red, green, blue)
+                                index = componentStart + 2
+                            }
+                        }
+                    }
+                }
+                if (color != null) {
                     currentStyle = if (foreground) currentStyle.copy(foreground = color)
                         else currentStyle.copy(background = color)
-                    index += 2
-                } else if (mode == 2 && index + 4 < tokens.size) {
-                    var componentStart = index + 2
-                    // ISO 8613-6 color-space identifier is optional.
-                    if (tokens.getOrNull(componentStart) == "0" && index + 5 < tokens.size) componentStart++
-                    if (componentStart + 2 < tokens.size) {
-                        val color = rgb(
-                            tokens[componentStart].toIntOrNull() ?: 0,
-                            tokens[componentStart + 1].toIntOrNull() ?: 0,
-                            tokens[componentStart + 2].toIntOrNull() ?: 0,
-                        )
-                        currentStyle = if (foreground) currentStyle.copy(foreground = color)
-                            else currentStyle.copy(background = color)
-                        index = componentStart + 2
-                    }
                 }
             } else {
                 when (code) {
