@@ -318,7 +318,7 @@ class TerminalScreenTest {
         val start = rendered.text.indexOf("RED")
         assertTrue(start >= 0)
         val style = rendered.spanStyles.first { start in it.start until it.end }.item
-        assertTrue(style.color == Color(0xFFCC3333))
+        assertTrue(style.color == Color(0xFFCD0000))
     }
 
 
@@ -340,6 +340,21 @@ class TerminalScreenTest {
         assertTrue(screen.cursorShapeCode() == 6)
         assertFalse(screen.renderAnnotated().text.contains("▏"))
         assertTrue(screen.cursorTextOffset() == screen.renderAnnotated().text.length - 1)
+    }
+
+    @Test fun ansiBasicColorsMatchTermuxXtermPalette() {
+        val screen = TerminalScreen(columns = 30, rows = 5)
+        screen.append("\\u001B[31mred\\u001B[0m ")
+        screen.append("\\u001B[32mgreen\\u001B[0m ")
+        screen.append("\\u001B[91mbright-red\\u001B[0m")
+        val rendered = screen.renderAnnotated()
+        fun colorOf(label: String): Color {
+            val start = rendered.text.indexOf(label)
+            return rendered.spanStyles.first { start in it.start until it.end }.item.color
+        }
+        assertTrue(colorOf("red") == Color(0xFFCD0000))
+        assertTrue(colorOf("green") == Color(0xFF00CD00))
+        assertTrue(colorOf("bright-red") == Color(0xFFFF0000))
     }
 
     @Test fun ansiBoldUnderlineAndBackgroundColorsArePreserved() {
