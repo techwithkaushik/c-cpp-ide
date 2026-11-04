@@ -41,6 +41,17 @@ class TerminalScreenTest {
         assertFalse(screen.render().contains("full screen app"))
     }
 
+    @Test fun alternateScreenKeepsFixedViewportForFullScreenEditors() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("\u001B[?1049h")
+        screen.append("\u001B[1;1Hnano")
+        val lines = screen.render().lines()
+        assertTrue(lines.size == 5)
+        assertTrue(lines.first().startsWith("nano"))
+        screen.append("\u001B[5;1Hstatus")
+        assertTrue(screen.render().lines().last().startsWith("status"))
+    }
+
     @Test fun cursorVisibilityModeHidesAndRestoresCursor() {
         val screen = TerminalScreen()
         screen.append("prompt")
