@@ -440,9 +440,12 @@ fun LinuxTerminalPanel(
             val outputHorizontalScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
             val terminalTextMeasurer = rememberTextMeasurer()
+            // Change the actual glyph/cell layout size. A graphics-only scale leaves
+            // the text layout and horizontal scroll extent at the old width.
+            val displayFontSize = (terminalFontSize * terminalVisualScale).coerceIn(7f, 56f)
             val cursorCellWidth = terminalTextMeasurer.measure(
                 AnnotatedString("M"),
-                style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp)
+                style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = displayFontSize.sp)
             ).size.width.toFloat().coerceAtLeast(1f)
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
             var terminalVisualScale by remember(active.id) { mutableFloatStateOf(1f) }
@@ -467,6 +470,14 @@ fun LinuxTerminalPanel(
                     Modifier.weight(1f).fillMaxWidth()
                         .background(Color(0xFF0B0F14))
                         .pointerInput(active.id) {
+                            // The whole terminal viewport is an input surface, including
+                            // blank rows and the unused area below the current prompt.
+                            detectTapGestures {
+                                terminalInputFocusRequester.requestFocus()
+                                keyboardController?.show()
+                            }
+                        }
+                        .pointerInput(active.id) {
                             // Unlike detectTransformGestures, this recognizer does
                             // not consume one-finger drags. Scrolling therefore stays
                             // available while pinch zoom is handled only for 2+ fingers.
@@ -488,27 +499,13 @@ fun LinuxTerminalPanel(
                     SelectionContainer {
                         Text(
                             active.output.value,
-                            color = Color(0xFFD8DEE9),
+                            color = Color(0xFFE5E5E5),
                             fontFamily = FontFamily.Monospace,
                             softWrap = false,
-                            fontSize = terminalFontSize.sp,
-                            lineHeight = (terminalFontSize * 1.28f).sp,
+                            fontSize = displayFontSize.sp,
+                            lineHeight = (displayFontSize * 1.28f).sp,
                             onTextLayout = { cursorTextLayout.value = it },
                             modifier = Modifier
-                                .pointerInput(active.id) {
-                                    detectTapGestures {
-                                        // The IME may be dismissed by Back while this field retains focus.
-                                        // Re-request focus and explicitly show the keyboard on the next tap.
-                                        terminalInputFocusRequester.requestFocus()
-                                        keyboardController?.show()
-                                    }
-                                }
-                                .graphicsLayer(
-                                    scaleX = terminalVisualScale,
-                                    scaleY = terminalVisualScale,
-                                    transformOrigin = TransformOrigin(0f, 0f),
-                                    clip = false
-                                )
                                 .horizontalScroll(outputHorizontalScrollState)
                                 .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
                                 .fillMaxWidth()
@@ -516,12 +513,7 @@ fun LinuxTerminalPanel(
                     }
                     // Draw the terminal cursor in a dedicated Canvas layer. The
                     // terminal text itself contains only shell output, never a cursor glyph.
-                    Canvas(Modifier.matchParentSize().graphicsLayer(
-                        scaleX = terminalVisualScale,
-                        scaleY = terminalVisualScale,
-                        transformOrigin = TransformOrigin(0f, 0f),
-                        clip = false
-                    )) {
+                    Canvas(Modifier.matchParentSize()) {
                         // Reading this Compose state invalidates the Canvas on every blink phase.
                         if (cursorBlinkTick >= 0 && active.screen.isCursorDrawn()) {
                             val layout = cursorTextLayout.value
