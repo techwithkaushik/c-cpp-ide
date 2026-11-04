@@ -147,7 +147,11 @@ internal class TerminalScreen(
                 for (index in 0 until visibleLength) {
                     if (line.cells[index] != '\u0000') {
                         offset++
-                        if (!Character.isHighSurrogate(line.cells[index])) offset += line.clusterSuffixes[index]?.length ?: 0
+                        if (!Character.isHighSurrogate(line.cells[index])) {
+                            val leadIndex = if (index > 0 && Character.isLowSurrogate(line.cells[index]) &&
+                                Character.isHighSurrogate(line.cells[index - 1])) index - 1 else index
+                            offset += line.clusterSuffixes[leadIndex]?.length ?: 0
+                        }
                     }
                 }
                 offset++ // newline between scrollback/live rows
@@ -161,7 +165,11 @@ internal class TerminalScreen(
                 for (index in 0 until visibleLength) {
                     if (cells[lineIndex][index] != '\u0000') {
                         offset++
-                        if (!Character.isHighSurrogate(cells[lineIndex][index])) offset += clusterSuffixes[lineIndex][index]?.length ?: 0
+                        if (!Character.isHighSurrogate(cells[lineIndex][index])) {
+                            val leadIndex = if (index > 0 && Character.isLowSurrogate(cells[lineIndex][index]) &&
+                                Character.isHighSurrogate(cells[lineIndex][index - 1])) index - 1 else index
+                            offset += clusterSuffixes[lineIndex][leadIndex]?.length ?: 0
+                        }
                     }
                 }
             } else if (lineIndex == row) {
@@ -312,7 +320,11 @@ internal class TerminalScreen(
             builder.pushStyle(span)
             if (cellIndex < visibleLength) {
                 builder.append(cell.toString())
-                if (!Character.isHighSurrogate(cell)) lineSuffixes[cellIndex]?.let(builder::append)
+                if (!Character.isHighSurrogate(cell)) {
+                    val leadIndex = if (cellIndex > 0 && Character.isLowSurrogate(cell) &&
+                        Character.isHighSurrogate(lineCells[cellIndex - 1])) cellIndex - 1 else cellIndex
+                    lineSuffixes[leadIndex]?.let(builder::append)
+                }
             } else if (includeCursor && cellIndex <= cursorAt) {
                 // Materialize blank terminal cells before the cursor. Without
                 // this padding, a cursor addressed to column N would be drawn
@@ -328,7 +340,11 @@ internal class TerminalScreen(
         cells[lineIndex].forEachIndexed { index, cell ->
             if (cell != '\u0000') {
                 append(cell)
-                if (!Character.isHighSurrogate(cell)) clusterSuffixes[lineIndex][index]?.let(::append)
+                if (!Character.isHighSurrogate(cell)) {
+                    val leadIndex = if (index > 0 && Character.isLowSurrogate(cell) &&
+                        Character.isHighSurrogate(cells[lineIndex][index - 1])) index - 1 else index
+                    clusterSuffixes[lineIndex][leadIndex]?.let(::append)
+                }
             }
         }
     }
