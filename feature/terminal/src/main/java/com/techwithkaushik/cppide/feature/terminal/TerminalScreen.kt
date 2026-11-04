@@ -275,21 +275,12 @@ internal class TerminalScreen(
             val style = lineStyles[cellIndex]
             val foreground = if (style.inverse) style.background else style.foreground
             val background = if (style.inverse) style.foreground else style.background
-            val cursorBlock = cursorDrawn && isCursor && cursorShape in 0..2
-            val cursorUnderline = cursorDrawn && isCursor && cursorShape in 3..4
             val span = SpanStyle(
-                color = when {
-                    cursorBlock -> Color(0xFF0B0F14)
-                    else -> foreground?.let(::composeColor) ?: Color.Unspecified
-                },
-                background = if (cursorBlock) Color(0xFFD8DEE9) else background?.let(::composeColor) ?: Color.Unspecified,
+                color = foreground?.let(::composeColor) ?: Color.Unspecified,
+                background = background?.let(::composeColor) ?: Color.Unspecified,
                 fontWeight = if (style.bold) FontWeight.Bold else if (style.dim) FontWeight.Light else FontWeight.Normal,
                 fontStyle = if (style.italic) FontStyle.Italic else FontStyle.Normal,
-                textDecoration = when {
-                    cursorUnderline -> TextDecoration.Underline
-                    style.underline -> TextDecoration.Underline
-                    else -> TextDecoration.None
-                },
+                textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
             )
             builder.pushStyle(span)
             if (cellIndex < visibleLength) {
