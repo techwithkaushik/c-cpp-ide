@@ -367,6 +367,22 @@ class TerminalScreenTest {
         assertTrue(screen.cursorTextOffset() == bar.text.length - 1)
     }
 
+    @Test fun cursorGridPositionUsesTerminalCellsForWideCharacters() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("A界")
+        assertTrue(screen.cursorGridPosition() == (3 to 0))
+    }
+
+    @Test fun cursorGridPositionIncludesScrollbackAndResetsForAlternateBuffer() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("a\r\nb\r\nc\r\nd\r\ne\r\nf")
+        assertTrue(screen.cursorGridPosition() == (1 to 5))
+        screen.append("\u001B[?1049h")
+        assertTrue(screen.cursorGridPosition() == (0 to 0))
+        screen.append("\u001B[?1049l")
+        assertTrue(screen.cursorGridPosition() == (1 to 5))
+    }
+
     @Test fun zwjFamilyEmojiRemainsOneWideGraphemeAcrossOutputChunks() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         val family = "👨‍👩‍👧‍👦"
