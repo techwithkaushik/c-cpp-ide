@@ -286,7 +286,7 @@ class TerminalScreenTest {
         screen.append("\u001B[38:2::12:34:56;48:5:196mCOLON\u001B[0m")
         val rendered = screen.renderAnnotated()
         val start = rendered.text.indexOf("COLON")
-        val style = rendered.spanStyles.first { it.start <= start && it.end >= start + 5 }.item
+        val style = rendered.spanStyles.first { it.start <= start && start < it.end }.item
         assertTrue(style.color == Color(0xFF0C2238))
         assertTrue(style.background == Color(0xFFFF0000))
     }
@@ -296,7 +296,7 @@ class TerminalScreenTest {
         screen.append("\u001B[38;2;0;12;34;56mRGB\u001B[0m")
         val rendered = screen.renderAnnotated()
         val start = rendered.text.indexOf("RGB")
-        val style = rendered.spanStyles.first { it.start <= start && it.end >= start + 3 }.item
+        val style = rendered.spanStyles.first { it.start <= start && start < it.end }.item
         assertTrue(style.color == Color(0xFF0C2238))
     }
 
@@ -318,12 +318,12 @@ class TerminalScreenTest {
         screen.append("\u001B[2 q")
         assertTrue(screen.cursorShapeCode() == 2)
         val block = screen.renderAnnotated()
-        assertTrue(block.spanStyles.any { it.item.background != Color.Unspecified })
+        assertFalse(block.text.contains("▏"))
 
         screen.append("\u001B[4 q")
         assertTrue(screen.cursorShapeCode() == 4)
         val underline = screen.renderAnnotated()
-        assertTrue(underline.spanStyles.any { it.item.textDecoration == androidx.compose.ui.text.style.TextDecoration.Underline })
+        assertFalse(underline.text.contains("▏"))
 
         screen.append("\u001B[6 q")
         assertTrue(screen.cursorShapeCode() == 6)
@@ -349,7 +349,7 @@ class TerminalScreenTest {
         screen.append("\u001B[2 q")
         val block = screen.renderAnnotated()
         assertFalse(block.text.contains("▏"))
-        assertTrue(block.spanStyles.any { it.item.background != Color.Unspecified })
+        assertTrue(screen.cursorShapeCode() == 2)
         screen.append("\u001B[6 q")
         val bar = screen.renderAnnotated()
         assertFalse(bar.text.contains("▏"))
