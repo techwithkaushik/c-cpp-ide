@@ -145,7 +145,10 @@ internal class TerminalScreen(
             scrollback.forEach { line ->
                 val visibleLength = line.cells.indexOfLast { it != ' ' && it != '\u0000' } + 1
                 for (index in 0 until visibleLength) {
-                    if (line.cells[index] != '\u0000') offset++
+                    if (line.cells[index] != '\u0000') {
+                        offset++
+                        if (!Character.isHighSurrogate(line.cells[index])) offset += line.clusterSuffixes[index]?.length ?: 0
+                    }
                 }
                 offset++ // newline between scrollback/live rows
             }
@@ -156,11 +159,17 @@ internal class TerminalScreen(
             if (lineIndex < row) {
                 val visibleLength = cells[lineIndex].indexOfLast { it != ' ' && it != '\u0000' } + 1
                 for (index in 0 until visibleLength) {
-                    if (cells[lineIndex][index] != '\u0000') offset++
+                    if (cells[lineIndex][index] != '\u0000') {
+                        offset++
+                        if (!Character.isHighSurrogate(cells[lineIndex][index])) offset += clusterSuffixes[lineIndex][index]?.length ?: 0
+                    }
                 }
             } else if (lineIndex == row) {
                 for (index in 0 until column.coerceAtMost(columns)) {
-                    if (index < columns && cells[lineIndex][index] != '\u0000') offset++
+                    if (index < columns && cells[lineIndex][index] != '\u0000') {
+                        offset++
+                        if (!Character.isHighSurrogate(cells[lineIndex][index])) offset += clusterSuffixes[lineIndex][index]?.length ?: 0
+                    }
                 }
                 return offset
             }
@@ -236,7 +245,14 @@ internal class TerminalScreen(
 
     fun render(): String {
         val lines = ArrayList<String>(scrollback.size + rows)
-        if (!alternateBuffer) lines.addAll(scrollback.map { line -> buildString { line.cells.forEach { if (it != '\u0000') append(it) } }.trimEnd() })
+        if (!alternateBuffer) lines.addAll(scrollback.map { line -> buildString {
+            line.cells.forEachIndexed { index, cell ->
+                if (cell != '\u0000') {
+                    append(cell)
+                    if (!Character.isHighSurrogate(cell)) line.clusterSuffixes[index]?.let(::append)
+                }
+            }
+        }.trimEnd() })
         val last = lastVisibleRow()
         for (index in 0..last) {
             val line = visibleLine(index).trimEnd()
@@ -394,7 +410,8 @@ internal class TerminalScreen(
             append(cells[row][lead])
             if (lead + 1 < columns && Character.isLowSurrogate(cells[row][lead + 1])) append(cells[row][lead + 1])
         } + (clusterSuffixes[row][lead] ?: "")
-        return base.codePoints().toArray().any { it in 0x1F1E6..0x1F1FF }
+        val indicators = base.codePoints().toArray().takeLastWhile { it in 0x1F1E6..0x1F1FF }
+        return indicators.size % 2 == 1
     }
 
     /** Approximate wcwidth: combining marks are zero cells; East Asian and emoji ranges are two. */
@@ -666,6 +683,7 @@ internal class TerminalScreen(
             for (index in scrollBottom downTo row + 1) {
                 cells[index] = cells[index - 1]
                 styles[index] = styles[index - 1]
+                clusterSuffixes[index] = clusterSuffixes[index - 1]
             }
             eraseRow(row)
         }
@@ -676,6 +694,7 @@ internal class TerminalScreen(
             for (index in row until scrollBottom) {
                 cells[index] = cells[index + 1]
                 styles[index] = styles[index + 1]
+                clusterSuffixes[index] = clusterSuffixes[index + 1]
             }
             eraseRow(scrollBottom)
         }
