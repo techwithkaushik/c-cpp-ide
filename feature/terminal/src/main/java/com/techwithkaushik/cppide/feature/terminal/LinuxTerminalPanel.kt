@@ -53,6 +53,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import androidx.compose.ui.graphics.Color
@@ -197,6 +198,7 @@ fun LinuxTerminalPanel(
     val connectionMode = terminalPreferences.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu"
     val terminalInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val clipboardManager = LocalClipboardManager.current
     val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
@@ -421,8 +423,8 @@ fun LinuxTerminalPanel(
             // Keep the cursor steady. Re-rendering the entire scrollback every
             // 530ms caused visible text flicker; Termux blinks only the cursor
             // in its Canvas renderer, not the terminal text buffer.
-            active.screen.setCursorBlinkPhase(true)
             LaunchedEffect(active.id) {
+                active.screen.setCursorBlinkPhase(true)
                 while (true) {
                     delay(530)
                     if (active.screen.advanceCursorBlinkPhase()) {
@@ -521,11 +523,16 @@ fun LinuxTerminalPanel(
                             fontSize = terminalFontSize.sp,
                             lineHeight = (terminalFontSize * 1.28f).sp,
                             onTextLayout = { cursorTextLayout.value = it },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
                                 .pointerInput(terminalInputFocusRequester) {
                                     detectTapGestures {
-                                        terminalInputFocusRequester.requestFocus()
+                                        // Back can leave the 1dp input focused while the IME is
+                                        // hidden. Clear and reacquire focus so a second tap always
+                                        // reopens the software keyboard.
+                                        focusManager.clearFocus(force = true)
                                         scope.launch {
+                                            delay(40)
+                                            terminalInputFocusRequester.requestFocus()
                                             delay(80)
                                             keyboardController?.show()
                                         }
@@ -533,6 +540,7 @@ fun LinuxTerminalPanel(
                                 }
                                 .horizontalScroll(outputHorizontalScrollState)
                                 .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
+                                .fillMaxWidth()
                         )
                     }
                     // Draw the terminal cursor in a dedicated Canvas layer. The
