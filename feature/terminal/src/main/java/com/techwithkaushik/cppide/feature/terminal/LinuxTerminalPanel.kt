@@ -73,6 +73,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.integration.linuxruntime.HostKeyConfirmationRequired
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
@@ -434,6 +435,7 @@ fun LinuxTerminalPanel(
             val outputScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val outputHorizontalScrollState = remember(active.id) { androidx.compose.foundation.ScrollState(0) }
             val cursorTextLayout = remember(active.id) { mutableStateOf<TextLayoutResult?>(null) }
+            var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
             val terminalTextMeasurer = rememberTextMeasurer()
             var pinchFontSize by remember(active.id) { mutableFloatStateOf(terminalFontSize.toFloat()) }
             LaunchedEffect(active.id, active.outputRevision.value) {
@@ -450,37 +452,40 @@ fun LinuxTerminalPanel(
                     }
                 }
             }
+            // Recalculate PTY geometry whenever the font changes, not only when
+            // the viewport bounds change. Pinch zoom otherwise leaves stale columns.
+            LaunchedEffect(terminalViewportSize, terminalFontSize) {
+                val size = terminalViewportSize
+                if (size.width > 0 && size.height > 0) {
+                    val cellMetrics = terminalTextMeasurer.measure(
+                        AnnotatedString("M"),
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = terminalFontSize.sp,
+                            lineHeight = (terminalFontSize * 1.28f).sp
+                        )
+                    )
+                    val cellWidth = cellMetrics.size.width.toFloat().coerceAtLeast(1f)
+                    val cellHeight = cellMetrics.size.height.toFloat().coerceAtLeast(1f)
+                    val columns = (size.width / cellWidth).toInt().coerceIn(20, 300)
+                    val rows = (size.height / cellHeight).toInt().coerceIn(5, 120)
+                    active.screen.resize(columns, rows)
+                    if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
+                        active.lastPtyColumns = columns
+                        active.lastPtyRows = rows
+                        active.resize(columns, rows)
+                        active.output.value = active.screen.renderAnnotated()
+                        active.outputRevision.value++
+                    }
+                }
+            }
             Column(
                 Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0B0F14))
             ) {
                 Box(
                     Modifier.weight(1f).fillMaxWidth()
                         .background(Color(0xFF0B0F14))
-                        .onSizeChanged { size ->
-                            // Termux derives terminal columns and rows from measured
-                            // monospace glyph width and font spacing. Only the output
-                            // viewport is measured here, excluding the IME key row.
-                            val cellMetrics = terminalTextMeasurer.measure(
-                                AnnotatedString("M"),
-                                style = TextStyle(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = terminalFontSize.sp,
-                                    lineHeight = (terminalFontSize * 1.28f).sp
-                                )
-                            )
-                            val cellWidth = cellMetrics.size.width.toFloat().coerceAtLeast(1f)
-                            val cellHeight = cellMetrics.size.height.toFloat().coerceAtLeast(1f)
-                            val columns = (size.width / cellWidth).toInt().coerceIn(20, 300)
-                            val rows = (size.height / cellHeight).toInt().coerceIn(5, 120)
-                            active.screen.resize(columns, rows)
-                            if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
-                                active.lastPtyColumns = columns
-                                active.lastPtyRows = rows
-                                active.resize(columns, rows)
-                                active.output.value = active.screen.renderAnnotated()
-                                active.outputRevision.value++
-                            }
-                        }
+                        .onSizeChanged { terminalViewportSize = it }
                         .pointerInput(active.id) {
                             // Unlike detectTransformGestures, this recognizer does
                             // not consume one-finger drags. Scrolling therefore stays
@@ -645,18 +650,6 @@ fun LinuxTerminalPanel(
                 )
             Column(Modifier.fillMaxWidth().background(Color(0xFF101820)).padding(horizontal = 4.dp, vertical = 1.dp)) {
                 if (extraKeysEnabled) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        TextButton(onClick = {
-                            terminalFontSize = (terminalFontSize - 1).coerceIn(10, 28)
-                            pinchFontSize = terminalFontSize.toFloat()
-                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
-                        }) { Text("A−", fontSize = 11.sp) }
-                        TextButton(onClick = {
-                            terminalFontSize = (terminalFontSize + 1).coerceIn(10, 28)
-                            pinchFontSize = terminalFontSize.toFloat()
-                            terminalPreferences.edit().putInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, terminalFontSize).apply()
-                        }) { Text("A+", fontSize = 11.sp) }
-                    }
                     val activeKeys = extraKeyOrder.filter { it in visibleExtraKeys }
                     val firstRowCount = (activeKeys.size + 1) / 2
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
