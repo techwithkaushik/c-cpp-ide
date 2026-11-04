@@ -464,11 +464,11 @@ fun LinuxTerminalPanel(
                 }
             }
             Column(
-                Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0B0F14))
+                Modifier.weight(1f).fillMaxWidth().background(Color.Black)
             ) {
                 Box(
                     Modifier.weight(1f).fillMaxWidth()
-                        .background(Color(0xFF0B0F14))
+                        .background(Color.Black)
                         .pointerInput(active.id) {
                             // The whole terminal viewport is an input surface, including
                             // blank rows and the unused area below the current prompt.
