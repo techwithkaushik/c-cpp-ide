@@ -176,7 +176,11 @@ internal class TerminalScreen(
                 for (index in 0 until column.coerceAtMost(columns)) {
                     if (index < columns && cells[lineIndex][index] != '\u0000') {
                         offset++
-                        if (!Character.isHighSurrogate(cells[lineIndex][index])) offset += clusterSuffixes[lineIndex][index]?.length ?: 0
+                        if (!Character.isHighSurrogate(cells[lineIndex][index])) {
+                            val leadIndex = if (index > 0 && Character.isLowSurrogate(cells[lineIndex][index]) &&
+                                Character.isHighSurrogate(cells[lineIndex][index - 1])) index - 1 else index
+                            offset += clusterSuffixes[lineIndex][leadIndex]?.length ?: 0
+                        }
                     }
                 }
                 return offset
@@ -257,7 +261,11 @@ internal class TerminalScreen(
             line.cells.forEachIndexed { index, cell ->
                 if (cell != '\u0000') {
                     append(cell)
-                    if (!Character.isHighSurrogate(cell)) line.clusterSuffixes[index]?.let(::append)
+                    if (!Character.isHighSurrogate(cell)) {
+                        val leadIndex = if (index > 0 && Character.isLowSurrogate(cell) &&
+                            Character.isHighSurrogate(line.cells[index - 1])) index - 1 else index
+                        line.clusterSuffixes[leadIndex]?.let(::append)
+                    }
                 }
             }
         }.trimEnd() })
