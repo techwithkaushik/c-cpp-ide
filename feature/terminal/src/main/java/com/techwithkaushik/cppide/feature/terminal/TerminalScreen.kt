@@ -303,6 +303,10 @@ internal class TerminalScreen(
     }
 
     private fun lastVisibleRow(): Int {
+        // Full-screen TUIs (nano, vim, less) depend on a stable viewport even
+        // when most rows are blank. Trimming those rows makes their footer and
+        // cursor coordinates collapse into the top of the Compose text node.
+        if (alternateBuffer) return rows - 1
         var last = rows - 1
         while (last > row && cells[last].all { it == ' ' }) last--
         return last
