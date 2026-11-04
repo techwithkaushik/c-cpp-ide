@@ -449,6 +449,25 @@ fun LinuxTerminalPanel(
                 style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = displayFontSize.sp)
             ).size.width.toFloat().coerceAtLeast(1f)
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            LaunchedEffect(active.id, terminalViewportSize, displayFontSize) {
+                if (terminalViewportSize.width <= 0 || terminalViewportSize.height <= 0) return@LaunchedEffect
+                // BottomSheet drag/expand changes the actual PTY grid. Debounce the
+                // stream of intermediate pixel sizes so the shell is not resized
+                // dozens of times during one gesture.
+                delay(90)
+                val lineHeightPx = with(density) { (displayFontSize * 1.28f).sp.toPx() }
+                val columns = (terminalViewportSize.width / cursorCellWidth).toInt().coerceIn(20, 300)
+                val rows = (terminalViewportSize.height / lineHeightPx.coerceAtLeast(1f)).toInt().coerceIn(5, 120)
+                if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
+                    active.screen.resize(columns, rows)
+                    active.resize(columns, rows)
+                    active.lastPtyColumns = columns
+                    active.lastPtyRows = rows
+                    active.output.value = active.screen.renderAnnotated()
+                    active.outputRevision.value++
+                }
+            }
             LaunchedEffect(active.id, active.outputRevision.value) {
                 val previousScrollValue = outputScrollState.value
                 val wasFollowingOutput = outputScrollState.maxValue - previousScrollValue <= 48
@@ -469,6 +488,7 @@ fun LinuxTerminalPanel(
                 Box(
                     Modifier.weight(1f).fillMaxWidth()
                         .background(Color.Black)
+                        .onSizeChanged { terminalViewportSize = it }
                         .pointerInput(active.id) {
                             // The whole terminal viewport is an input surface, including
                             // blank rows and the unused area below the current prompt.
