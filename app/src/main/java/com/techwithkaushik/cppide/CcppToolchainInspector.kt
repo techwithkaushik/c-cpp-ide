@@ -1,9 +1,8 @@
 package com.techwithkaushik.cppide
 
 import android.content.Context
-import com.techwithkaushik.cppide.integration.termuxruntime.AndroidRuntimeLauncher
-import com.techwithkaushik.cppide.integration.termuxruntime.BootstrapSmokeTest
-import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -48,25 +47,22 @@ internal data class CppToolchainReport(
  */
 internal class CcppToolchainInspector(context: Context) {
     private val appContext = context.applicationContext
-    private val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
+    private val runtime = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
     private val pathPreferences = ToolPathPreferences(appContext)
     private val discovery = LinuxToolchainDiscovery()
 
     fun inspect(projectName: String?): CppToolchainReport {
-        if (!runtime.hasBootstrapLayout()) {
-            return unavailable("No embedded Linux runtime is installed. Set up Runtime & Bootstrap first.", projectName)
+        runtime.ensureDirectories()
+        if (!runtime.ready()) {
+            return unavailable("Ubuntu rootfs or bundled PRoot is missing. Set up Runtime & Bootstrap first.", projectName)
         }
 
-        val smoke = BootstrapSmokeTest(runtime).run()
+        val smoke = LinuxRuntimeSmokeTest(runtime).run()
         if (!smoke.success) {
-            val reason = smoke.failureReason ?: "The embedded shell could not be started."
-            return unavailable("Runtime validation failed: $reason", projectName)
+            return unavailable("Ubuntu runtime validation failed: " + (smoke.error ?: "the shell could not be started."), projectName)
         }
 
-        val inventory = discovery.discover(appContext.filesDir)
-        val shell = runtime.layout.shell.takeIf { it.isFile && it.canExecute() }
-            ?: File(runtime.layout.prefix, "bin/bash").takeIf { it.isFile && it.canExecute() }
-            ?: return unavailable("The runtime has no executable shell entry point.", projectName)
+        val inventory = discovery.discover(runtime.ubuntuRoot)
 
         val toolNames = listOf("clang", "clang++", "clangd", "clang-format", "clang-tidy", "lldb")
         val statuses = toolNames.map { name ->
@@ -87,7 +83,7 @@ internal class CcppToolchainInspector(context: Context) {
                     detail = "Not found in the runtime PATH or common manual toolchain locations."
                 )
                 else -> {
-                    val result = probe(shell, candidate)
+                    val result = probe(candidate)
                     CppToolStatus(
                         executable = name,
                         path = candidate,
@@ -114,7 +110,7 @@ internal class CcppToolchainInspector(context: Context) {
     }
 
     private fun toGuestPath(hostPath: String): String? {
-        val root = appContext.filesDir.canonicalFile
+        val root = runtime.ubuntuRoot.canonicalFile
         val file = File(hostPath).canonicalFile
         if (!file.toPath().startsWith(root.toPath())) return null
         return "/" + file.relativeTo(root).invariantSeparatorsPath
@@ -128,17 +124,31 @@ internal class CcppToolchainInspector(context: Context) {
         return configured
     }
 
-    private fun probe(shell: File, executable: String): Triple<Boolean, String?, String?> {
+    private fun probe(executable: String): Triple<Boolean, String?, String?> {
         val safePath = "'" + executable.replace("'", "'\\''") + "'"
         val process = try {
             ProcessBuilder(
-                AndroidRuntimeLauncher.systemLinker.absolutePath,
-                shell.absolutePath,
-                "-c",
-                "$safePath --version"
-            ).directory(runtime.layout.home).apply {
+                runtime.proot.absolutePath,
+                "-0", "-v", "0",
+                "-r", runtime.ubuntuRoot.absolutePath,
+                "-w", "/root",
+                "-b", "/dev:/dev",
+                "-b", "/proc:/proc",
+                "-b", "/sys:/sys",
+                executable, "--version"
+            ).directory(runtime.ubuntuRoot).apply {
                 environment().clear()
-                environment().putAll(runtime.layout.environment())
+                environment()["HOME"] = "/root"
+                environment()["USER"] = "root"
+                environment()["LOGNAME"] = "root"
+                environment()["SHELL"] = "/bin/bash"
+                environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                environment()["TMPDIR"] = runtime.usrTmp.absolutePath
+                environment()["PROOT_TMP_DIR"] = runtime.usrTmp.absolutePath
+                environment()["PROOT_NO_SECCOMP"] = "1"
+                environment()["PROOT_LOADER"] = runtime.prootLoader.absolutePath
+                environment()["TERM"] = "xterm-256color"
+                environment()["LANG"] = "C.UTF-8"
                 redirectErrorStream(true)
             }.start()
         } catch (error: Exception) {
