@@ -2,6 +2,7 @@ package com.techwithkaushik.cppide.feature.terminal
 
 import android.content.Context
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.Canvas
@@ -124,6 +125,10 @@ private object LinuxTerminalSessions {
     // rebuilding the annotated scrollback. All screen/state mutations remain
     // confined to the main thread.
     private val outputHandler = Handler(Looper.getMainLooper())
+    // Keep PTY coalescing timers off the main looper. If Compose is busy laying
+    // out a large terminal snapshot, incoming output must still be drained.
+    private val flushThread = HandlerThread("terminal-output-flush").apply { start() }
+    private val flushHandler = Handler(flushThread.looper)
     private val renderExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "terminal-render").apply { isDaemon = true }
     }
@@ -138,12 +143,15 @@ private object LinuxTerminalSessions {
     val tabs = mutableStateListOf<LinuxTerminalTab>()
     var selectedId by mutableIntStateOf(0)
         private set
+    // Plain volatile mirror: render workers must not read Compose snapshot state.
+    @Volatile private var selectedTabIdForWorker = 0
     var onLastSessionExited: (() -> Unit)? = null
     private var nextId = 1
 
     fun select(id: Int) {
         val tab = tabs.firstOrNull { it.id == id } ?: return
         selectedId = id
+        selectedTabIdForWorker = id
         // Snapshot construction is intentionally off the UI thread. The single
         // worker preserves byte order with pending PTY output and resize events.
         renderExecutor.execute {
@@ -196,6 +204,7 @@ private object LinuxTerminalSessions {
         tabs.add(tab)
         activeTabIds.add(tab.id)
         selectedId = tab.id
+        selectedTabIdForWorker = tab.id
         return tab
     }
 
@@ -213,7 +222,7 @@ private object LinuxTerminalSessions {
         synchronized(outputLock) {
             pendingOutput.getOrPut(tab.id) { StringBuilder() }.append(text)
             if (!scheduledFlushes.add(tab.id)) return
-            outputHandler.postDelayed({
+            flushHandler.postDelayed({
                 val batch = synchronized(outputLock) {
                     scheduledFlushes.remove(tab.id)
                     pendingOutput.remove(tab.id)?.toString().orEmpty()
@@ -240,7 +249,7 @@ private object LinuxTerminalSessions {
                                 tab.screen.append(nextBatch)
                                 receivedOutput = true
                             }
-                            if (receivedOutput && activeTabIds.contains(tab.id) && selectedId == tab.id) {
+                            if (receivedOutput && activeTabIds.contains(tab.id) && selectedTabIdForWorker == tab.id) {
                                 val rendered = tab.screen.renderAnnotated()
                                 outputHandler.post {
                                     if (selectedId == tab.id && activeTabIds.contains(tab.id)) {
@@ -270,9 +279,11 @@ private object LinuxTerminalSessions {
         runCatching { tab.session.close() }
         if (tabs.isEmpty()) {
             selectedId = 0
+            selectedTabIdForWorker = 0
             onLastSessionExited?.invoke()
         } else if (selectedId == tab.id) {
             selectedId = tabs.getOrNull(index - 1)?.id ?: tabs.first().id
+            selectedTabIdForWorker = selectedId
         }
     }
 
