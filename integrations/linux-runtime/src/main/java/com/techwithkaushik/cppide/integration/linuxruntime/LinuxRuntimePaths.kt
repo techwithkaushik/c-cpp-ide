@@ -39,30 +39,43 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
         linkNativeBinary(prootLoader, File(nativeDir, "libproot-loader.so"))
     }
 
-    private fun linkNativeBinary(alias: File, target: File) {
-        if (!target.isFile) return
-        if (Files.isSymbolicLink(alias.toPath())) {
-            if (runCatching { alias.canonicalFile == target.canonicalFile }.getOrDefault(false)) return
-            Files.delete(alias.toPath())
-        } else if (alias.exists()) {
-            if (alias.canonicalFile == target.canonicalFile) return
-            if (!alias.delete()) throw IllegalStateException("Cannot replace runtime binary: $alias")
-        }
-        try {
-            Files.createSymbolicLink(alias.toPath(), target.toPath())
-        } catch (e: Exception) {
-            throw IllegalStateException("Cannot link $alias to APK-bundled binary $target", e)
-        }
+    /**
+     * Returns a useful, non-secret explanation of the installed rootfs state.
+     * Installer versions are layout metadata, not distro compatibility versions:
+     * older successfully installed rootfs trees remain usable when their required
+     * Ubuntu files are present.
+     */
+    fun rootfsDiagnostic(): String {
+        val markerLines = runCatching { marker.takeIf(File::isFile)?.readLines()?.take(8).orEmpty() }
+            .getOrDefault(emptyList())
+        val installerVersion = markerLines.firstOrNull { it.startsWith("installerVersion=") }
+            ?.substringAfter("=")?.toIntOrNull()
+        val osRelease = File(ubuntuRoot, "etc/os-release")
+        val binSh = File(ubuntuRoot, "bin/sh")
+        val usrBinSh = File(ubuntuRoot, "usr/bin/sh")
+        val structural = osRelease.isFile && (binSh.exists() || usrBinSh.exists())
+        val versionSupported = installerVersion != null && installerVersion in 1..CURRENT_INSTALLER_VERSION
+        return "rootfsPath=${ubuntuRoot.absolutePath}; rootfsExists=${ubuntuRoot.exists()}; " +
+            "markerExists=${marker.isFile}; installerVersion=${installerVersion ?: "unknown"}; " +
+            "supportedInstallerVersion=$versionSupported; osRelease=${osRelease.isFile}; " +
+            "binSh=${binSh.exists()}; usrBinSh=${usrBinSh.exists()}; " +
+            "rootfsValid=${versionSupported && structural}; marker=${markerLines.joinToString("|")}"
     }
 
     fun hasRootfs(): Boolean {
-        val currentInstaller = runCatching {
-            marker.readLines().any { it.trim() == "installerVersion=5" }
-        }.getOrDefault(false)
-        return currentInstaller && File(ubuntuRoot, "etc/os-release").isFile &&
+        val markerLines = runCatching { marker.takeIf(File::isFile)?.readLines()?.take(8).orEmpty() }
+            .getOrDefault(emptyList())
+        val installerVersion = markerLines.firstOrNull { it.startsWith("installerVersion=") }
+            ?.substringAfter("=")?.toIntOrNull()
+        val structural = File(ubuntuRoot, "etc/os-release").isFile &&
             (File(ubuntuRoot, "bin/sh").exists() || File(ubuntuRoot, "usr/bin/sh").exists())
+        return installerVersion != null && installerVersion in 1..CURRENT_INSTALLER_VERSION && structural
     }
 
     fun hasProot(): Boolean = proot.isFile && prootLoader.isFile
     fun ready(): Boolean = hasRootfs() && hasProot()
+
+    companion object {
+        private const val CURRENT_INSTALLER_VERSION = 5
+    }
 }
