@@ -89,7 +89,7 @@ data class CppBuildPreferences(
             arguments.forEach { argument ->
                 require(argument.isNotBlank() && '\u0000' !in argument) { "Invalid compiler argument." }
                 require(argument !in MANAGED_FLAGS &&
-                    argument != "-o" &&\n                    !(argument.startsWith("-o") && argument in setOf("-openmp", "-openmp-simd")) &&
+                    !(argument == "-o" || (argument.startsWith("-o") && argument !in setOf("-openmp", "-openmp-simd"))) &&
                     !argument.startsWith("--output=") &&
                     !argument.startsWith("-std=") &&
                     !argument.startsWith("-I") &&
