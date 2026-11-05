@@ -273,7 +273,7 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         // same explicitly. Do not force-source ~/.bashrc here: that would run
         // user startup scripts twice when their profile already sources it.
         std::vector<std::string> arguments = {
-            proot, "-0", "-v", "0", "-r", rootfs, "-w", "/root",
+            proot, "-0", "-v", "0", "--link2symlink", "-r", rootfs, "-w", "/root",
             "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
             "-b", resolver + ":/etc/resolv.conf", shell, "--login", "-i"
         };
