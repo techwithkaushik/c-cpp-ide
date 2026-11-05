@@ -47,6 +47,9 @@ internal class TerminalScreen(
     private val scrollback = ArrayDeque<ScrollbackLine>()
     private var row = 0
     private var column = 0
+    // DEC autowrap is delayed: filling the final cell does not scroll until
+    // the next printable character arrives.
+    private var wrapPending = false
     private var savedRow = 0
     private var savedColumn = 0
     private var escapeState = 0
@@ -312,9 +315,16 @@ internal class TerminalScreen(
         includeCursor: Boolean,
     ) {
         val visibleLength = lineCells.indexOfLast { it != ' ' && it != '\u0000' } + 1
+        // A background/foreground SGR applies to blank cells too. Do not trim
+        // styled trailing spaces or full-row background fills from the output.
+        val styledLength = lineStyles.indexOfLast { style ->
+            style.foreground != null || style.background != null || style.bold || style.dim ||
+                style.italic || style.underline || style.inverse
+        } + 1
+        val contentLength = maxOf(visibleLength, styledLength)
         val cursorAt = if (includeCursor) column.coerceAtMost(columns - 1) else -1
         val cursorDrawn = includeCursor && cursorVisible && cursorBlinkOn
-        val end = maxOf(visibleLength, if (cursorAt >= 0) cursorAt + 1 else 0)
+        val end = maxOf(contentLength, if (cursorAt >= 0) cursorAt + 1 else 0)
         for (cellIndex in 0 until end) {
             val isCursor = cellIndex == cursorAt
             val cell = lineCells[cellIndex]
@@ -330,8 +340,8 @@ internal class TerminalScreen(
                 textDecoration = if (style.underline) TextDecoration.Underline else TextDecoration.None,
             )
             builder.pushStyle(span)
-            if (cellIndex < visibleLength) {
-                builder.append(cell.toString())
+            if (cellIndex < contentLength) {
+                builder.append(if (cell == '\u0000') " " else cell.toString())
                 if (!Character.isHighSurrogate(cell)) {
                     val leadIndex = if (cellIndex > 0 && Character.isLowSurrogate(cell) &&
                         Character.isHighSurrogate(lineCells[cellIndex - 1])) cellIndex - 1 else cellIndex
@@ -374,11 +384,11 @@ internal class TerminalScreen(
     private fun consumeCodePoint(codePoint: Int) {
         when (codePoint) {
             0x1B -> escapeState = 1
-            0x0D -> column = 0
-            0x0A -> lineFeed()
-            0x08 -> column = (column - 1).coerceAtLeast(0)
+            0x0D -> { column = 0; wrapPending = false }
+            0x0A -> { lineFeed(); wrapPending = false }
+            0x08 -> { column = (column - 1).coerceAtLeast(0); wrapPending = false }
             0x07 -> Unit
-            0x09 -> column = (((column / 8) + 1) * 8).coerceAtMost(columns - 1)
+            0x09 -> { column = (((column / 8) + 1) * 8).coerceAtMost(columns - 1); wrapPending = false }
             else -> if (codePoint >= 0x20 && codePoint != 0x7F) {
                 val type = Character.getType(codePoint)
                 val combining = type == Character.NON_SPACING_MARK.toInt() ||
@@ -400,7 +410,12 @@ internal class TerminalScreen(
                 }
                 val width = unicodeCellWidth(codePoint)
                 if (width == 0) return
-                if (column + width > columns) { column = 0; lineFeed() }
+                // A pending wrap is consumed only by the next printable glyph.
+                if (wrapPending || column + width > columns) {
+                    column = 0
+                    lineFeed()
+                    wrapPending = false
+                }
                 val chars = Character.toChars(codePoint)
                 cells[row][column] = chars[0]
                 styles[row][column] = currentStyle
@@ -413,7 +428,10 @@ internal class TerminalScreen(
                     styles[row][column + chars.size] = currentStyle
                 }
                 column += width
-                if (column >= columns) { column = 0; lineFeed() }
+                if (column >= columns) {
+                    column = columns - 1
+                    wrapPending = true
+                }
             }
         }
     }
@@ -509,6 +527,8 @@ internal class TerminalScreen(
     }
 
     private fun applyCsi(final: Char, raw: String) {
+        // Cursor-addressing and editing controls cancel delayed autowrap.
+        if (final != 'm' && final != 'q') wrapPending = false
         val parameters = raw.removePrefix("?").split(';').map { it.toIntOrNull() ?: 0 }
         fun param(index: Int, fallback: Int = 1) = parameters.getOrNull(index)?.takeIf { it > 0 } ?: fallback
         when (final) {
