@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -230,6 +231,10 @@ fun TermuxLinuxTerminalPanel(
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (TermuxLinuxTabs.tabs.isEmpty()) startUbuntu()
+    }
+
     pendingArchitectureWarning?.let { (uri, warning) ->
         AlertDialog(
             onDismissRequest = { pendingArchitectureWarning = null },
@@ -255,8 +260,7 @@ fun TermuxLinuxTerminalPanel(
                 }
                 Text("×", color = Color(0xFFFF8A80), modifier = Modifier.clickable { TermuxLinuxTabs.close(tab.id) }.padding(8.dp))
             }
-            Button(enabled = !busy, onClick = ::startUbuntu) { Text("+ Ubuntu") }
-            OutlinedButton(onClick = onOpenSettings) { Text("Settings") }
+            Button(enabled = !busy, onClick = ::startUbuntu) { Text("+") }
         }
 
         val active = TermuxLinuxTabs.tabs.firstOrNull { it.id == TermuxLinuxTabs.selectedId }
@@ -268,13 +272,6 @@ fun TermuxLinuxTerminalPanel(
             )
         } else {
             Column(Modifier.weight(1f).fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Termux Terminal", color = Color(0xFF8CC8FF), fontSize = 18.sp)
-                Text("Ubuntu sessions run on Termux's native PTY, emulator, cursor, scrollback and input implementation.", color = Color(0xFF9AA7B5), fontSize = 12.sp)
-                Button(enabled = !busy, onClick = ::startUbuntu) { Text("Start Ubuntu") }
-                Button(enabled = !busy, onClick = ::downloadOnline) { Text("Download Online") }
-                OutlinedButton(enabled = !busy, onClick = { localRootfsPicker.launch("application/*") }) { Text("Select Local File") }
-                localInstallStatus?.let { Text(it, color = Color(0xFF8CC8FF), fontSize = 12.sp) }
-                OutlinedButton(onClick = onOpenSettings) { Text("Terminal settings") }
                 if (busy) CircularProgressIndicator()
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
             }
