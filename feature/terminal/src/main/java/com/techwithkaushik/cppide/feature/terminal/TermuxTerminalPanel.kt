@@ -182,6 +182,7 @@ fun TermuxTerminalPanel(
     // the native View; otherwise text becomes noticeably too small on high-DPI
     // devices and row/column metrics are calculated from the wrong size.
     val autoKeyboardOnOpen = autoShowKeyboard
+    val shouldBlinkTerminalCursor = cursorBlinkEnabled
     val terminalFontSizePx = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP,
         terminalFontSizeSp.toFloat(),
@@ -333,7 +334,7 @@ fun TermuxTerminalPanel(
                         activeTab.client.attach(this)
                         terminalViewRef.value = this
                         attachSession(activeTab.session)
-                        activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
+                        activeTab.client.setCursorBlinkEnabled(shouldBlinkTerminalCursor)
                         isFocusable = true
                         isFocusableInTouchMode = true
                         post { requestFocus() }
