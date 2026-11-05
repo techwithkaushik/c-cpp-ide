@@ -57,6 +57,18 @@ Resolution order: explicit workspace configuration, then user language settings,
 - [ ] clangd process launch, JSON-RPC transport, editor diagnostics/completion and workspace lifecycle are not yet connected.
 - [ ] Build/Run, format-on-save and C/C++ settings persistence still require integration and tests.
 
+## Language Settings screen behavior
+
+- A language dropdown is the entry point; C/C++ is the first enabled integration. Other catalog entries explicitly report that their integration is not implemented yet.
+- Refresh rechecks the app-private embedded runtime, scans distro PATH and conventional manual toolchain locations, then executes each discovered tool's `--version` through the embedded shell/system-linker path. File existence alone is not a ready state.
+- Required C/C++ tools are `clang`, `clang++` and `clangd`. The C/C++ settings form is hidden until all three pass execution probes.
+- Optional `clang-format`, `clang-tidy` and `lldb` are displayed independently.
+- Per-executable absolute Linux guest paths can override discovery. Saved overrides are revalidated on Refresh; invalid overrides are not silently replaced.
+- The workspace is inspected for `.clangd`, `.clang-format`, `compile_commands.json`, `CMakeLists.txt`, `Makefile` and `meson.build`.
+- C/C++ standards, compiler flags, clangd arguments, include paths and preprocessor definitions are persisted separately from editor appearance settings.
+
+The embedded Termux terminal install command shown when tools are missing is `pkg update && pkg install clang lldb`. Refresh must verify real executables after installation; entering a command is not success.
+
 ## Required validation before calling C/C++ support complete
 
 1. Install clang and clangd in each supported distro through the integrated terminal; verify versions from the same runtime used by Build/Run.
