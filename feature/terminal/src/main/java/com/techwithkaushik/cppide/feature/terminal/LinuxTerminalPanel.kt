@@ -545,13 +545,17 @@ fun LinuxTerminalPanel(
                         if (cursorBlinkTick >= 0 && active.screen.isCursorDrawn()) {
                             val layout = cursorTextLayout.value
                             if (layout != null) {
-                                val (cursorColumn, cursorLine) = active.screen.cursorGridPosition()
-                                if (cursorLine !in 0 until layout.lineCount) return@Canvas
-                                // Position the cursor from terminal cell coordinates, not UTF-16
-                                // text offsets. Wide glyphs and grapheme suffixes cannot skew it.
-                                val left = cursorColumn * cursorCellWidth - outputHorizontalScrollState.value
-                                val top = layout.getLineTop(cursorLine) - outputScrollState.value
-                                val bottom = layout.getLineBottom(cursorLine) - outputScrollState.value
+                                // Ask Compose for the caret rectangle at the terminal's
+                                // rendered insertion offset. Multiplying the terminal column
+                                // by an estimated "M" width drifts after wide glyphs, combining
+                                // sequences and emoji; TextLayoutResult already knows the
+                                // exact shaped-text position.
+                                val cursorOffset = active.screen.cursorTextOffset()
+                                    .coerceIn(0, layout.layoutInput.text.length)
+                                val caret = layout.getCursorRect(cursorOffset)
+                                val left = caret.left - outputHorizontalScrollState.value
+                                val top = caret.top - outputScrollState.value
+                                val bottom = caret.bottom - outputScrollState.value
                                 val right = left + cursorCellWidth
                                 if (right >= 0f && left <= size.width && bottom >= 0f && top <= size.height) {
                                     when (active.screen.cursorShapeCode()) {
