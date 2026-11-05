@@ -11,6 +11,8 @@ The IDE owns its Linux userspace inside its private app directory. It must never
 - The importer accepts `.tar`, `.tar.gz`, and `.tar.xz`, limits entries and expanded size, rejects archive path traversal and escaping symlinks, stages the new rootfs, and keeps the prior rootfs until promotion succeeds.
 - The PRoot downloader uses a fixed upstream Android release URL and checks ELF architecture. That upstream release does not publish a SHA-256 digest; this is a documented supply-chain limitation. A production release should publish and pin a project-controlled digest for a current PRoot build.
 - The local shell uses the native PTY bridge in `:core:jni`, the Android system linker, and the app-owned PRoot/rootfs paths.
+- Interactive Ubuntu login shells start with PRoot's `--link2symlink` compatibility mode. This is required for Linux package operations that create hard links: PRoot translates guest hard-link requests into symlinks where Android's app-private filesystem cannot provide the expected Linux hard-link semantics. The smoke test uses the same launch option.
+- PRoot seccomp acceleration remains disabled by default for compatibility with Android 10/vendor kernels that previously terminated guest processes with SIGSYS. This favors reliable package installation over raw execution speed; only enable acceleration after device-level apt and shell stress tests prove it safe.
 - The runtime setup screen runs a real shell smoke test before reporting the runtime as ready.
 - SSH opens a shell channel directly from the terminal panel. First-use host keys require explicit SHA-256 fingerprint confirmation; changed pinned keys are rejected.
 
