@@ -113,9 +113,12 @@ fun RuntimeSetupPanel(
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
+                        DeveloperLog.info(context, "UbuntuSetup", "Starting Ubuntu Base download")
                         val installed = UbuntuBaseDownloader(paths).downloadAndInstall()
+                        DeveloperLog.info(context, "UbuntuSetup", "Ubuntu Base installed successfully")
                         "Ubuntu system files have been installed. The terminal component is the next step."
                     } catch (e: Exception) {
+                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu Base download failed", e)
                         runtimeFailureMessage(e.message, "Ubuntu could not be downloaded. Please check your internet connection and try again.")
                     }
                 }
@@ -138,9 +141,11 @@ fun RuntimeSetupPanel(
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
+                        DeveloperLog.info(context, "UbuntuSetup", "Validating bundled terminal runtime")
                         val installed = ProotDownloader(paths).downloadAndInstall()
                         "The terminal component is ready."
                     } catch (e: Exception) {
+                        DeveloperLog.error(context, "UbuntuSetup", "Bundled terminal runtime validation failed", e)
                         runtimeFailureMessage(e.message, "The terminal component could not be prepared. Please update or reinstall the app.")
                     }
                 }
@@ -184,6 +189,7 @@ fun RuntimeSetupPanel(
                             else -> "import.tar"
                         })
                         staged.copyTo(namedArchive, overwrite = true)
+                        DeveloperLog.info(context, "UbuntuSetup", "Installing selected Ubuntu root filesystem archive")
                         RootfsInstaller(paths).install(namedArchive, rootfsSha.ifBlank { null })
                         namedArchive.delete()
                         if (paths.hasProot()) {
@@ -194,6 +200,7 @@ fun RuntimeSetupPanel(
                             "Ubuntu system files are installed. Set up the terminal component to start Ubuntu."
                         }
                     } catch (e: Exception) {
+                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu root filesystem installation failed", e)
                         runtimeFailureMessage(e.message, "Ubuntu could not be installed. Please check the archive and available storage.")
                     } finally { staged?.delete() }
                 }
