@@ -65,7 +65,7 @@ internal fun IdeSettingsScreen(
     val context = LocalContext.current.applicationContext
     val prefs = remember(context) { context.getSharedPreferences(SettingsPreference.FILE, Context.MODE_PRIVATE) }
     var category by rememberSaveable { mutableStateOf("Interface") }
-    var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
+    var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(IdeDesignTokens.Metrics.MIN_TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.MAX_TERMINAL_FONT_SIZE).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
     var cursorBlink by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, true)) }
     var resetMessage by rememberSaveable { mutableStateOf("") }
