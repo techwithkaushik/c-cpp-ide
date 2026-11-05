@@ -35,7 +35,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             ProcessBuilder(
                 paths.proot.absolutePath,
                 // Keep PRoot quiet; the smoke test reports the shell exit and captured stderr.
-                "-0", "-v", "0",
+                "-0", "-v", "0", "--link2symlink",
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
                 "-b", "${resolver.absolutePath}:/etc/resolv.conf",
@@ -104,7 +104,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val failure = listOf(
             "Ubuntu shell exited with code $exit.",
             androidExecBlocker,
-            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --login -i -c <smoke-test>",
+            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 --link2symlink -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --login -i -c <smoke-test>",
             err.takeIf { it.isNotBlank() }?.let { "PRoot stderr (tail): ${it.takeLast(6000)}" }
                 ?: "PRoot stderr was empty.",
             out.takeIf { it.isNotBlank() }?.let { "PRoot stdout (tail): ${it.takeLast(2000)}" }
