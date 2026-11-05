@@ -210,6 +210,25 @@ Java_com_techwithkaushik_cppide_core_jni_NativePtyProcess_nativeStart(
         setsid();
         const int slave = open(slave_path.c_str(), O_RDWR);
         if (slave < 0 || ioctl(slave, TIOCSCTTY, 0) != 0) _exit(126);
+
+        // Preserve terminal control characters exactly as applications emit
+        // them. In particular, OCRNL converts carriage return (\\r) into
+        // newline on some inherited PTY configurations. Progress renderers
+        // such as apt rely on bare CR to return to column zero; translating it
+        // into NL turns every progress refresh into a new scrollback row.
+        // Keep normal NL -> CRLF output processing for shell applications.
+        struct termios terminal_settings {};
+        if (tcgetattr(slave, &terminal_settings) == 0) {
+#ifdef OCRNL
+            terminal_settings.c_oflag &= ~OCRNL;
+#endif
+#ifdef ONLRET
+            terminal_settings.c_oflag &= ~ONLRET;
+#endif
+            terminal_settings.c_oflag |= OPOST | ONLCR;
+            tcsetattr(slave, TCSANOW, &terminal_settings);
+        }
+
         dup2(slave, STDIN_FILENO);
         dup2(slave, STDOUT_FILENO);
         dup2(slave, STDERR_FILENO);
