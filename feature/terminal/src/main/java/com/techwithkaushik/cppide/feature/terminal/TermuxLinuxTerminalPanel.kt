@@ -85,15 +85,24 @@ fun TermuxLinuxTerminalPanel(
         busy = true
         error = null
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
+            // Runtime checks and filesystem preparation stay off the UI thread.
+            val validation = withContext(Dispatchers.IO) {
                 runCatching {
                     paths.ensureDirectories()
                     check(paths.hasRootfs()) { "Ubuntu rootfs is not installed or incomplete. Open Runtime & Bootstrap settings." }
                     ProotDownloader(paths).downloadAndInstall()
                     val smoke = LinuxRuntimeSmokeTest(paths).run()
                     check(smoke.success) { smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." } }
-                    UbuntuTermuxSession.create(context, paths)
                 }
+            }
+            // Termux TerminalSession creates an Android Handler internally. It must be
+            // constructed on the main Looper, never on a Dispatchers.IO worker.
+            val result = if (validation.isSuccess) {
+                withContext(Dispatchers.Main.immediate) {
+                    runCatching { UbuntuTermuxSession.create(context, paths) }
+                }
+            } else {
+                Result.failure(validation.exceptionOrNull() ?: IllegalStateException("Ubuntu validation failed."))
             }
             busy = false
             result.onSuccess { session ->
