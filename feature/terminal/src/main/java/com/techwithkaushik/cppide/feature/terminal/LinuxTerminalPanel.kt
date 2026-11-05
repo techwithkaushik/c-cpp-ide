@@ -209,9 +209,10 @@ private object LinuxTerminalSessions {
             scheduledFlushes.remove(tab.id)
             val batch = pendingOutput.remove(tab.id)?.toString().orEmpty()
             if (batch.isNotEmpty() && tabs.any { it.id == tab.id }) {
+                val renderForVisibleTab = selectedId == tab.id
                 renderExecutor.execute {
                     tab.screen.append(batch)
-                    if (selectedId == tab.id) {
+                    if (renderForVisibleTab) {
                         val rendered = tab.screen.renderAnnotated()
                         outputHandler.post {
                             if (selectedId == tab.id && tabs.any { it.id == tab.id }) {
