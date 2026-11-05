@@ -37,6 +37,8 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         var count = 0
         var expanded = 0L
         val directoryModes = mutableListOf<Pair<File, Int>>()
+        var previousRoot: File? = null
+        var activated = false
         try {
             val raw = BufferedInputStream(open())
             val decoded = RootfsArchitectureInspector.decoder(raw, archiveName)
@@ -91,18 +93,22 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             requireValidUbuntuRootfs(stage)
             val old = File(paths.staging, "distro-previous")
             if (old.exists() && !old.deleteRecursively()) throw IOException("Cannot remove previous extraction backup.")
-            if (paths.ubuntuRoot.exists() && !paths.ubuntuRoot.renameTo(old)) throw IOException("Cannot replace existing distro directory.")
-            if (!stage.renameTo(paths.ubuntuRoot)) {
-                if (old.exists()) old.renameTo(paths.ubuntuRoot)
-                throw IOException("Cannot activate extracted distro directory.")
+            if (paths.ubuntuRoot.exists()) {
+                if (!paths.ubuntuRoot.renameTo(old)) throw IOException("Cannot replace existing distro directory.")
+                previousRoot = old
             }
-            old.deleteRecursively()
+            if (!stage.renameTo(paths.ubuntuRoot)) throw IOException("Cannot activate extracted distro directory.")
+            activated = true
             paths.marker.writeText("installerVersion=$INSTALLER_VERSION\nroot=${paths.ubuntuRoot.absolutePath}\nentries=$count\nexpandedBytes=$expanded\n")
+            previousRoot?.deleteRecursively()
+            previousRoot = null
             DeveloperLog.info("UbuntuInstaller", "Rootfs extraction completed; entries=$count; expandedBytes=$expanded; durationMs=${System.currentTimeMillis() - startedAt}")
             return Result(paths.ubuntuRoot, count, expanded)
         } catch (error: Exception) {
             DeveloperLog.error("UbuntuInstaller", "Rootfs extraction failed; entries=$count; expandedBytes=$expanded", error)
             stage.deleteRecursively()
+            if (activated) paths.ubuntuRoot.deleteRecursively()
+            previousRoot?.let { backup -> if (backup.exists()) backup.renameTo(paths.ubuntuRoot) }
             throw error
         }
     }
