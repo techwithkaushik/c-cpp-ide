@@ -33,7 +33,7 @@ internal class EmbeddedCppBuildRunner(context: Context) {
         val timedOut: Boolean = false,
         val error: String? = null
     ) {
-        val compileSucceeded: Boolean get() = compileExitCode == 0 && error == null && !timedOut
+        val compileSucceeded: Boolean get() = compileExitCode == 0
         val runSucceeded: Boolean get() = compileSucceeded && runExitCode == 0 && !timedOut
     }
 
