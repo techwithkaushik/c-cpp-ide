@@ -3,6 +3,7 @@ package com.techwithkaushik.cppide.core.logging
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Process
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
