@@ -33,9 +33,30 @@ internal object LanguageToolingCatalog {
                 Role.Debugger to listOf("lldb", "gdb")
             ),
             packagesByDistro = mapOf(
-                "ubuntu" to mapOf(Role.Compiler to listOf("clang"), Role.LanguageServer to listOf("clangd"), Role.Formatter to listOf("clang-format"), Role.Linter to listOf("clang-tidy")),
-                "debian" to mapOf(Role.Compiler to listOf("clang"), Role.LanguageServer to listOf("clangd"), Role.Formatter to listOf("clang-format"), Role.Linter to listOf("clang-tidy")),
-                "archlinux" to mapOf(Role.Compiler to listOf("clang"), Role.LanguageServer to listOf("clang"), Role.Formatter to listOf("clang"), Role.Linter to listOf("clang"))
+                // Ubuntu/Debian split the compiler, language server, formatter, linter and debugger
+                // into independently installable packages. Keep installs role-specific.
+                "ubuntu" to mapOf(
+                    Role.Compiler to listOf("clang"),
+                    Role.LanguageServer to listOf("clangd"),
+                    Role.Formatter to listOf("clang-format"),
+                    Role.Linter to listOf("clang-tidy"),
+                    Role.Debugger to listOf("lldb")
+                ),
+                "debian" to mapOf(
+                    Role.Compiler to listOf("clang"),
+                    Role.LanguageServer to listOf("clangd"),
+                    Role.Formatter to listOf("clang-format"),
+                    Role.Linter to listOf("clang-tidy"),
+                    Role.Debugger to listOf("lldb")
+                ),
+                // Arch Linux ships clangd, clang-format and clang-tidy with the clang package.
+                "archlinux" to mapOf(
+                    Role.Compiler to listOf("clang"),
+                    Role.LanguageServer to listOf("clang"),
+                    Role.Formatter to listOf("clang"),
+                    Role.Linter to listOf("clang"),
+                    Role.Debugger to listOf("lldb")
+                )
             )
         ),
         Spec("python", "Python", setOf("py", "pyi"), mapOf(
