@@ -450,14 +450,14 @@ class TerminalScreenTest {
     @Test fun carriageReturnCancelsPendingAutowrap() {
         val screen = TerminalScreen(columns = 20, rows = 5)
         screen.append("12345678901234567890")
-        screen.append("\\rX")
+        screen.append("\rX")
         assertTrue(screen.render().lines().first().startsWith("X"))
         assertTrue(screen.cursorGridPosition() == (1 to 0))
     }
 
     @Test fun trailingBackgroundColorIsRetainedAcrossBlankCells() {
         val screen = TerminalScreen(columns = 20, rows = 5)
-        screen.append("\\u001B[44m\\u001B[2K")
+        screen.append("\u001B[44m\u001B[2K")
         val rendered = screen.renderAnnotated()
         assertTrue(rendered.text.length >= 20)
         assertTrue(rendered.spanStyles.any { it.item.background != Color.Unspecified })
