@@ -75,7 +75,7 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
          * /etc/group does not name. Add names only for missing IDs, without
          * changing any existing Ubuntu group or numeric GID.
          */
-        private fun ensureSupplementaryGroupNames(rootfs: File) {
+        internal fun ensureSupplementaryGroupNames(rootfs: File) {
             val root = runCatching { rootfs.canonicalFile }.getOrNull() ?: return
             val groupFile = File(root, "etc/group")
             val group = runCatching { groupFile.canonicalFile }.getOrNull() ?: return
@@ -85,8 +85,10 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
             val androidGroups = linkedMapOf(
                 3003 to "android_inet",
                 9997 to "android_everybody",
-                20490 to "android_shared",
-                50490 to "android_user"
+                20490 to "android_shared_legacy",
+                20491 to "android_shared",
+                50490 to "android_user_legacy",
+                50491 to "android_user"
             )
             val lines = runCatching { group.readLines(Charsets.UTF_8) }.getOrNull() ?: return
             val existingGids = lines.mapNotNull { line ->
