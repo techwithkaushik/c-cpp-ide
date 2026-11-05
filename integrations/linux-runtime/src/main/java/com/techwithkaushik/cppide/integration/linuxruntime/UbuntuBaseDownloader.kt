@@ -1,6 +1,5 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
-import android.os.Process
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -13,7 +12,7 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
 
     fun downloadAndInstall(onProgress: (Long, Long) -> Unit = { _, _ -> }): Result {
         paths.ensureDirectories()
-        val arch = if (Process.is64Bit()) "arm64" else "armhf"
+        val arch = paths.ubuntuArchitecture
         val fileName = "ubuntu-base-24.04.5-base-$arch.tar.gz"
         val baseUrl = "https://cdimage.ubuntu.com/ubuntu-base/releases/noble/release/"
         val sumsFile = File(paths.base, "SHA256SUMS")
