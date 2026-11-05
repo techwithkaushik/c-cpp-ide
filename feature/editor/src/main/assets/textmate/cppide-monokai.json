@@ -1,0 +1,68 @@
+{
+  "name": "cppide-monokai",
+  "settings": [
+    {
+      "settings": {
+        "background": "#272822",
+        "foreground": "#F8F8F2",
+        "lineHighlight": "#272822",
+        "selection": "#264F78"
+      }
+    },
+    {
+      "scope": "comment",
+      "settings": {
+        "foreground": "#75715E",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": "keyword, keyword.control, storage",
+      "settings": {
+        "foreground": "#F92672"
+      }
+    },
+    {
+      "scope": "storage.type, support.type",
+      "settings": {
+        "foreground": "#66D9EF"
+      }
+    },
+    {
+      "scope": "string",
+      "settings": {
+        "foreground": "#E6DB74"
+      }
+    },
+    {
+      "scope": "constant.numeric, constant.language",
+      "settings": {
+        "foreground": "#A6E22E"
+      }
+    },
+    {
+      "scope": "entity.name.function",
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    },
+    {
+      "scope": "entity.name.namespace",
+      "settings": {
+        "foreground": "#66D9EF"
+      }
+    },
+    {
+      "scope": "meta.preprocessor",
+      "settings": {
+        "foreground": "#F92672"
+      }
+    },
+    {
+      "scope": "constant.character.escape",
+      "settings": {
+        "foreground": "#A6E22E"
+      }
+    }
+  ]
+}
