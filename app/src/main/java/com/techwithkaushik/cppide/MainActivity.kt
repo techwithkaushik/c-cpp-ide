@@ -1565,7 +1565,8 @@ private fun WorkspaceScreen(
                     controller = editorController,
                     fontSize = editorFontSize,
                     wordWrap = editorWordWrap,
-                    themeName = editorTheme
+                    themeName = editorTheme,
+                    fileName = activeFile
                 )
             }
         }
