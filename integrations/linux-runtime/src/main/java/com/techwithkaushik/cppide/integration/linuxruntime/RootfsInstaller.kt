@@ -9,6 +9,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
+import java.util.EnumSet
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
@@ -54,6 +56,10 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             removeEntrySymlink(target)
                             if (!target.exists() && !target.mkdirs()) throw IOException("Cannot create directory: ${entry.name}")
                             if (!target.isDirectory) throw IOException("Directory conflicts with non-directory: ${entry.name}")
+                            // Preserve guest directory permissions. In particular, /tmp
+                            // must remain world-writable so apt's _apt sandbox can create
+                            // temporary files after extraction.
+                            applyMode(target, entry.mode)
                         }
                         entry.isLink -> {
                             val linked = safeTarget(stage, entry.linkName)
@@ -84,9 +90,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                                 }
                                 if (copied != entry.size) throw IOException("Truncated archive entry: ${entry.name}")
                             }
-                            target.setReadable(true, false)
-                            target.setWritable(entry.mode and 0x80 != 0, true)
-                            if (entry.mode and 0x49 != 0) target.setExecutable(true, false)
+                            applyMode(target, entry.mode)
                         }
                     }
                 }
@@ -112,6 +116,25 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         } catch (error: Exception) {
             stage.deleteRecursively()
             throw error
+        }
+    }
+
+    private fun applyMode(target: File, archiveMode: Int) {
+        val mode = archiveMode and 0x1ff
+        val permissions = EnumSet.noneOf(PosixFilePermission::class.java)
+        if (mode and 0x100 != 0) permissions.add(PosixFilePermission.OWNER_READ)
+        if (mode and 0x80 != 0) permissions.add(PosixFilePermission.OWNER_WRITE)
+        if (mode and 0x40 != 0) permissions.add(PosixFilePermission.OWNER_EXECUTE)
+        if (mode and 0x20 != 0) permissions.add(PosixFilePermission.GROUP_READ)
+        if (mode and 0x10 != 0) permissions.add(PosixFilePermission.GROUP_WRITE)
+        if (mode and 0x8 != 0) permissions.add(PosixFilePermission.GROUP_EXECUTE)
+        if (mode and 0x4 != 0) permissions.add(PosixFilePermission.OTHERS_READ)
+        if (mode and 0x2 != 0) permissions.add(PosixFilePermission.OTHERS_WRITE)
+        if (mode and 0x1 != 0) permissions.add(PosixFilePermission.OTHERS_EXECUTE)
+        try {
+            Files.setPosixFilePermissions(target.toPath(), permissions)
+        } catch (error: Exception) {
+            throw IOException("Cannot preserve Ubuntu permissions for ${target.name}.", error)
         }
     }
 
