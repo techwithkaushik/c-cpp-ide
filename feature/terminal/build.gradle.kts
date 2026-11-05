@@ -29,5 +29,7 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.xz)
     implementation(libs.jsch)
+    // Termux's maintained VT emulator, PTY view, input and scrollback implementation.
+    implementation(libs.termux.terminal.view)
     testImplementation("junit:junit:4.13.2")
 }
