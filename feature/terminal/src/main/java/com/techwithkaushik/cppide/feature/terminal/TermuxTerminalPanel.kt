@@ -336,8 +336,8 @@ private fun TerminalExtraKeys(
         TerminalExtraKey("ALT", client.readAltKey()) { client.toggleAlt() }
         TerminalExtraKey("SHIFT", client.readShiftKey()) { client.toggleShift() }
         TerminalExtraKey("FN", client.readFnKey()) { client.toggleFn() }
-        TerminalExtraKey("ESC") { terminalView?.mTermSession?.write("\u001b") }
-        TerminalExtraKey("TAB") { terminalView?.mTermSession?.write("\t") }
+        TerminalExtraKey("ESC") { terminalView?.mTermSession?.writeCodePoint(false, 27) }
+        TerminalExtraKey("TAB") { terminalView?.mTermSession?.writeCodePoint(false, 9) }
         TerminalExtraKey("↑") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_UP, client.keyModifiers()) }
         TerminalExtraKey("↓") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_DOWN, client.keyModifiers()) }
         TerminalExtraKey("←") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_LEFT, client.keyModifiers()) }
