@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -89,6 +90,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import android.icu.text.BreakIterator
+import java.util.Locale
 import java.io.OutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
@@ -556,17 +559,50 @@ fun LinuxTerminalPanel(
                                 val left = caret.left - outputHorizontalScrollState.value
                                 val top = caret.top - outputScrollState.value
                                 val bottom = caret.bottom - outputScrollState.value
-                                val right = left + cursorCellWidth
-                                if (right >= 0f && left <= size.width && bottom >= 0f && top <= size.height) {
-                                    when (active.screen.cursorShapeCode()) {
-                                        0, 1, 2 -> drawRect(
-                                            color = Color(0xFF8AB4F8).copy(alpha = 0.38f),
-                                            topLeft = Offset(left, top),
-                                            size = androidx.compose.ui.geometry.Size(
-                                                cursorCellWidth.coerceAtLeast(2f),
-                                                (bottom - top).coerceAtLeast(2f)
+                                val shape = active.screen.cursorShapeCode()
+                                val cursorHeight = (bottom - top).coerceAtLeast(2f)
+                                // A terminal block cursor is opaque. When a glyph exists
+                                // under the insertion point, redraw that complete grapheme
+                                // in a contrasting foreground so the character remains legible.
+                                var blockWidth = cursorCellWidth.coerceAtLeast(2f)
+                                var blockGlyph: androidx.compose.ui.text.TextLayoutResult? = null
+                                if (shape in 0..2 && cursorOffset < layout.layoutInput.text.length) {
+                                    val source = layout.layoutInput.text.text
+                                    val breaker = BreakIterator.getCharacterInstance(Locale.ROOT)
+                                    breaker.setText(source)
+                                    val next = breaker.following(cursorOffset)
+                                    if (next != BreakIterator.DONE) {
+                                        val cluster = source.substring(cursorOffset, next)
+                                        if (cluster.isNotEmpty() && cluster.none { it == '\\n' || it == '\\r' }) {
+                                            blockGlyph = terminalTextMeasurer.measure(
+                                                AnnotatedString(cluster),
+                                                style = TextStyle(
+                                                    color = Color(0xFF0B0F14),
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = displayFontSize.sp,
+                                                    fontWeight = FontWeight.Normal
+                                                )
                                             )
-                                        )
+                                            blockWidth = maxOf(blockWidth, blockGlyph.size.width.toFloat())
+                                        }
+                                    }
+                                }
+                                val right = left + blockWidth
+                                if (right >= 0f && left <= size.width && bottom >= 0f && top <= size.height) {
+                                    when (shape) {
+                                        0, 1, 2 -> {
+                                            drawRect(
+                                                color = Color(0xFF8AB4F8),
+                                                topLeft = Offset(left, top),
+                                                size = androidx.compose.ui.geometry.Size(
+                                                    blockWidth,
+                                                    cursorHeight
+                                                )
+                                            )
+                                            blockGlyph?.let { glyph ->
+                                                drawText(glyph, topLeft = Offset(left, top))
+                                            }
+                                        }
                                         3, 4 -> drawLine(
                                             color = Color(0xFF8AB4F8),
                                             start = Offset(left, bottom - 2f),
