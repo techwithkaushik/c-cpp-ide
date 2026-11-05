@@ -10,6 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
@@ -32,6 +38,8 @@ import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
+import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
+import com.techwithkaushik.cppide.integration.linuxruntime.RootfsArchitectureInspector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,13 +80,93 @@ fun TermuxLinuxTerminalPanel(
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingArchitectureWarning by remember { mutableStateOf<Pair<Uri, String>?>(null) }
+    var localInstallStatus by remember { mutableStateOf<String?>(null) }
     val preferences = remember(context) { context.getSharedPreferences("developer_options", 0) }
+    val localRootfsPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) inspectLocalRootfs(uri)
+    }
+
     val fontSize = remember(context) {
         context.getSharedPreferences("ide_preferences", 0).getInt("terminal_font_size", 14).coerceIn(10, 28)
     }
 
     DisposableEffect(Unit) {
         onDispose { /* Sessions deliberately outlive this panel; tab close owns process cleanup. */ }
+    }
+
+    fun displayName(uri: Uri): String {
+        val cursor = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        return cursor?.use { if (it.moveToFirst()) it.getString(0) else null }
+            ?.takeIf { it.isNotBlank() } ?: "ubuntu.tar"
+    }
+
+    fun installLocalRootfs(uri: Uri, allowArchitectureMismatch: Boolean) {
+        if (busy) return
+        busy = true
+        error = null
+        localInstallStatus = "Inspecting and installing local Ubuntu rootfs…"
+        val archiveName = displayName(uri)
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    RootfsInstaller(paths).install(
+                        open = { context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot open the selected archive.") },
+                        archiveName = archiveName
+                    )
+                }
+            }
+            busy = false
+            localInstallStatus = null
+            result.onSuccess {
+                pendingArchitectureWarning = null
+                DeveloperLog.event("UbuntuInstaller", "local_rootfs_installed", mapOf("archive" to archiveName, "entries" to it.entries, "expandedBytes" to it.expandedBytes))
+            }.onFailure {
+                error = it.message ?: "Local Ubuntu installation failed."
+                DeveloperLog.failure("UbuntuInstaller", "local_rootfs_install_failed", it, mapOf("archive" to archiveName))
+            }
+        }
+    }
+
+    fun inspectLocalRootfs(uri: Uri) {
+        if (busy) return
+        busy = true
+        error = null
+        val archiveName = displayName(uri)
+        scope.launch {
+            val inspection = withContext(Dispatchers.IO) {
+                runCatching {
+                    RootfsArchitectureInspector.inspect(
+                        open = { context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot read the selected archive.") },
+                        archiveName = archiveName
+                    )
+                }
+            }
+            busy = false
+            inspection.onSuccess { report ->
+                val mismatch = report.architecture != paths.ubuntuArchitecture
+                if (mismatch) {
+                    pendingArchitectureWarning = uri to "Detected ${report.architecture} rootfs, but this app process requires ${paths.ubuntuArchitecture}. ELF files: arm64=${report.arm64Executables}, armhf=${report.armhfExecutables}, other=${report.otherExecutables}. Installing an incompatible rootfs may make Ubuntu unable to start."
+                } else {
+                    installLocalRootfs(uri, allowArchitectureMismatch = false)
+                }
+            }.onFailure { error = it.message ?: "Could not inspect this rootfs archive." }
+        }
+    }
+
+    fun downloadOnline() {
+        if (busy) return
+        busy = true
+        error = null
+        localInstallStatus = "Downloading and installing Ubuntu Base…"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader(paths).downloadAndInstall() }
+            }
+            busy = false
+            localInstallStatus = null
+            result.onFailure { error = it.message ?: "Ubuntu download or installation failed." }
+        }
     }
 
     fun startUbuntu() {
@@ -141,6 +229,20 @@ fun TermuxLinuxTerminalPanel(
         }
     }
 
+    pendingArchitectureWarning?.let { (uri, warning) ->
+        AlertDialog(
+            onDismissRequest = { pendingArchitectureWarning = null },
+            title = { Text("Rootfs architecture mismatch") },
+            text = { Text("$warning\n\nContinue only if you understand the risk.") },
+            confirmButton = {
+                TextButton(onClick = { pendingArchitectureWarning = null; installLocalRootfs(uri, allowArchitectureMismatch = true) }) {
+                    Text("Install anyway")
+                }
+            },
+            dismissButton = { TextButton(onClick = { pendingArchitectureWarning = null }) { Text("Cancel") } }
+        )
+    }
+
     Column(modifier.fillMaxSize().background(Color(0xFF0B0F14))) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp),
@@ -168,6 +270,9 @@ fun TermuxLinuxTerminalPanel(
                 Text("Termux Terminal", color = Color(0xFF8CC8FF), fontSize = 18.sp)
                 Text("Ubuntu sessions run on Termux's native PTY, emulator, cursor, scrollback and input implementation.", color = Color(0xFF9AA7B5), fontSize = 12.sp)
                 Button(enabled = !busy, onClick = ::startUbuntu) { Text("Start Ubuntu") }
+                Button(enabled = !busy, onClick = ::downloadOnline) { Text("Download Online") }
+                OutlinedButton(enabled = !busy, onClick = { localRootfsPicker.launch("application/*") }) { Text("Select Local File") }
+                localInstallStatus?.let { Text(it, color = Color(0xFF8CC8FF), fontSize = 12.sp) }
                 OutlinedButton(onClick = onOpenSettings) { Text("Terminal settings") }
                 if (busy) CircularProgressIndicator()
                 error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 12.sp) }
