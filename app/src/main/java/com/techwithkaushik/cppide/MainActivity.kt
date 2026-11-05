@@ -5,6 +5,7 @@ import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 
 import android.os.Bundle
 import android.view.WindowManager
@@ -162,6 +163,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     // Validate the app-owned Ubuntu runtime once on every cold app launch.
     // The result is cached for this launch so users do not need to open Settings.
     LaunchedEffect(appContext) {
+        DeveloperLog.info(appContext, "Ubuntu", "Startup runtime validation started")
         val runtimePrefs = appContext.getSharedPreferences("linux_runtime_validation", android.content.Context.MODE_PRIVATE)
         val result = withContext(Dispatchers.IO) {
             val paths = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
@@ -180,6 +182,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     else "Ubuntu shell validation failed: ${smoke.error ?: smoke.output}"
                 }
             }
+        }
+        if (result == "Ubuntu runtime ready.") {
+            DeveloperLog.info(appContext, "Ubuntu", "Startup runtime validation succeeded")
+        } else {
+            DeveloperLog.error(appContext, "Ubuntu", "Startup runtime validation failed: $result")
         }
         runtimePrefs.edit()
             .putBoolean("ready", result == "Ubuntu runtime ready.")

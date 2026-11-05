@@ -23,10 +23,15 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     fun install(archive: File, expectedSha256: String? = null): Result {
         val startedAt = System.currentTimeMillis()
         DeveloperLog.info("UbuntuInstaller", "Rootfs extraction requested; archive=${archive.name}; bytes=${archive.length()}; checksumProvided=${expectedSha256 != null}")
-        require(archive.isFile && archive.length() > 0) { "Rootfs archive is missing or empty." }
-        if (expectedSha256 != null) {
-            require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "Invalid SHA-256 value." }
-            require(sha256(archive).equals(expectedSha256, ignoreCase = true)) { "Rootfs SHA-256 mismatch." }
+        try {
+            require(archive.isFile && archive.length() > 0) { "Rootfs archive is missing or empty." }
+            if (expectedSha256 != null) {
+                require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "Invalid SHA-256 value." }
+                require(sha256(archive).equals(expectedSha256, ignoreCase = true)) { "Rootfs SHA-256 mismatch." }
+            }
+        } catch (error: Exception) {
+            DeveloperLog.error("UbuntuInstaller", "Rootfs archive preflight validation failed", error)
+            throw error
         }
         paths.ensureDirectories()
         val stage = File(paths.staging, "distro-${System.currentTimeMillis()}")
