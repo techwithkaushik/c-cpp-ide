@@ -434,4 +434,32 @@ class TerminalScreenTest {
         screen.append("\u001B[?1049l")
         assertTrue(screen.render().contains(family))
     }
+
+    @Test fun terminalUsesDelayedAutowrapAtRightMargin() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("12345678901234567890")
+        assertTrue(screen.cursorGridPosition() == (19 to 0))
+        assertTrue(screen.render().lines().first().startsWith("12345678901234567890"))
+        screen.append("X")
+        val lines = screen.render().lines()
+        assertTrue(lines.size >= 2)
+        assertTrue(lines[1].startsWith("X"))
+        assertTrue(screen.cursorGridPosition() == (1 to 1))
+    }
+
+    @Test fun carriageReturnCancelsPendingAutowrap() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("12345678901234567890")
+        screen.append("\\rX")
+        assertTrue(screen.render().lines().first().startsWith("X"))
+        assertTrue(screen.cursorGridPosition() == (1 to 0))
+    }
+
+    @Test fun trailingBackgroundColorIsRetainedAcrossBlankCells() {
+        val screen = TerminalScreen(columns = 20, rows = 5)
+        screen.append("\\u001B[44m\\u001B[2K")
+        val rendered = screen.renderAnnotated()
+        assertTrue(rendered.text.length >= 20)
+        assertTrue(rendered.spanStyles.any { it.item.background != Color.Unspecified })
+    }
 }
