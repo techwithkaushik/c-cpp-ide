@@ -1,0 +1,47 @@
+{
+  "name": "C",
+  "scopeName": "source.c",
+  "patterns": [
+    {"include": "#comments"},
+    {"include": "#preprocessor"},
+    {"include": "#strings"},
+    {"include": "#numbers"},
+    {"include": "#keywords"},
+    {"include": "#types"},
+    {"include": "#functions"}
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {"name": "comment.line.double-slash.c", "match": "//.*$"},
+        {"name": "comment.block.c", "begin": "/\\*", "end": "\\*/"}
+      ]
+    },
+    "preprocessor": {
+      "name": "meta.preprocessor.c",
+      "match": "^\\s*#\\s*(include|define|undef|if|ifdef|ifndef|elif|else|endif|pragma|error|warning|line)\\b.*$"
+    },
+    "strings": {
+      "patterns": [
+        {"name": "string.quoted.double.c", "begin": "\"", "end": "\"", "patterns": [{"name": "constant.character.escape.c", "match": "\\\\."}]},
+        {"name": "string.quoted.single.c", "begin": "'", "end": "'", "patterns": [{"name": "constant.character.escape.c", "match": "\\\\."}]}
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.c",
+      "match": "\\b(0[xX][0-9A-Fa-f]+|0[bB][01]+|[0-9]+(\\.[0-9]*)?([eE][+-]?[0-9]+)?)[uUlLfF]*\\b"
+    },
+    "keywords": {
+      "name": "keyword.control.c",
+      "match": "\\b(auto|break|case|const|continue|default|do|else|enum|extern|for|goto|if|register|return|sizeof|static|struct|switch|typedef|union|volatile|while|_Alignas|_Alignof|_Atomic|_Bool|_Complex|_Generic|_Imaginary|_Noreturn|_Static_assert|_Thread_local)\\b"
+    },
+    "types": {
+      "name": "storage.type.c",
+      "match": "\\b(void|char|short|int|long|float|double|signed|unsigned|_Bool|size_t|intptr_t|uintptr_t)\\b"
+    },
+    "functions": {
+      "name": "entity.name.function.c",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
+    }
+  }
+}
