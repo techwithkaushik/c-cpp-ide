@@ -496,10 +496,12 @@ private class IdeTermuxSessionClient(
     private val context: Context
 ) : TerminalSessionClient {
     @Volatile private var terminalView: TerminalView? = null
-    @Volatile private var controlPressed = false
-    @Volatile private var altPressed = false
-    @Volatile private var shiftPressed = false
-    @Volatile private var fnPressed = false
+    // Snapshot-backed modifier state keeps the extra-key toolbar in sync with
+    // sticky modifier toggles while remaining readable by TerminalView callbacks.
+    private var controlPressed by mutableStateOf(false)
+    private var altPressed by mutableStateOf(false)
+    private var shiftPressed by mutableStateOf(false)
+    private var fnPressed by mutableStateOf(false)
 
     fun toggleControl() { controlPressed = !controlPressed }
     fun toggleAlt() { altPressed = !altPressed }
