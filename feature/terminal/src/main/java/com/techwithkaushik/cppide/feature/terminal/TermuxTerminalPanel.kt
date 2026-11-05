@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.util.TypedValue
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.background
@@ -130,7 +131,19 @@ fun TermuxTerminalPanel(
     val terminalPreferences = remember(appContext) {
         appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE)
     }
-    val terminalFontSize = terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE)
+    val terminalFontSizeSp = terminalPreferences.getInt(
+        IdeDesignTokens.Preference.TERMINAL_FONT_SIZE,
+        IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
+    )
+    // TerminalRenderer draws with Android Canvas/Paint, whose text size is in
+    // physical pixels. Settings store SP, so convert once before configuring
+    // the native View; otherwise text becomes noticeably too small on high-DPI
+    // devices and row/column metrics are calculated from the wrong size.
+    val terminalFontSizePx = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_SP,
+        terminalFontSizeSp.toFloat(),
+        appContext.resources.displayMetrics
+    ).toInt().coerceAtLeast(1)
     val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
 
     if (!runtimeStatus.ready || shell == null) {
@@ -186,7 +199,7 @@ fun TermuxTerminalPanel(
             TerminalSessionRegistry.initialSessionCreated = true
             if (tabs.isEmpty()) {
                 TerminalSessionRegistry.createTab(
-                    appContext, linker, shell, shellArguments, home, environment, terminalFontSize
+                    appContext, linker, shell, shellArguments, home, environment, terminalFontSizePx
                 )
             }
         }
@@ -264,7 +277,7 @@ fun TermuxTerminalPanel(
                 modifier = Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0D1117)),
                 factory = { viewContext ->
                     TerminalView(viewContext, null).apply {
-                        setTextSize(terminalFontSize)
+                        setTextSize(terminalFontSizePx)
                         setTypeface(Typeface.MONOSPACE)
                         val terminalViewClient = IdeTermuxViewClient(viewContext)
                         setTerminalViewClient(terminalViewClient)
