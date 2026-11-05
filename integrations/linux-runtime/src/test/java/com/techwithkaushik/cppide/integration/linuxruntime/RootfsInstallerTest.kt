@@ -99,4 +99,22 @@ class RootfsInstallerTest {
         assertEquals(File(nativeLibraries, "libproot-loader.so").canonicalFile, paths.prootLoader.canonicalFile)
     }
 
+
+    @Test fun supplementaryAndroidGroupIdsAreNamedAndUpdateIsIdempotent() {
+        val root = temporaryFolder.newFolder("ubuntu-root")
+        val etc = File(root, "etc").apply { mkdirs() }
+        val group = File(etc, "group").apply {
+            writeText("root:x:0:\\nusers:x:100:\\n")
+        }
+
+        LocalLinuxSession.ensureSupplementaryGroupNames(root)
+        val first = group.readText()
+        assertTrue(first.contains("android_shared:x:20491:"))
+        assertTrue(first.contains("android_user:x:50491:"))
+        assertTrue(first.contains("android_inet:x:3003:"))
+
+        LocalLinuxSession.ensureSupplementaryGroupNames(root)
+        assertEquals(first, group.readText())
+    }
+
 }
