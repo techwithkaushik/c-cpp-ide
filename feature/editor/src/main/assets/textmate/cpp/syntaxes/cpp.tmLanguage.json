@@ -1,0 +1,58 @@
+{
+  "name": "C++",
+  "scopeName": "source.cpp",
+  "patterns": [
+    {"include": "#comments"},
+    {"include": "#preprocessor"},
+    {"include": "#strings"},
+    {"include": "#numbers"},
+    {"include": "#keywords"},
+    {"include": "#types"},
+    {"include": "#standard-library"},
+    {"include": "#functions"},
+    {"include": "#namespaces"}
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {"name": "comment.line.double-slash.cpp", "match": "//.*$"},
+        {"name": "comment.block.cpp", "begin": "/\\*", "end": "\\*/"}
+      ]
+    },
+    "preprocessor": {
+      "name": "meta.preprocessor.cpp",
+      "match": "^\\s*#\\s*(include|define|undef|if|ifdef|ifndef|elif|else|endif|pragma|error|warning|line)\\b.*$"
+    },
+    "strings": {
+      "patterns": [
+        {"name": "string.quoted.double.cpp", "begin": "\"", "end": "\"", "patterns": [{"name": "constant.character.escape.cpp", "match": "\\\\."}]},
+        {"name": "string.quoted.single.cpp", "begin": "'", "end": "'", "patterns": [{"name": "constant.character.escape.cpp", "match": "\\\\."}]},
+        {"name": "string.quoted.raw.cpp", "begin": "R\"\\(", "end": "\\)\""}
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.cpp",
+      "match": "\\b(0[xX][0-9A-Fa-f']+|0[bB][01']+|[0-9][0-9']*(\\.[0-9']*)?([eE][+-]?[0-9']+)?)[uUlLfFzZ]*\\b"
+    },
+    "keywords": {
+      "name": "keyword.control.cpp",
+      "match": "\\b(alignas|alignof|and|and_eq|asm|auto|bitand|bitor|break|case|catch|class|compl|concept|const|consteval|constexpr|constinit|const_cast|continue|co_await|co_return|co_yield|decltype|default|delete|do|dynamic_cast|else|enum|explicit|export|extern|false|for|friend|goto|if|inline|mutable|namespace|new|noexcept|not|not_eq|nullptr|operator|or|or_eq|override|private|protected|public|register|reinterpret_cast|requires|return|sizeof|static|static_assert|static_cast|struct|switch|template|this|thread_local|throw|true|try|typedef|typeid|typename|union|using|virtual|volatile|while|xor|xor_eq)\\b"
+    },
+    "types": {
+      "name": "storage.type.cpp",
+      "match": "\\b(bool|char|char8_t|char16_t|char32_t|double|float|int|long|short|signed|unsigned|void|wchar_t|size_t|string|vector|map|set|array|optional|variant|unique_ptr|shared_ptr)\\b"
+    },
+    "standard-library": {
+      "name": "support.type.cpp",
+      "match": "\\b(std)\\b"
+    },
+    "functions": {
+      "name": "entity.name.function.cpp",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
+    },
+    "namespaces": {
+      "name": "entity.name.namespace.cpp",
+      "match": "(?<=namespace\\s)[A-Za-z_][A-Za-z0-9_]*"
+    }
+  }
+}
