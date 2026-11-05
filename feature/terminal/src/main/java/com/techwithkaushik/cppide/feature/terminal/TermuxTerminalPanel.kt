@@ -328,7 +328,7 @@ fun TermuxTerminalPanel(
                     TerminalView(viewContext, null).apply {
                         setTextSize(terminalFontSizePx)
                         setTypeface(Typeface.MONOSPACE)
-                        val terminalViewClient = IdeTermuxViewClient(viewContext)
+                        val terminalViewClient = IdeTermuxViewClient(viewContext, activeTab.client)
                         setTerminalViewClient(terminalViewClient)
                         terminalViewClient.attachView(this)
                         activeTab.client.attach(this)
@@ -555,6 +555,11 @@ private class IdeTermuxSessionClient(
     fun toggleShift() { shiftPressed = !shiftPressed }
     fun toggleFn() { fnPressed = !fnPressed }
 
+    fun readControlKey(): Boolean = controlPressed
+    fun readAltKey(): Boolean = altPressed
+    fun readShiftKey(): Boolean = shiftPressed
+    fun readFnKey(): Boolean = fnPressed
+
     fun keyModifiers(): Int {
         var modifiers = 0
         if (controlPressed) modifiers = modifiers or KeyHandler.KEYMOD_CTRL
@@ -642,7 +647,8 @@ private class IdeTermuxSessionClient(
 }
 
 private class IdeTermuxViewClient(
-    private val context: Context
+    private val context: Context,
+    private val sessionClient: IdeTermuxSessionClient
 ) : TerminalViewClient {
     @Volatile private var terminalView: TerminalView? = null
 
@@ -676,10 +682,10 @@ private class IdeTermuxViewClient(
     override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean = false
     override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean = false
     override fun onLongPress(event: MotionEvent): Boolean = false
-    override fun readControlKey(): Boolean = controlPressed
-    override fun readAltKey(): Boolean = altPressed
-    override fun readShiftKey(): Boolean = shiftPressed
-    override fun readFnKey(): Boolean = fnPressed
+    override fun readControlKey(): Boolean = sessionClient.readControlKey()
+    override fun readAltKey(): Boolean = sessionClient.readAltKey()
+    override fun readShiftKey(): Boolean = sessionClient.readShiftKey()
+    override fun readFnKey(): Boolean = sessionClient.readFnKey()
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
     override fun onEmulatorSet() = Unit
     override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
