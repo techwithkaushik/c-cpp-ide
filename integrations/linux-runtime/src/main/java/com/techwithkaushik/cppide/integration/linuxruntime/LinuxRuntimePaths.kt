@@ -2,11 +2,14 @@ package com.techwithkaushik.cppide.integration.linuxruntime
 
 import java.io.File
 import java.nio.file.Files
+import android.os.Process
 
 /** Simple app-private paths for the extracted distro and bundled Android PRoot. */
 class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) {
     val base = filesDir
-    val distro = File(filesDir, "rootfs")
+    val distro = File(filesDir, "ubuntu")
+    private val legacyDistro = File(filesDir, "rootfs")
+    val ubuntuArchitecture: String = if (Process.is64Bit()) "arm64" else "armhf"
     val ubuntuRoot: File get() = distro
     val usr = File(filesDir, "usr")
     val usrTmp = File(usr, "tmp")
@@ -15,6 +18,13 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     val prootLoader = File(usrBin, "libproot-loader.so")
     val marker = File(base, "runtime.properties")
     val staging = File(base, "staging")
+
+    private fun migrateLegacyRootfs() {
+        if (distro.exists() || !legacyDistro.isDirectory) return
+        if (!legacyDistro.renameTo(distro)) {
+            throw IllegalStateException("Cannot migrate existing Ubuntu rootfs directory.")
+        }
+    }
 
     /** Android-native executables must resolve to the APK's executable nativeLibraryDir. */
     val nativeLibraryDir: File? by lazy {
@@ -30,6 +40,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     }
 
     fun ensureDirectories() {
+        migrateLegacyRootfs()
         listOf(base, distro, usrTmp, usrBin, staging).forEach {
             if (!it.exists() && !it.mkdirs()) throw IllegalStateException("Cannot create runtime directory: $it")
             if (!it.isDirectory) throw IllegalStateException("Runtime path is not a directory: $it")
