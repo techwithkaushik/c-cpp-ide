@@ -39,6 +39,22 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
         linkNativeBinary(prootLoader, File(nativeDir, "libproot-loader.so"))
     }
 
+    private fun linkNativeBinary(alias: File, target: File) {
+        if (!target.isFile) return
+        if (Files.isSymbolicLink(alias.toPath())) {
+            if (runCatching { alias.canonicalFile == target.canonicalFile }.getOrDefault(false)) return
+            Files.delete(alias.toPath())
+        } else if (alias.exists()) {
+            if (alias.canonicalFile == target.canonicalFile) return
+            if (!alias.delete()) throw IllegalStateException("Cannot replace runtime binary: $alias")
+        }
+        try {
+            Files.createSymbolicLink(alias.toPath(), target.toPath())
+        } catch (e: Exception) {
+            throw IllegalStateException("Cannot link $alias to APK-bundled binary $target", e)
+        }
+    }
+
     /**
      * Returns a useful, non-secret explanation of the installed rootfs state.
      * Installer versions are layout metadata, not distro compatibility versions:
