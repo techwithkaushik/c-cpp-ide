@@ -449,8 +449,14 @@ fun LinuxTerminalPanel(
                                 ProotDownloader(paths).downloadAndInstall()
                                 val smoke = LinuxRuntimeSmokeTest(paths).run()
                                 if (!smoke.success) {
+                                    DeveloperLog.error(
+                                        context,
+                                        "Ubuntu",
+                                        "Runtime smoke test failed: ${smoke.error ?: smoke.output}; ${paths.rootfsDiagnostic()}"
+                                    )
                                     terminalUserMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                                 } else {
+                                    DeveloperLog.info(context, "Ubuntu", "Runtime smoke test passed")
                                     "Ubuntu runtime ready."
                                 }
                             }
@@ -467,7 +473,7 @@ fun LinuxTerminalPanel(
                         // reusing a recent successful shell smoke test.
                         ProotDownloader(paths).downloadAndInstall()
                         check(paths.hasRootfs() && paths.hasProot()) {
-                            "Ubuntu runtime files changed after the last successful validation. Reopen Runtime & Bootstrap."
+                            "Ubuntu runtime files changed after the last successful validation. Reopen Runtime & Bootstrap. ${paths.rootfsDiagnostic()}"
                         }
                     }
                     LocalLinuxSession.start(paths)
