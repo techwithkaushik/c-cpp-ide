@@ -77,7 +77,8 @@ internal fun LanguageSettingsPanel(projectName: String) {
         }
         val missing = current.tools.filter { it.executable in CppToolchainReport.REQUIRED_TOOLS && !it.installed }
         if (missing.isNotEmpty()) {
-            LNotice("C/C++ tools not detected", "Required tools missing: ${missing.joinToString { it.executable }}. Install them in the integrated terminal or provide absolute paths below, then refresh.")
+            LNotice("C/C++ tools not detected", "Required tools missing: ${missing.joinToString { it.executable }}. Open the integrated terminal and run the install command below, or provide absolute paths. Refresh after installation.")
+            Text("Termux package command: pkg update && pkg install clang lldb", color = LText, fontSize = 12.sp)
             ToolPathFields(current.tools.filter { it.executable in CppToolchainReport.REQUIRED_TOOLS }, paths, { name, value -> paths[name] = value }) { name ->
                 inspector.savePath(name, paths[name].orEmpty().ifBlank { null }); refresh++
             }
