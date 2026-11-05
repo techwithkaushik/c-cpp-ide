@@ -67,6 +67,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             target.parentFile?.mkdirs()
                             removeEntrySymlink(target)
                             Files.copy(linked.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                            applyMode(target, entry.mode)
                         }
                         entry.isFile -> {
                             if (entry.size < 0 || entry.size > MAX_EXPANDED_BYTES - expanded) {
