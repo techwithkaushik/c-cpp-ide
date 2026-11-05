@@ -117,4 +117,30 @@ class RootfsInstallerTest {
         assertEquals(first, group.readText())
     }
 
+
+    @Test fun acceptsCompatibleRootfsCreatedByEarlierInstallerVersion() {
+        val files = temporaryFolder.newFolder("legacy-runtime")
+        val root = File(files, "rootfs")
+        File(root, "etc").mkdirs()
+        File(root, "bin").mkdirs()
+        File(root, "etc/os-release").writeText("NAME=Ubuntu\\nID=ubuntu\\n")
+        File(root, "bin/sh").writeText("shell-placeholder")
+        File(files, "runtime.properties").writeText("installerVersion=4\\nroot=${root.absolutePath}\\nentries=2\\n")
+
+        val paths = LinuxRuntimePaths(files)
+        assertTrue("Earlier compatible installer marker should remain valid", paths.hasRootfs())
+        assertTrue(paths.rootfsDiagnostic().contains("installerVersion=4"))
+    }
+
+    @Test fun rejectsRootfsFromUnknownFutureInstallerVersion() {
+        val files = temporaryFolder.newFolder("future-runtime")
+        val root = File(files, "rootfs")
+        File(root, "etc").mkdirs()
+        File(root, "bin").mkdirs()
+        File(root, "etc/os-release").writeText("NAME=Ubuntu\\nID=ubuntu\\n")
+        File(root, "bin/sh").writeText("shell-placeholder")
+        File(files, "runtime.properties").writeText("installerVersion=99\\n")
+
+        assertFalse(LinuxRuntimePaths(files).hasRootfs())
+    }
 }
