@@ -101,15 +101,17 @@ internal object DeveloperLog {
 
     private fun redact(value: String): String {
         var result = value
+        result = Regex("(?i)-----BEGIN [^-]*PRIVATE KEY-----[\\s\\S]*?-----END [^-]*PRIVATE KEY-----")
+            .replace(result, "[PRIVATE KEY REDACTED]")
         val patterns = listOf(
             Regex("(?i)(password|passwd|passphrase|token|secret|authorization)\\s*([=:])\\s*[^\\s,;]+"),
-            Regex("(?i)(private[_ -]?key)\\s*([=:])\\s*[^\\n]+"),
-            Regex("(?i)(-----BEGIN [^-]*PRIVATE KEY-----)[\\s\\S]*?(-----END [^-]*PRIVATE KEY-----)")
+            Regex("(?i)(private[_ -]?key)\\s*([=:])\\s*[^\\n]+")
         )
-        patterns.forEach { pattern -> result = pattern.replace(result) { match ->
-            if (match.groupValues.size >= 3 && match.groupValues[1].isNotBlank()) "${match.groupValues[1]}${match.groupValues[2]}[REDACTED]"
-            else "[PRIVATE KEY REDACTED]"
-        } }
+        patterns.forEach { pattern ->
+            result = pattern.replace(result) { match ->
+                "${match.groupValues[1]}${match.groupValues[2]}[REDACTED]"
+            }
+        }
         return result
     }
 
