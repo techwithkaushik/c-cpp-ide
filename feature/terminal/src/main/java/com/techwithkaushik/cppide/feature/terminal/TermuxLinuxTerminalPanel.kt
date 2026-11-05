@@ -36,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.UUID
 
 private data class TermuxLinuxTab(val id: Int, val session: TerminalSession)
 
@@ -84,10 +85,14 @@ fun TermuxLinuxTerminalPanel(
         if (busy) return
         busy = true
         error = null
+        val operationId = UUID.randomUUID().toString().take(8)
+        DeveloperLog.event("TermuxTerminal", "ubuntu_start_requested", mapOf("operationId" to operationId))
         scope.launch {
-            // Runtime checks and filesystem preparation stay off the UI thread.
+            var failureStage = "runtime_validation"
+            val validationStartedAt = System.nanoTime()
             val validation = withContext(Dispatchers.IO) {
                 runCatching {
+                    DeveloperLog.event("TermuxTerminal", "runtime_validation_started", mapOf("operationId" to operationId))
                     paths.ensureDirectories()
                     check(paths.hasRootfs()) { "Ubuntu rootfs is not installed or incomplete. Open Runtime & Bootstrap settings." }
                     ProotDownloader(paths).downloadAndInstall()
@@ -95,11 +100,24 @@ fun TermuxLinuxTerminalPanel(
                     check(smoke.success) { smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." } }
                 }
             }
-            // Termux TerminalSession creates an Android Handler internally. It must be
-            // constructed on the main Looper, never on a Dispatchers.IO worker.
+            val validationDurationMs = (System.nanoTime() - validationStartedAt) / 1_000_000
+            DeveloperLog.event("TermuxTerminal", "runtime_validation_completed", mapOf(
+                "operationId" to operationId,
+                "result" to if (validation.isSuccess) "success" else "failed",
+                "durationMs" to validationDurationMs
+            ))
             val result = if (validation.isSuccess) {
+                failureStage = "terminal_session_create"
+                val sessionStartedAt = System.nanoTime()
+                DeveloperLog.event("TermuxTerminal", "terminal_session_create_started", mapOf("operationId" to operationId))
                 withContext(Dispatchers.Main.immediate) {
                     runCatching { UbuntuTermuxSession.create(context, paths) }
+                }.also { sessionResult ->
+                    DeveloperLog.event("TermuxTerminal", "terminal_session_create_completed", mapOf(
+                        "operationId" to operationId,
+                        "result" to if (sessionResult.isSuccess) "success" else "failed",
+                        "durationMs" to (System.nanoTime() - sessionStartedAt) / 1_000_000
+                    ))
                 }
             } else {
                 Result.failure(validation.exceptionOrNull() ?: IllegalStateException("Ubuntu validation failed."))
@@ -107,9 +125,17 @@ fun TermuxLinuxTerminalPanel(
             busy = false
             result.onSuccess { session ->
                 val id = TermuxLinuxTabs.add(session)
-                DeveloperLog.event("TermuxTerminal", "ubuntu_tab_started", mapOf("tabId" to id))
+                DeveloperLog.event("TermuxTerminal", "ubuntu_tab_started", mapOf(
+                    "operationId" to operationId,
+                    "tabId" to id,
+                    "validationDurationMs" to validationDurationMs
+                ))
             }.onFailure {
-                DeveloperLog.failure("TermuxTerminal", "ubuntu_tab_start_failed", it)
+                DeveloperLog.failure("TermuxTerminal", "ubuntu_tab_start_failed", it, mapOf(
+                    "operationId" to operationId,
+                    "failureStage" to failureStage,
+                    "validationDurationMs" to validationDurationMs
+                ))
                 error = it.message ?: "Ubuntu terminal could not start."
             }
         }
