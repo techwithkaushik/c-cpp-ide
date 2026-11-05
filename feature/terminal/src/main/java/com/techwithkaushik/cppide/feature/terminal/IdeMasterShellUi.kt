@@ -85,11 +85,11 @@ fun IdeMasterShellUi(
                 workspaceContent()
             }
         }
-        if (bottomPanelVisible) {
-            Column(
-                Modifier.fillMaxWidth().height(dockHeight)
-                    .background(VsCodeTerminalBg, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
-            ) {
+        Column(
+            Modifier.fillMaxWidth().height(dockHeight)
+                .background(VsCodeTerminalBg, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
+        ) {
+            if (bottomPanelVisible) {
                 Row(
                     Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
