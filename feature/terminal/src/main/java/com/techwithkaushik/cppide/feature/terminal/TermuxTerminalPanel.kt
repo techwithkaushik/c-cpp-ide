@@ -138,6 +138,9 @@ fun TermuxTerminalPanel(
             terminalPreferences.getInt(
                 IdeDesignTokens.Preference.TERMINAL_FONT_SIZE,
                 IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
+            ).coerceIn(
+                IdeDesignTokens.Metrics.MIN_TERMINAL_FONT_SIZE,
+                IdeDesignTokens.Metrics.MAX_TERMINAL_FONT_SIZE
             )
         )
     }
@@ -154,6 +157,9 @@ fun TermuxTerminalPanel(
                     terminalFontSizeSp = sharedPreferences?.getInt(
                         IdeDesignTokens.Preference.TERMINAL_FONT_SIZE,
                         IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
+                    )?.coerceIn(
+                        IdeDesignTokens.Metrics.MIN_TERMINAL_FONT_SIZE,
+                        IdeDesignTokens.Metrics.MAX_TERMINAL_FONT_SIZE
                     ) ?: IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
                 }
                 IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD -> {
