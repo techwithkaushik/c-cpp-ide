@@ -31,10 +31,10 @@ object DeveloperLog {
         if (!initialized.compareAndSet(false, true)) return
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            write(app, "FATAL", "Crash", "Uncaught exception on thread \${thread.name}", error)
+            write(app, "FATAL", "Crash", "Uncaught exception on thread ${thread.name}", error)
             previous?.uncaughtException(thread, error)
         }
-        info(app, "Application", "Process started; sdk=\${Build.VERSION.SDK_INT}; abi=\${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"}")
+        info(app, "Application", "Process started; sdk=${Build.VERSION.SDK_INT}; abi=${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"}")
     }
 
     fun isEnabled(context: Context): Boolean =
@@ -65,7 +65,7 @@ object DeveloperLog {
         }
         val safe = redactSensitiveValues(details).take(24_000)
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).format(Date())
-        val line = "$timestamp $level/$tag [pid=\${Process.myPid()} thread=\${Thread.currentThread().name}]: $safe\n"
+        val line = "$timestamp $level/$tag [pid=${Process.myPid()} thread=${Thread.currentThread().name}]: $safe\n"
         val bytes = line.toByteArray(Charsets.UTF_8)
         synchronized(lock) {
             runCatching {
@@ -84,7 +84,7 @@ object DeveloperLog {
         File(directory, "app.3.log").delete()
         for (index in 2 downTo 1) {
             val from = File(directory, "app.$index.log")
-            if (from.exists()) from.renameTo(File(directory, "app.\${index + 1}.log"))
+            if (from.exists()) from.renameTo(File(directory, "app.${index + 1}.log"))
         }
         active.renameTo(File(directory, "app.1.log"))
     }
@@ -125,7 +125,6 @@ object DeveloperLog {
 
     fun clear(context: Context) {
         synchronized(lock) { File(context.applicationContext.filesDir, "developer-logs").deleteRecursively() }
-        info(context, "DeveloperLog", "Stored developer logs cleared")
     }
 
     suspend fun export(context: Context, destination: Uri) = withContext(Dispatchers.IO) {

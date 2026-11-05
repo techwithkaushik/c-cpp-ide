@@ -100,7 +100,7 @@ internal fun DeveloperOptionsPanel() {
         Text(if (enabled) "Logging is ON. New diagnostics are saved automatically in private app storage."
             else "Logging is OFF. Existing log files are kept until you clear or export them.",
             color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
-        Text("Stored logs: $fileCount files · \${"%.1f".format(Locale.US, totalBytes / 1024.0)} KB · maximum 4 files of 512 KB each",
+        Text("Stored logs: $fileCount files · ${"%.1f".format(Locale.US, totalBytes / 1024.0)} KB · maximum 4 files of 512 KB each",
             color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
         Text("Passwords, tokens, authorization values and private keys are redacted. Terminal commands and terminal output are not collected. Android does not let ordinary apps read the complete system Logcat; only app-instrumented events and uncaught app-process crashes are captured.",
             color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
