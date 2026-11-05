@@ -236,7 +236,7 @@ object DeveloperLog {
         app.contentResolver.openOutputStream(destination, "w")?.use { output ->
             ZipOutputStream(output).use { zip ->
                 zip.putNextEntry(ZipEntry("README.txt"))
-                zip.write(("Code Studio developer diagnostics. Sensitive values are redacted. Logging is opt-in and limited to app-instrumented events and uncaught app-process crashes; this is not a full Android Logcat dump.\n").toByteArray(Charsets.UTF_8))
+                zip.write(("Code Studio developer diagnostics. Sensitive values are redacted. Logging is opt-in and includes this app process PID only from Android Logcat, app-instrumented events and uncaught app-process crashes. Other apps and Android system logs are excluded.\n").toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("device-info.txt"))
                 val version = runCatching {
