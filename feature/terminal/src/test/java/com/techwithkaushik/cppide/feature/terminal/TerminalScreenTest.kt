@@ -462,4 +462,14 @@ class TerminalScreenTest {
         assertTrue(rendered.text.length >= 20)
         assertTrue(rendered.spanStyles.any { it.item.background != Color.Unspecified })
     }
+
+    @Test fun carriageReturnAndEraseLineRedrawProgressWithoutAddingRows() {
+        val screen = TerminalScreen(columns = 40, rows = 5)
+        screen.append("Reading package lists... 19%\\r\\u001B[2KReading package lists... 79%")
+        val rendered = screen.render()
+        assertTrue(rendered.contains("Reading package lists... 79%"))
+        assertFalse(rendered.contains("19%"))
+        assertEquals(1, rendered.lines().count { it.contains("Reading package lists") })
+    }
+
 }
