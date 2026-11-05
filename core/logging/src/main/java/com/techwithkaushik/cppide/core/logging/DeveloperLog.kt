@@ -3,13 +3,11 @@ package com.techwithkaushik.cppide.core.logging
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -24,9 +22,6 @@ object DeveloperLog {
     private const val MAX_READ_CHARS = 180_000
     private val lock = Any()
     private val initialized = AtomicBoolean(false)
-    private val collectorLock = Any()
-    private val collectorRunning = AtomicBoolean(false)
-    private val logcatProcess = AtomicReference<Process?>(null)
     @Volatile private var appContext: Context? = null
 
     fun initialize(context: Context) {
@@ -39,7 +34,6 @@ object DeveloperLog {
             previous?.uncaughtException(thread, error)
         }
         info(app, "Application", "Process started; sdk=${Build.VERSION.SDK_INT}; abi=${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"}")
-        if (isEnabled(app)) startOwnProcessLogcat(app)
     }
 
     fun isEnabled(context: Context): Boolean =
@@ -51,9 +45,6 @@ object DeveloperLog {
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(ENABLED, enabled).apply()
         if (enabled) {
             info(app, "DeveloperLog", "Developer logging enabled")
-            startOwnProcessLogcat(app)
-        } else {
-            stopOwnProcessLogcat()
         }
     }
 
@@ -65,77 +56,6 @@ object DeveloperLog {
     fun info(tag: String, message: String) { appContext?.let { info(it, tag, message) } }
     fun warn(tag: String, message: String, error: Throwable? = null) { appContext?.let { warn(it, tag, message, error) } }
     fun error(tag: String, message: String, error: Throwable? = null) { appContext?.let { error(it, tag, message, error) } }
-
-    /**
-     * Capture Android Log API output from this app process only. The PID filter
-     * deliberately excludes Android/system and all other application processes.
-     * Android 10+ supports this mode without requesting READ_LOGS.
-     */
-    private fun startOwnProcessLogcat(context: Context) {
-        synchronized(collectorLock) {
-            if (!isEnabled(context) || !collectorRunning.compareAndSet(false, true)) return
-            val app = context.applicationContext
-            Thread({
-                try {
-                    val pid = Process.myPid()
-                    val process = ProcessBuilder(
-                        "/system/bin/logcat",
-                        "--pid=$pid",
-                        "-v", "threadtime"
-                    ).redirectErrorStream(true).start()
-                    logcatProcess.set(process)
-                    appendDiagnosticLine(app, "INFO/LogcatCollector: Own-process Logcat capture started; pid=$pid; filter=--pid")
-                    process.inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
-                        lines.forEach { raw ->
-                            if (!collectorRunning.get() || !isEnabled(app)) return@forEach
-                            val safe = redactSensitiveValues(raw).take(12_000)
-                            if (safe.isNotBlank()) appendDiagnosticLine(app, "LOGCAT/$pid: $safe")
-                        }
-                    }
-                    val exitCode = runCatching { process.waitFor() }.getOrDefault(-1)
-                    if (collectorRunning.get() && isEnabled(app)) {
-                        appendDiagnosticLine(app, "WARN/LogcatCollector: Own-process Logcat reader stopped; pid=$pid; exitCode=$exitCode")
-                    }
-                } catch (error: Exception) {
-                    if (isEnabled(app)) {
-                        appendDiagnosticLine(
-                            app,
-                            "WARN/LogcatCollector: Own-process Logcat unavailable; pid=${Process.myPid()}; reason=${redactSensitiveValues(error.message ?: error.javaClass.simpleName)}"
-                        )
-                    }
-                } finally {
-                    logcatProcess.getAndSet(null)?.let { runCatching { it.destroy() } }
-                    collectorRunning.set(false)
-                }
-            }, "app-own-logcat").apply { isDaemon = true; start() }
-        }
-    }
-
-    private fun stopOwnProcessLogcat() {
-        synchronized(collectorLock) {
-            collectorRunning.set(false)
-            logcatProcess.getAndSet(null)?.let { process ->
-                runCatching { process.destroy() }
-                runCatching { process.inputStream.close() }
-            }
-        }
-    }
-
-    private fun appendDiagnosticLine(context: Context, line: String) {
-        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).format(Date())
-        val bytes = "$timestamp $line\\n".toByteArray(Charsets.UTF_8)
-        synchronized(lock) {
-            runCatching {
-                val directory = File(context.applicationContext.filesDir, "developer-logs")
-                if (!directory.exists() && !directory.mkdirs()) return@runCatching
-                val active = File(directory, "app.log")
-                if (active.exists() && active.length() + bytes.size > MAX_FILE_BYTES) rotate(directory, active)
-                active.appendBytes(bytes)
-                directory.listFiles()?.filter { it.isFile && it.name.startsWith("app") }
-                    ?.sortedByDescending { it.lastModified() }?.drop(MAX_FILES)?.forEach { it.delete() }
-            }
-        }
-    }
 
     /** Writes stable key/value events for later diagnostics and regression analysis. */
     fun event(tag: String, event: String, fields: Map<String, Any?> = emptyMap()) {
@@ -236,7 +156,7 @@ object DeveloperLog {
         app.contentResolver.openOutputStream(destination, "w")?.use { output ->
             ZipOutputStream(output).use { zip ->
                 zip.putNextEntry(ZipEntry("README.txt"))
-                zip.write(("Code Studio developer diagnostics. Sensitive values are redacted. Logging is opt-in and includes this app process PID only from Android Logcat, app-instrumented events and uncaught app-process crashes. Other apps and Android system logs are excluded.\n").toByteArray(Charsets.UTF_8))
+                zip.write(("Code Studio developer diagnostics. Sensitive values are redacted. Logging is opt-in and contains only app-instrumented events and uncaught app-process crashes. Android system logs and other apps are never read.\n").toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("device-info.txt"))
                 val version = runCatching {
