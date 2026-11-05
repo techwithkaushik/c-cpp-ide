@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -17,23 +18,23 @@ import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import kotlin.math.floor
+import kotlin.math.roundToInt
+import kotlin.math.abs
 
-/** Maps laid-out cell dimensions to the PTY, suppressing duplicate resize calls. */
+/** Measures terminal cells after layout and synchronizes the PTY only when its grid changes. */
 private class PtyResizeListener(
     private val session: TerminalSession,
     density: Float,
     fontSizeSp: Int,
 ) : View.OnLayoutChangeListener {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        textSize = fontSizeSp * density
-    }
+    private val density = density
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE; textSize = fontSizeSp * density }
     private var lastColumns = 0
     private var lastRows = 0
 
-    fun setFontSize(fontSizeSp: Int, density: Float) {
+    fun setFontSize(fontSizeSp: Int) {
         val size = fontSizeSp * density
-        if (paint.textSize != size) { paint.textSize = size; lastColumns = 0; lastRows = 0 }
+        if (abs(paint.textSize - size) > 0.01f) { paint.textSize = size; lastColumns = 0; lastRows = 0 }
     }
 
     override fun onLayoutChange(view: View, left: Int, top: Int, right: Int, bottom: Int, oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int) {
@@ -52,30 +53,74 @@ private class PtyResizeListener(
     }
 }
 
+/** TerminalView supplies a cumulative pinch scale; convert it to incremental font changes. */
+private class TerminalZoomController(
+    private val view: TerminalView,
+    private val resizeListener: PtyResizeListener,
+    initialFontSizeSp: Int,
+) {
+    private var fontSizeSp = initialFontSizeSp.coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+    private var lastScale = 1f
+
+    fun onScale(cumulativeScale: Float): Float {
+        val targetScale = cumulativeScale.coerceIn(MIN_SCALE, MAX_SCALE)
+        val ratio = targetScale / lastScale
+        if (abs(ratio - 1f) >= SCALE_EPSILON) {
+            val nextSize = (fontSizeSp * ratio).roundToInt().coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+            if (nextSize != fontSizeSp) {
+                fontSizeSp = nextSize
+                view.setTextSize(fontSizeSp)
+                resizeListener.setFontSize(fontSizeSp)
+                view.requestLayout()
+            }
+        }
+        lastScale = targetScale
+        return targetScale
+    }
+
+    companion object {
+        private const val MIN_FONT_SP = 8
+        private const val MAX_FONT_SP = 32
+        private const val MIN_SCALE = 0.65f
+        private const val MAX_SCALE = 2.0f
+        private const val SCALE_EPSILON = 0.015f
+    }
+}
+
 @Composable
 internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = Modifier, fontSizeSp: Int = 14, onSessionFinished: (TerminalSession) -> Unit = {}) {
     AndroidView(
         modifier = modifier,
         factory = { context ->
             TerminalView(context, null).apply {
-                setTerminalViewClient(createTerminalViewClient(context))
                 setTextSize(fontSizeSp)
                 setTypeface(Typeface.MONOSPACE)
-                val listener = PtyResizeListener(session, resources.displayMetrics.density, fontSizeSp)
-                setTag(android.R.id.content, listener)
-                addOnLayoutChangeListener(listener)
+                val resizeListener = PtyResizeListener(session, resources.displayMetrics.density, fontSizeSp)
+                val zoomController = TerminalZoomController(this, resizeListener, fontSizeSp)
+                setTag(android.R.id.content, resizeListener)
+                setTag(android.R.id.custom, zoomController)
+                setTerminalViewClient(createTerminalViewClient(context, this, zoomController))
+                addOnLayoutChangeListener(resizeListener)
                 attachSession(session)
-                post { listener.onLayoutChange(this, left, top, right, bottom, left, top, right, bottom) }
+                isFocusable = true
+                isFocusableInTouchMode = true
+                requestFocus()
+                post { resizeListener.onLayoutChange(this, left, top, right, bottom, left, top, right, bottom) }
             }
         },
         update = { view ->
-            (view.getTag(android.R.id.content) as? PtyResizeListener)?.setFontSize(fontSizeSp, view.resources.displayMetrics.density)
+            val resizeListener = view.getTag(android.R.id.content) as? PtyResizeListener
+            resizeListener?.setFontSize(fontSizeSp)
             if (view.mTermSession !== session) view.attachSession(session)
+            view.isFocusable = true
+            view.isFocusableInTouchMode = true
             view.setTextSize(fontSizeSp)
+            view.requestFocus()
         },
         onRelease = { view ->
             (view.getTag(android.R.id.content) as? PtyResizeListener)?.let(view::removeOnLayoutChangeListener)
             view.setTag(android.R.id.content, null)
+            view.setTag(android.R.id.custom, null)
             if (view.mTermSession === session) view.attachSession(null)
         }
     )
@@ -106,13 +151,17 @@ internal fun createTermuxSessionClient(context: Context, onSessionFinished: (Ter
     override fun logStackTrace(tag: String, e: Exception) = DeveloperLog.error("Termux/$tag", "Terminal library exception", e)
 }
 
-private fun createTerminalViewClient(context: Context): TerminalViewClient = object : TerminalViewClient {
-    override fun onScale(scale: Float): Float = scale.coerceIn(0.65f, 2.0f)
-    override fun onSingleTapUp(e: MotionEvent) = Unit
+private fun createTerminalViewClient(context: Context, terminalView: TerminalView, zoomController: TerminalZoomController): TerminalViewClient = object : TerminalViewClient {
+    override fun onScale(scale: Float): Float = zoomController.onScale(scale)
+    override fun onSingleTapUp(e: MotionEvent) {
+        terminalView.requestFocus()
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(terminalView, InputMethodManager.SHOW_IMPLICIT)
+    }
     override fun shouldBackButtonBeMappedToEscape(): Boolean = false
     override fun shouldEnforceCharBasedInput(): Boolean = true
     override fun shouldUseCtrlSpaceWorkaround(): Boolean = false
-    override fun isTerminalViewSelected(): Boolean = true
+    override fun isTerminalViewSelected(): Boolean = terminalView.hasFocus()
     override fun copyModeChanged(copyMode: Boolean) = Unit
     override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean = false
     override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean = false
