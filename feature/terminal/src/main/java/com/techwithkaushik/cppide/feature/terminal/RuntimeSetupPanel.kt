@@ -86,17 +86,30 @@ fun RuntimeSetupPanel(
     ) { rootfsUri = it }
     LaunchedEffect(context) {
         status = withContext(Dispatchers.IO) {
+            DeveloperLog.info(context, "UbuntuSetup", "Initial runtime validation started; ${paths.rootfsDiagnostic()}")
             val prootCheck = runCatching {
                 // Materializes APK native-library links and validates the ELF ABI.
                 ProotDownloader(paths).downloadAndInstall()
             }
             when {
-                !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
-                prootCheck.isFailure -> runtimeFailureMessage(prootCheck.exceptionOrNull()?.message, "Ubuntu is installed, but its terminal component could not be prepared.")
+                !paths.hasRootfs() -> {
+                    val diagnostic = paths.rootfsDiagnostic()
+                    DeveloperLog.warn(context, "UbuntuSetup", "Rootfs validation rejected the installed distro; $diagnostic")
+                    "Ubuntu rootfs is not installed or incomplete."
+                }
+                prootCheck.isFailure -> {
+                    DeveloperLog.error(context, "UbuntuSetup", "Bundled PRoot validation failed", prootCheck.exceptionOrNull())
+                    runtimeFailureMessage(prootCheck.exceptionOrNull()?.message, "Ubuntu is installed, but its terminal component could not be prepared.")
+                }
                 else -> {
                     val smoke = LinuxRuntimeSmokeTest(paths).run()
-                    if (smoke.success) "Ubuntu shell smoke test passed."
-                    else runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
+                    if (smoke.success) {
+                        DeveloperLog.info(context, "UbuntuSetup", "Initial Ubuntu shell smoke test passed")
+                        "Ubuntu shell smoke test passed."
+                    } else {
+                        DeveloperLog.error(context, "UbuntuSetup", "Initial Ubuntu shell smoke test failed: ${smoke.error ?: smoke.output}")
+                        runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
+                    }
                 }
             }
         }
@@ -130,6 +143,7 @@ fun RuntimeSetupPanel(
                         status = "Ubuntu shell smoke test passed."
                         onRuntimeReady()
                     } else {
+                        DeveloperLog.error(context, "UbuntuSetup", "Downloaded Ubuntu Base failed shell smoke test: ${smoke.error ?: smoke.output}")
                         status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                     }
                 }
@@ -157,6 +171,7 @@ fun RuntimeSetupPanel(
                         status = "Ubuntu shell smoke test passed."
                         onRuntimeReady()
                     } else {
+                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu shell smoke test failed after PRoot validation: ${smoke.error ?: smoke.output}")
                         status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                     }
                 }
@@ -189,18 +204,23 @@ fun RuntimeSetupPanel(
                             else -> "import.tar"
                         })
                         staged.copyTo(namedArchive, overwrite = true)
-                        DeveloperLog.info(context, "UbuntuSetup", "Installing selected Ubuntu root filesystem archive")
-                        RootfsInstaller(paths).install(namedArchive, rootfsSha.ifBlank { null })
+                        DeveloperLog.info(context, "UbuntuSetup", "Installing selected Ubuntu root filesystem archive: name=${namedArchive.name}, bytes=${namedArchive.length()}")
+                        val installResult = RootfsInstaller(paths).install(namedArchive, rootfsSha.ifBlank { null })
+                        DeveloperLog.info(context, "UbuntuSetup", "Rootfs extraction completed: entries=${installResult.entries}, expandedBytes=${installResult.expandedBytes}; ${paths.rootfsDiagnostic()}")
                         namedArchive.delete()
                         if (paths.hasProot()) {
                             val smoke = LinuxRuntimeSmokeTest(paths).run()
-                            if (!smoke.success) throw IOException(runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again."))
+                            if (!smoke.success) {
+                                DeveloperLog.error(context, "UbuntuSetup", "Installed rootfs failed shell smoke test: ${smoke.error ?: smoke.output}")
+                                throw IOException("Ubuntu shell smoke test failed.")
+                            }
+                            DeveloperLog.info(context, "UbuntuSetup", "Imported Ubuntu rootfs passed shell smoke test")
                             "Ubuntu rootfs installed and shell smoke test passed."
                         } else {
                             "Ubuntu system files are installed. Set up the terminal component to start Ubuntu."
                         }
                     } catch (e: Exception) {
-                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu root filesystem installation failed", e)
+                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu root filesystem installation failed; ${paths.rootfsDiagnostic()}", e)
                         runtimeFailureMessage(e.message, "Ubuntu could not be installed. Please check the archive and available storage.")
                     } finally { staged?.delete() }
                 }
@@ -212,6 +232,7 @@ fun RuntimeSetupPanel(
                         status = "Ubuntu shell smoke test passed."
                         onRuntimeReady()
                     } else {
+                        DeveloperLog.error(context, "UbuntuSetup", "Post-install Ubuntu shell smoke test failed: ${smoke.error ?: smoke.output}")
                         status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                     }
                 }
