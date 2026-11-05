@@ -27,6 +27,7 @@ dependencies {
     // with this project's Kotlin 2.2.x / compileSdk 36 toolchain.
     implementation(platform(libs.sora.editor.bom))
     implementation(libs.sora.editor)
+    implementation(libs.sora.language.textmate)
     implementation(project(":core:designsystem"))
     implementation(project(":core:lsp"))
     implementation(platform(libs.androidx.compose.bom))
