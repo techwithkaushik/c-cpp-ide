@@ -31,6 +31,18 @@ class NativeVTermScreen(columns: Int = 80, rows: Int = 24) : Closeable {
         if (!closed.get()) nativeResize(handle, columns.coerceIn(20, 400), rows.coerceIn(5, 200))
     }
 
+    /**
+     * Returns a stable cell snapshot for rendering without losing ANSI attributes,
+     * palette/true-colour values, combining code points or wide-cell widths.
+     * Layout: [rows, columns, cursorRow, cursorColumn, cells...]. Each cell has
+     * six code-point slots followed by foreground RGB, background RGB, attribute
+     * flags and display width. A colour value of -1 means terminal default.
+     */
+    fun snapshot(): LongArray {
+        if (closed.get()) return LongArray(0)
+        return nativeSnapshot(handle)
+    }
+
     /** Returns the zero-based row and column of the VT cursor. */
     fun cursor(): Pair<Int, Int>? {
         if (closed.get()) return null
@@ -51,6 +63,7 @@ class NativeVTermScreen(columns: Int = 80, rows: Int = 24) : Closeable {
     private external fun nativeRender(handle: Long): String
     private external fun nativeResize(handle: Long, columns: Int, rows: Int)
     private external fun nativeCursor(handle: Long): Long
+    private external fun nativeSnapshot(handle: Long): LongArray
     private external fun nativeDestroy(handle: Long)
 
     companion object {
