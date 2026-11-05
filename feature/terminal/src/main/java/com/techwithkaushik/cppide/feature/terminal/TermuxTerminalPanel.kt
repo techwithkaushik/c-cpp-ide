@@ -330,16 +330,7 @@ fun TermuxTerminalPanel(
                         activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                         isFocusable = true
                         isFocusableInTouchMode = true
-                        post {
-                            requestFocus()
-                            if (autoKeyboardOnOpen) {
-                                postDelayed({
-                                    (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
-                                        android.view.inputmethod.InputMethodManager)
-                                        ?.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-                                }, 180L)
-                            }
-                        }
+                        post { requestFocus() }
                     }
                 },
                 update = { view ->
@@ -350,6 +341,19 @@ fun TermuxTerminalPanel(
                     view.setTextSize(terminalFontSizePx)
                 }
             )
+            androidx.compose.runtime.LaunchedEffect(activeTab.id) {
+                terminalViewRef.value?.post {
+                    val view = terminalViewRef.value ?: return@post
+                    view.requestFocus()
+                    if (autoKeyboardOnOpen) {
+                        view.postDelayed({
+                            (view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                                android.view.inputmethod.InputMethodManager)
+                                ?.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                        }, 180L)
+                    }
+                }
+            }
         }
     }
 }
