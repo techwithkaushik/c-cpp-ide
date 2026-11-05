@@ -4,6 +4,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -69,7 +70,9 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             target.parentFile?.let {
                                 if (!it.exists() && !it.mkdirs()) throw IOException("Cannot create parent directory.")
                             }
-                            target.outputStream().buffered().use { out ->
+                            // Rootfs archives contain many large files. A larger output
+                            // buffer reduces small writes during extraction on flash storage.
+                            BufferedOutputStream(target.outputStream(), 256 * 1024).use { out ->
                                 var copied = 0L
                                 while (true) {
                                     val n = tar.read(buffer)
