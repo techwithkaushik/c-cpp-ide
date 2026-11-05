@@ -61,7 +61,7 @@ internal fun createTermuxSessionClient(
     override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
         // Clipboard is intentionally handled through Android's app-scoped clipboard service.
         // The actual Context is supplied by TerminalViewClient's view callback below.
-        DeveloperLog.debug("TermuxTerminal", "Terminal requested clipboard copy (0 chars)")
+        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Terminal", text))
     }
 
     override fun onPasteTextFromClipboard(session: TerminalSession) {
