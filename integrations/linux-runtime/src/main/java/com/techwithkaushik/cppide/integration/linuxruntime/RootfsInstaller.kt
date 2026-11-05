@@ -2,37 +2,35 @@ package com.techwithkaushik.cppide.integration.linuxruntime
 
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
-import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
 import java.util.EnumSet
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.Locale
 
 /** Extracts a tar archive without distro-specific edits. */
 class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     data class Result(val root: File, val entries: Int, val expandedBytes: Long)
 
     fun install(archive: File, expectedSha256: String? = null): Result {
-        val startedAt = System.currentTimeMillis()
-        DeveloperLog.info("UbuntuInstaller", "Rootfs extraction requested; archive=${archive.name}; bytes=${archive.length()}; checksumProvided=${expectedSha256 != null}")
-        try {
-            require(archive.isFile && archive.length() > 0) { "Rootfs archive is missing or empty." }
-            if (expectedSha256 != null) {
-                require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "Invalid SHA-256 value." }
-                require(sha256(archive).equals(expectedSha256, ignoreCase = true)) { "Rootfs SHA-256 mismatch." }
-            }
-        } catch (error: Exception) {
-            DeveloperLog.error("UbuntuInstaller", "Rootfs archive preflight validation failed", error)
-            throw error
+        require(archive.isFile && archive.length() > 0) { "Rootfs archive is missing or empty." }
+        if (expectedSha256 != null) {
+            require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "Invalid SHA-256 value." }
+            require(sha256(archive).equals(expectedSha256, ignoreCase = true)) { "Rootfs SHA-256 mismatch." }
         }
+        return install({ FileInputStream(archive) }, archive.name)
+    }
+
+    /** Extract directly from a reopenable source stream; archive bytes are never loaded into memory. */
+    fun install(open: () -> InputStream, archiveName: String): Result {
+        val startedAt = System.currentTimeMillis()
+        DeveloperLog.info("UbuntuInstaller", "Rootfs extraction requested; archive=$archiveName; source=stream")
         paths.ensureDirectories()
         val stage = File(paths.staging, "distro-${System.currentTimeMillis()}")
         if (!stage.mkdirs()) throw IOException("Cannot create extraction directory.")
@@ -40,14 +38,8 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         var expanded = 0L
         val directoryModes = mutableListOf<Pair<File, Int>>()
         try {
-            val raw = BufferedInputStream(FileInputStream(archive))
-            val lower = archive.name.lowercase(Locale.ROOT)
-            val decoded = when {
-                lower.endsWith(".tar.gz") || lower.endsWith(".tgz") -> GzipCompressorInputStream(raw)
-                lower.endsWith(".tar.xz") -> XZCompressorInputStream(raw)
-                lower.endsWith(".tar") -> raw
-                else -> throw IOException("Unsupported archive. Use .tar, .tar.gz, or .tar.xz.")
-            }
+            val raw = BufferedInputStream(open())
+            val decoded = RootfsArchitectureInspector.decoder(raw, archiveName)
             TarArchiveInputStream(decoded).use { tar ->
                 val buffer = ByteArray(32 * 1024)
                 while (true) {
