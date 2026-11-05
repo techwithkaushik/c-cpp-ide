@@ -86,7 +86,7 @@ internal fun DeveloperOptionsPanel() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text("Developer logging", color = IdeDesignTokens.Color.TextPrimary, fontSize = 13.sp)
-                    Text("Capture app, Ubuntu, PRoot, terminal, SSH and crash diagnostics. Logging is off by default.",
+                    Text("Capture this app process Logcat plus Ubuntu, PRoot, terminal, SSH and crash diagnostics. Logging is off by default.",
                         color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
                 }
                 Switch(checked = enabled, onCheckedChange = {
@@ -102,7 +102,7 @@ internal fun DeveloperOptionsPanel() {
             color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
         Text("Stored logs: $fileCount files · ${"%.1f".format(Locale.US, totalBytes / 1024.0)} KB · maximum 4 files of 512 KB each",
             color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
-        Text("Passwords, tokens, authorization values and private keys are redacted. Terminal commands and terminal output are not collected. Android does not let ordinary apps read the complete system Logcat; only app-instrumented events and uncaught app-process crashes are captured.",
+        Text("Only this app process PID is captured from Android Logcat; other apps and Android system logs are excluded. App-instrumented events and uncaught app-process crashes are saved too. Passwords, tokens, authorization values and private keys are redacted. Terminal commands and terminal output are not collected.",
             color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
             OutlinedButton(enabled = DeveloperLog.hasLogs(context), onClick = { refreshLogs(true) }, modifier = Modifier.weight(1f)) { Text("View logs") }
