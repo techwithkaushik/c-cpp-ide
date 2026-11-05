@@ -10,9 +10,103 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.lang.EmptyLanguage
+import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
+import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
+import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
+import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
+import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
+import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
+import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
+import org.eclipse.tm4e.core.registry.IThemeSource
+import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
+
+/**
+ * Loads local C/C++ TextMate grammars once and attaches the matching language to each editor.
+ * Semantic completion/diagnostics remain the responsibility of clangd; this layer is only the
+ * responsive local syntax/indentation provider.
+ */
+private object CppTextMateSupport {
+    private var initialized = false
+    private var activeTheme = ""
+    private val scopeByEditor = WeakHashMap<CodeEditor, String>()
+
+    @Synchronized
+    private fun ensureInitialized(context: android.content.Context) {
+        if (initialized) return
+        val appContext = context.applicationContext
+        val providers = FileProviderRegistry.getInstance()
+        providers.addFileProvider(AssetsFileResolver(appContext.assets))
+
+        val themes = listOf(
+            "cppide-dark" to true,
+            "cppide-light" to false,
+            "cppide-monokai" to true,
+            "cppide-solarized" to true
+        )
+        val registry = ThemeRegistry.getInstance()
+        themes.forEach { (name, dark) ->
+            val path = "textmate/$name.json"
+            val stream = providers.tryGetInputStream(path)
+                ?: error("Missing TextMate theme asset: $path")
+            registry.loadTheme(
+                ThemeModel(IThemeSource.fromInputStream(stream, path, null), name).apply {
+                    isDark = dark
+                }
+            )
+        }
+        GrammarRegistry.getInstance().loadGrammars("textmate/languages.json")
+        registry.setTheme("cppide-dark")
+        activeTheme = "cppide-dark"
+        initialized = true
+    }
+
+    fun apply(editor: CodeEditor, fileName: String, themeName: String) {
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        val scope = when (extension) {
+            "c" -> "source.c"
+            "cc", "cpp", "cxx", "c++", "hh", "hpp", "hxx", "h" -> "source.cpp"
+            else -> null
+        }
+        if (scope == null) {
+            scopeByEditor.remove(editor)
+            if (editor.editorLanguage !is EmptyLanguage) {
+                editor.setEditorLanguage(EmptyLanguage())
+            }
+            return
+        }
+
+        ensureInitialized(editor.context)
+        val theme = when (themeName) {
+            "Light+ (VS Code)" -> "cppide-light"
+            "Monokai" -> "cppide-monokai"
+            "Solarized Dark" -> "cppide-solarized"
+            else -> "cppide-dark"
+        }
+        if (activeTheme != theme) {
+            ThemeRegistry.getInstance().setTheme(theme)
+            activeTheme = theme
+        }
+        if (editor.colorScheme !is TextMateColorScheme) {
+            editor.colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
+        }
+
+        val currentLanguage = editor.editorLanguage
+        if (currentLanguage is TextMateLanguage) {
+            if (scopeByEditor[editor] != scope) currentLanguage.updateLanguage(scope)
+        } else {
+            editor.setEditorLanguage(TextMateLanguage.create(scope, false))
+        }
+        scopeByEditor[editor] = scope
+    }
+
+    fun detach(editor: CodeEditor) {
+        scopeByEditor.remove(editor)
+    }
+}
 
 /**
  * Imperative command bridge for the Sora editor hosted by Compose.
@@ -144,7 +238,8 @@ fun SoraCodeEditor(
     controller: SoraEditorController? = null,
     fontSize: Float = 14f,
     wordWrap: Boolean = false,
-    themeName: String = "Dark+ (VS Code)"
+    themeName: String = "Dark+ (VS Code)",
+    fileName: String = ""
 ) {
     val currentOnCodeChange = rememberUpdatedState(onCodeChange)
     val suppressProgrammaticChanges = androidx.compose.runtime.remember { AtomicBoolean(false) }
@@ -161,6 +256,7 @@ fun SoraCodeEditor(
                 setTabWidth(4)
                 setScrollBarEnabled(true)
                 setHorizontalScrollBarEnabled(true)
+                CppTextMateSupport.apply(this, fileName, themeName)
                 configureEditorTheme(this, themeName)
                 controller?.attach(this)
                 // Touch long-press and mouse right-click both expose familiar editor actions.
@@ -182,6 +278,7 @@ fun SoraCodeEditor(
         update = { editor ->
             editor.setTextSize(fontSize)
             editor.setTypefaceText(Typeface.MONOSPACE)
+            CppTextMateSupport.apply(editor, fileName, themeName)
             configureEditorTheme(editor, themeName)
             editor.isWordwrap = wordWrap
             editor.setLineNumberEnabled(true)
@@ -201,6 +298,7 @@ fun SoraCodeEditor(
         },
         onRelease = { editor ->
             controller?.detach(editor)
+            CppTextMateSupport.detach(editor)
             editor.release()
         }
     )
