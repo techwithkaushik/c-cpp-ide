@@ -158,11 +158,8 @@ internal fun IdeSettingsScreen(
                         SettingsCard("Clipboard", "Copy and paste", "Terminal copy/paste uses the Android clipboard")
                     }
                     "Languages" -> {
-                        SettingsHeading("LANGUAGES & TOOLS", "Available language tools.")
-                        listOf("C / C++ — clangd, clang, clang++", "Python — pyright, python", "JavaScript / TypeScript — typescript-language-server, prettier", "Lua — lua-language-server", "Rust — rust-analyzer, rustc", "Text, JSON, TOML, YAML, HTML and CSS").forEach {
-                            SettingsCard(it.substringBefore(" — "), "Tooling", it.substringAfter(" — ", it))
-                        }
-                        SettingsCard("Custom executable paths", "Advanced", "Use the Languages tab in the existing tooling configuration to save and validate custom paths.")
+                        SettingsHeading("LANGUAGES & TOOLS", "Select a language and inspect its installed tools and configuration.")
+                        LanguageSettingsPanel(projectName = projectName)
                     }
                     "Build & Run" -> {
                         SettingsHeading("BUILD & RUN", "Build options.")
