@@ -109,7 +109,7 @@ fun RuntimeSetupPanel(
         Text("Ubuntu Linux runtime", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Button(enabled = !busy, onClick = {
             busy = true
-            status = "Downloading official Ubuntu Base and verifying SHA256SUMS…"
+            status = "Downloading Ubuntu system files…"
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
@@ -134,12 +134,12 @@ fun RuntimeSetupPanel(
         }) { Text("Download official Ubuntu Base 24.04.5") }
         Button(enabled = !busy, onClick = {
             busy = true
-            status = "Verifying APK-bundled Android PRoot v5.5.0…"
+            status = "Checking terminal component…"
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     try {
                         val installed = ProotDownloader(paths).downloadAndInstall()
-                        "${installed.release} installed (SHA-256 ${installed.sha256.take(16)}…). The upstream asset currently publishes no SHA-256 digest; the release URL and version are pinned."
+                        "The terminal component is ready."
                     } catch (e: Exception) {
                         runtimeFailureMessage(e.message, "The terminal component could not be prepared. Please update or reinstall the app.")
                     }
@@ -152,11 +152,11 @@ fun RuntimeSetupPanel(
                         status = "Ubuntu shell smoke test passed."
                         onRuntimeReady()
                     } else {
-                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                        status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                     }
                 }
             }
-        }) { Text("Verify bundled Android PRoot v5.5.0") }
+        }) { Text("Check terminal component") }
         Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
             Text(if (rootfsUri == null) "1 · Select Ubuntu rootfs archive" else "Change Ubuntu rootfs")
         }
@@ -240,6 +240,8 @@ private const val MAX_IMPORT_BYTES = 4L * 1024 * 1024 * 1024
 private fun runtimeFailureMessage(details: String?, fallback: String): String {
     val message = details.orEmpty().lowercase()
     return when {
+        message.contains("sha-256 value") || message.contains("invalid sha") ->
+            "The SHA-256 value is invalid. Enter a 64-character checksum or leave it empty."
         message.contains("checksum") || message.contains("sha-256") || message.contains("digest") ->
             "The Ubuntu download could not be verified. Please download it again."
         message.contains("no space") || message.contains("enospc") || message.contains("not enough space") ->
@@ -251,8 +253,6 @@ private fun runtimeFailureMessage(details: String?, fallback: String): String {
         message.contains("unsupported archive") || message.contains("invalid archive") ||
             message.contains("truncated archive") || message.contains("archive exceeds") ->
             "This Ubuntu archive is damaged or unsupported. Select a valid .tar, .tar.gz, or .tar.xz archive."
-        message.contains("sha-256 value") || message.contains("invalid sha") ->
-            "The SHA-256 value is invalid. Enter a 64-character SHA-256 checksum or leave it empty."
         message.contains("rootfs") && (message.contains("missing") || message.contains("incomplete")) ->
             "Ubuntu files are missing or incomplete. Install the Ubuntu environment again."
         message.contains("proot") && (message.contains("permission denied") || message.contains("eacces") ||
