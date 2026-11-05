@@ -32,7 +32,7 @@ internal fun TermuxTerminalView(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            TerminalView(context).apply {
+            TerminalView(context, null).apply {
                 setTerminalViewClient(createTerminalViewClient(context))
                 setTextSize(fontSizeSp)
                 setTypeface(Typeface.MONOSPACE)
