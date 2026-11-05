@@ -33,9 +33,30 @@ internal object LanguageToolingCatalog {
                 Role.Debugger to listOf("lldb", "gdb")
             ),
             packagesByDistro = mapOf(
-                "ubuntu" to mapOf(Role.Compiler to listOf("clang"), Role.LanguageServer to listOf("clangd"), Role.Formatter to listOf("clang-format"), Role.Linter to listOf("clang-tidy")),
-                "debian" to mapOf(Role.Compiler to listOf("clang"), Role.LanguageServer to listOf("clangd"), Role.Formatter to listOf("clang-format"), Role.Linter to listOf("clang-tidy")),
-                "archlinux" to mapOf(Role.Compiler to listOf("clang"), Role.LanguageServer to listOf("clang"), Role.Formatter to listOf("clang"), Role.Linter to listOf("clang"))
+                // Ubuntu/Debian split the compiler, language server, formatter, linter and debugger
+                // into independently installable packages. Keep installs role-specific.
+                "ubuntu" to mapOf(
+                    Role.Compiler to listOf("clang"),
+                    Role.LanguageServer to listOf("clangd"),
+                    Role.Formatter to listOf("clang-format"),
+                    Role.Linter to listOf("clang-tidy"),
+                    Role.Debugger to listOf("lldb")
+                ),
+                "debian" to mapOf(
+                    Role.Compiler to listOf("clang"),
+                    Role.LanguageServer to listOf("clangd"),
+                    Role.Formatter to listOf("clang-format"),
+                    Role.Linter to listOf("clang-tidy"),
+                    Role.Debugger to listOf("lldb")
+                ),
+                // Arch Linux ships clangd, clang-format and clang-tidy with the clang package.
+                "archlinux" to mapOf(
+                    Role.Compiler to listOf("clang"),
+                    Role.LanguageServer to listOf("clang"),
+                    Role.Formatter to listOf("clang"),
+                    Role.Linter to listOf("clang"),
+                    Role.Debugger to listOf("lldb")
+                )
             )
         ),
         Spec("python", "Python", setOf("py", "pyi"), mapOf(
@@ -92,6 +113,21 @@ internal object LanguageToolingCatalog {
         return specs.firstOrNull { extension in it.extensions }
     }
 
+    /**
+     * clangd uses distinct LSP language identifiers for C and C++, even though both share one
+     * server binary and toolchain profile. Build-system files are project metadata, not source docs.
+     * A plain .h header defaults to C++ until compile_commands.json or workspace settings resolve it.
+     */
+    fun languageIdFor(fileName: String): String? {
+        val normalized = fileName.substringAfterLast('/').lowercase()
+        if (normalized == "makefile" || normalized == "cmakelists.txt") return null
+        return when (normalized.substringAfterLast('.', missingDelimiterValue = "")) {
+            "c" -> "c"
+            "cc", "cpp", "cxx", "c++", "hh", "hpp", "hxx", "h" -> "cpp"
+            else -> null
+        }
+    }
+
     fun all(): List<Spec> = specs.toList()
 }
 
@@ -110,6 +146,22 @@ internal class ToolPathPreferences(context: Context) {
         preferences.edit().apply {
             if (normalized == null) remove(key(languageId, role))
             else putString(key(languageId, role), normalized)
+        }.apply()
+    }
+
+    /** Per-executable overrides are needed when a language has more than one compiler binary. */
+    fun getExecutable(languageId: String, executable: String): String? =
+        preferences.getString(executableKey(languageId, executable), null)?.takeIf { it.isNotBlank() }
+
+    fun setExecutable(languageId: String, executable: String, absolutePath: String?) {
+        require(executable.matches(Regex("[A-Za-z0-9_+.-]{1,64}"))) { "Invalid executable name." }
+        val normalized = absolutePath?.trim()?.takeIf { it.isNotEmpty() }
+        if (normalized != null) {
+            require(File(normalized).isAbsolute) { "Tool paths must be absolute." }
+        }
+        preferences.edit().apply {
+            if (normalized == null) remove(executableKey(languageId, executable))
+            else putString(executableKey(languageId, executable), normalized)
         }.apply()
     }
 
@@ -145,6 +197,9 @@ internal class ToolPathPreferences(context: Context) {
 
     private fun key(languageId: String, role: LanguageToolingCatalog.Role) =
         "tool_path.${languageId.lowercase()}.${role.name.lowercase()}"
+
+    private fun executableKey(languageId: String, executable: String) =
+        "tool_path.${languageId.lowercase()}.executable.${executable.lowercase()}"
 
     private companion object {
         const val PREFERENCES_NAME = "language_tool_paths"
