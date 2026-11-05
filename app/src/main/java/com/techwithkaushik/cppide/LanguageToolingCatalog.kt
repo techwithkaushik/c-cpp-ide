@@ -113,6 +113,21 @@ internal object LanguageToolingCatalog {
         return specs.firstOrNull { extension in it.extensions }
     }
 
+    /**
+     * clangd uses distinct LSP language identifiers for C and C++, even though both share one
+     * server binary and toolchain profile. Build-system files are project metadata, not source docs.
+     * A plain .h header defaults to C++ until compile_commands.json or workspace settings resolve it.
+     */
+    fun languageIdFor(fileName: String): String? {
+        val normalized = fileName.substringAfterLast('/').lowercase()
+        if (normalized == "makefile" || normalized == "cmakelists.txt") return null
+        return when (normalized.substringAfterLast('.', missingDelimiterValue = "")) {
+            "c" -> "c"
+            "cc", "cpp", "cxx", "c++", "hh", "hpp", "hxx", "h" -> "cpp"
+            else -> null
+        }
+    }
+
     fun all(): List<Spec> = specs.toList()
 }
 
