@@ -115,7 +115,7 @@ internal fun IdeSettingsScreen(
             }
         }
     }
-    val categories = listOf("Interface", "Editor", "Terminal", "Languages", "Build & Run", "Runtime & Bootstrap")
+    val categories = listOf("Interface", "Editor", "Terminal", "Languages", "Build & Run", "Runtime & Bootstrap", "Developer Options")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
         Row(
@@ -153,6 +153,10 @@ internal fun IdeSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)
         ) {
                 when (category) {
+                    "Developer Options" -> {
+                        SettingsHeading("DEVELOPER OPTIONS")
+                        DeveloperOptionsPanel()
+                    }
                     "Runtime & Bootstrap" -> {
                         SettingsHeading("RUNTIME & BOOTSTRAP")
                         RuntimeSetupPanel(
