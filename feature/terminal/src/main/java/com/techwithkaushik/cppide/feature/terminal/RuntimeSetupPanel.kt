@@ -92,7 +92,7 @@ fun RuntimeSetupPanel(
             }
             when {
                 !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
-                prootCheck.isFailure -> "Ubuntu rootfs is present; bundled Android PRoot validation failed: ${prootCheck.exceptionOrNull()?.message ?: "unknown error"}"
+                prootCheck.isFailure -> runtimeFailureMessage(prootCheck.exceptionOrNull()?.message, "Ubuntu is installed, but its terminal component could not be prepared.")
                 else -> {
                     val smoke = LinuxRuntimeSmokeTest(paths).run()
                     if (smoke.success) "Ubuntu shell smoke test passed."
@@ -116,7 +116,7 @@ fun RuntimeSetupPanel(
                         val installed = UbuntuBaseDownloader(paths).downloadAndInstall()
                         "Ubuntu Base installed and SHA-256 verified (${installed.bytes / (1024 * 1024)} MiB). Install PRoot to launch a local shell."
                     } catch (e: Exception) {
-                        "Ubuntu download failed: ${e.message ?: e.javaClass.simpleName}"
+                        runtimeFailureMessage(e.message, "Ubuntu could not be downloaded. Please check your internet connection and try again.")
                     }
                 }
                 status = result
@@ -127,7 +127,7 @@ fun RuntimeSetupPanel(
                         status = "Ubuntu shell smoke test passed."
                         onRuntimeReady()
                     } else {
-                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                        status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                     }
                 }
             }
@@ -141,7 +141,7 @@ fun RuntimeSetupPanel(
                         val installed = ProotDownloader(paths).downloadAndInstall()
                         "${installed.release} installed (SHA-256 ${installed.sha256.take(16)}…). The upstream asset currently publishes no SHA-256 digest; the release URL and version are pinned."
                     } catch (e: Exception) {
-                        "Bundled PRoot validation failed: ${e.message ?: e.javaClass.simpleName}"
+                        runtimeFailureMessage(e.message, "The terminal component could not be prepared. Please update or reinstall the app.")
                     }
                 }
                 status = result
@@ -188,13 +188,13 @@ fun RuntimeSetupPanel(
                         namedArchive.delete()
                         if (paths.hasProot()) {
                             val smoke = LinuxRuntimeSmokeTest(paths).run()
-                            if (!smoke.success) throw IOException("Ubuntu shell smoke test failed: ${smoke.error ?: smoke.output}")
+                            if (!smoke.success) throw IOException(smoke.error ?: smoke.output)
                             "Ubuntu rootfs installed and shell smoke test passed."
                         } else {
                             "Ubuntu rootfs installed and validated. Install PRoot next to enable local shell execution."
                         }
                     } catch (e: Exception) {
-                        "Ubuntu installation failed: ${e.message ?: e.javaClass.simpleName}"
+                        runtimeFailureMessage(e.message, "Ubuntu could not be installed. Please check the archive and available storage.")
                     } finally { staged?.delete() }
                 }
                 status = result
@@ -224,13 +224,46 @@ fun RuntimeSetupPanel(
             )
             OutlinedButton(onClick = {
                 val clipboard = context.getSystemService(ClipboardManager::class.java)
-                clipboard?.setPrimaryClip(ClipData.newPlainText("CPPIDE runtime log", status))
-                Toast.makeText(context, "Runtime log copied", Toast.LENGTH_SHORT).show()
+                clipboard?.setPrimaryClip(ClipData.newPlainText("CPPIDE status", status))
+                Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
             }) {
-                Text("Copy log", fontSize = 11.sp)
+                Text("Copy message", fontSize = 11.sp)
             }
         }
     }
 }
 
 private const val MAX_IMPORT_BYTES = 4L * 1024 * 1024 * 1024
+
+
+/** Converts low-level runtime diagnostics into clear actions for the app user. */
+private fun runtimeFailureMessage(details: String?, fallback: String): String {
+    val message = details.orEmpty().lowercase()
+    return when {
+        message.contains("checksum") || message.contains("sha-256") || message.contains("digest") ->
+            "The Ubuntu download could not be verified. Please download it again."
+        message.contains("no space") || message.contains("enospc") || message.contains("not enough space") ->
+            "There is not enough free storage. Free up some space and try again."
+        message.contains("unknownhost") || message.contains("unable to resolve") ||
+            message.contains("connection") || message.contains("timed out") || message.contains("http 4") ||
+            message.contains("http 5") ->
+            "Could not connect to the download server. Check your internet connection and try again."
+        message.contains("unsupported archive") || message.contains("invalid archive") ||
+            message.contains("truncated archive") || message.contains("archive exceeds") ->
+            "This Ubuntu archive is damaged or unsupported. Select a valid .tar, .tar.gz, or .tar.xz archive."
+        message.contains("sha-256 value") || message.contains("invalid sha") ->
+            "The SHA-256 value is invalid. Enter a 64-character SHA-256 checksum or leave it empty."
+        message.contains("rootfs") && (message.contains("missing") || message.contains("incomplete")) ->
+            "Ubuntu files are missing or incomplete. Install the Ubuntu environment again."
+        message.contains("proot") && (message.contains("permission denied") || message.contains("eacces") ||
+            message.contains("missing") || message.contains("loader")) ->
+            "The terminal component could not start. Please update or reinstall the app."
+        message.contains("timed out") || message.contains("timeout") ->
+            "Ubuntu is taking too long to start. Please try again."
+        message.contains("apt-get check") || message.contains("dpkg") ->
+            "Ubuntu's package database needs repair. Open the terminal and run: sudo apt --fix-broken install"
+        message.contains("permission denied") || message.contains("eacces") ->
+            "Ubuntu could not access a required file. Reinstall the Ubuntu environment and try again."
+        else -> fallback
+    }
+}
