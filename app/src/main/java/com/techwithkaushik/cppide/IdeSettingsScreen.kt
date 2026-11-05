@@ -75,6 +75,7 @@ internal fun IdeSettingsScreen(
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var scrollbackLines by remember { mutableStateOf(prefs.getInt("terminal_scrollback_lines", 5000).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
+    var cursorBlink by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, true)) }
     var extraKeys by remember { mutableStateOf(prefs.getStringSet("terminal_extra_keys", DefaultTerminalExtraKeys)?.toSet() ?: DefaultTerminalExtraKeys) }
     var extraKeyOrder by remember { mutableStateOf(prefs.getString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(","))?.split(",")?.filter { it in DefaultTerminalExtraKeyOrder }?.let { it + DefaultTerminalExtraKeyOrder.filterNot(it::contains) } ?: DefaultTerminalExtraKeyOrder) }
     var customExtraKeys by remember { mutableStateOf(prefs.getStringSet("terminal_custom_extra_keys", emptySet())?.toSet() ?: emptySet()) }
@@ -114,7 +115,7 @@ internal fun IdeSettingsScreen(
             }
         }
     }
-    val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap")
+    val categories = listOf("Interface", "Editor", "Terminal", "Languages", "Build & Run", "Runtime & Bootstrap")
 
     Column(Modifier.fillMaxSize().background(SettingsBg)) {
         Row(
@@ -143,7 +144,7 @@ internal fun IdeSettingsScreen(
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
-                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; terminalConnectionMode = "ubuntu"; extraKeys = DefaultTerminalExtraKeys; extraKeyOrder = DefaultTerminalExtraKeyOrder; customExtraKeys = emptySet(); prefs.edit().remove("terminal_custom_extra_keys").putString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(",")).putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putString("terminal_connection_mode", "ubuntu").putStringSet("terminal_extra_keys", DefaultTerminalExtraKeys).apply() }
+                    "Terminal" -> { terminalFontSize = 13f; scrollbackLines = 5000f; autoKeyboard = true; cursorBlink = true; terminalConnectionMode = "ubuntu"; extraKeys = DefaultTerminalExtraKeys; extraKeyOrder = DefaultTerminalExtraKeyOrder; customExtraKeys = emptySet(); prefs.edit().remove("terminal_custom_extra_keys").putString("terminal_extra_key_order", DefaultTerminalExtraKeyOrder.joinToString(",")).putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putInt("terminal_scrollback_lines", 5000).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, true).putString("terminal_connection_mode", "ubuntu").putStringSet("terminal_extra_keys", DefaultTerminalExtraKeys).apply() }
                 }
             }) { Text("↺ Reset section", color = SettingsAccent) }
         }
@@ -178,6 +179,17 @@ internal fun IdeSettingsScreen(
                             }
                         }
                                     }
+                    "Languages" -> {
+                        SettingsHeading("LANGUAGES & TOOLS")
+                        Text("Choose a language to inspect its runtime, compiler, language server and workspace configuration.", color = SettingsMuted, fontSize = 11.sp)
+                        LanguageSettingsPanel(projectName = projectName)
+                    }
+                    "Build & Run" -> {
+                        SettingsHeading("BUILD & RUN")
+                        SettingsCard("Target environment", "Linux", "The selected app-private Ubuntu runtime is used for compiler and program execution.")
+                        SettingsCard("C / C++", "Compiler", "Build & Run uses clang/clang++ and the options configured in Languages.")
+                        SettingsCard("Output", "Build panel", "Compiler diagnostics and program output appear in the workspace Build panel.")
+                    }
                     "Terminal" -> {
                         SettingsHeading("TERMINAL")
                         SettingsHeading("SESSION CONNECTION")
@@ -327,6 +339,9 @@ internal fun IdeSettingsScreen(
                         Slider(value = scrollbackLines, onValueChange = { scrollbackLines = it; prefs.edit().putInt("terminal_scrollback_lines", it.toInt()).apply() }, valueRange = 1000f..10000f, steps = 8)
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
+                        }
+                        SettingsSwitch("Blink terminal cursor", "Animate the terminal cursor while the terminal is active", cursorBlink) {
+                            cursorBlink = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, it).apply()
                         }
                                         Button(
                             onClick = { category = "Runtime & Bootstrap" },
