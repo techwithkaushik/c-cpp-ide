@@ -31,14 +31,28 @@ android {
         }.standardOutput.asText.get().trim()
             .also { if (it.isBlank()) error("Unable to determine the current Git commit SHA") }
 
+        val isShallowCheckout = providers.exec {
+            commandLine("git", "rev-parse", "--is-shallow-repository")
+            isIgnoreExitValue = false
+        }.standardOutput.asText.get().trim().toBoolean()
+
+        check(!isShallowCheckout) {
+            "Full Git history is required to calculate versionCode. " +
+                "Fetch the branch with complete history (actions/checkout: fetch-depth: 0)."
+        }
+
         val relatedBranchCommitCount = providers.exec {
             commandLine("git", "rev-list", "--count", "HEAD")
             isIgnoreExitValue = false
         }.standardOutput.asText.get().trim().toIntOrNull()
-            ?: error("Unable to determine the current branch commit count")
+            ?.takeIf { it > 0 }
+            ?: error("Unable to determine a positive current branch commit count")
 
         versionCode = relatedBranchCommitCount
         versionName = "$distroName-$shortCommitSha"
+        logger.lifecycle(
+            "App version: versionName=$versionName, versionCode=$versionCode, branch=$gitBranch"
+        )
     }
     flavorDimensions += "bootstrapAbi"
     productFlavors {
