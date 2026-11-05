@@ -96,7 +96,7 @@ fun RuntimeSetupPanel(
                 else -> {
                     val smoke = LinuxRuntimeSmokeTest(paths).run()
                     if (smoke.success) "Ubuntu shell smoke test passed."
-                    else "Ubuntu runtime validation failed: ${smoke.error ?: smoke.output}"
+                    else runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                 }
             }
         }
@@ -114,7 +114,7 @@ fun RuntimeSetupPanel(
                 val result = withContext(Dispatchers.IO) {
                     try {
                         val installed = UbuntuBaseDownloader(paths).downloadAndInstall()
-                        "Ubuntu Base installed and SHA-256 verified (${installed.bytes / (1024 * 1024)} MiB). Install PRoot to launch a local shell."
+                        "Ubuntu system files have been installed. The terminal component is the next step."
                     } catch (e: Exception) {
                         runtimeFailureMessage(e.message, "Ubuntu could not be downloaded. Please check your internet connection and try again.")
                     }
@@ -188,10 +188,10 @@ fun RuntimeSetupPanel(
                         namedArchive.delete()
                         if (paths.hasProot()) {
                             val smoke = LinuxRuntimeSmokeTest(paths).run()
-                            if (!smoke.success) throw IOException(smoke.error ?: smoke.output)
+                            if (!smoke.success) throw IOException(runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again."))
                             "Ubuntu rootfs installed and shell smoke test passed."
                         } else {
-                            "Ubuntu rootfs installed and validated. Install PRoot next to enable local shell execution."
+                            "Ubuntu system files are installed. Set up the terminal component to start Ubuntu."
                         }
                     } catch (e: Exception) {
                         runtimeFailureMessage(e.message, "Ubuntu could not be installed. Please check the archive and available storage.")
@@ -205,7 +205,7 @@ fun RuntimeSetupPanel(
                         status = "Ubuntu shell smoke test passed."
                         onRuntimeReady()
                     } else {
-                        status = "Runtime files are present, but Ubuntu shell execution failed: ${smoke.error ?: smoke.output}"
+                        status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                     }
                 }
             }
