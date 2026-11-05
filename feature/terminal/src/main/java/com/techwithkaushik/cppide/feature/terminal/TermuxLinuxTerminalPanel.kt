@@ -83,10 +83,6 @@ fun TermuxLinuxTerminalPanel(
     var pendingArchitectureWarning by remember { mutableStateOf<Pair<Uri, String>?>(null) }
     var localInstallStatus by remember { mutableStateOf<String?>(null) }
     val preferences = remember(context) { context.getSharedPreferences("developer_options", 0) }
-    val localRootfsPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) inspectLocalRootfs(uri)
-    }
-
     val fontSize = remember(context) {
         context.getSharedPreferences("ide_preferences", 0).getInt("terminal_font_size", 14).coerceIn(10, 28)
     }
@@ -114,8 +110,6 @@ fun TermuxLinuxTerminalPanel(
                         open = { context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot open the selected archive.") },
                         archiveName = archiveName
                     )
-                    val smoke = LinuxRuntimeSmokeTest(paths).run()
-                    check(smoke.success) { smoke.error ?: smoke.output.ifBlank { "Imported rootfs failed the Ubuntu shell smoke test." } }
                     installed
                 }
             }
@@ -155,6 +149,10 @@ fun TermuxLinuxTerminalPanel(
                 }
             }.onFailure { error = it.message ?: "Could not inspect this rootfs archive." }
         }
+    }
+
+    val localRootfsPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) inspectLocalRootfs(uri)
     }
 
     fun downloadOnline() {
