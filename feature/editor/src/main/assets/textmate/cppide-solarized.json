@@ -1,0 +1,68 @@
+{
+  "name": "cppide-solarized",
+  "settings": [
+    {
+      "settings": {
+        "background": "#002B36",
+        "foreground": "#839496",
+        "lineHighlight": "#002B36",
+        "selection": "#264F78"
+      }
+    },
+    {
+      "scope": "comment",
+      "settings": {
+        "foreground": "#586E75",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": "keyword, keyword.control, storage",
+      "settings": {
+        "foreground": "#859900"
+      }
+    },
+    {
+      "scope": "storage.type, support.type",
+      "settings": {
+        "foreground": "#2AA198"
+      }
+    },
+    {
+      "scope": "string",
+      "settings": {
+        "foreground": "#2AA198"
+      }
+    },
+    {
+      "scope": "constant.numeric, constant.language",
+      "settings": {
+        "foreground": "#B58900"
+      }
+    },
+    {
+      "scope": "entity.name.function",
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    },
+    {
+      "scope": "entity.name.namespace",
+      "settings": {
+        "foreground": "#2AA198"
+      }
+    },
+    {
+      "scope": "meta.preprocessor",
+      "settings": {
+        "foreground": "#859900"
+      }
+    },
+    {
+      "scope": "constant.character.escape",
+      "settings": {
+        "foreground": "#B58900"
+      }
+    }
+  ]
+}
