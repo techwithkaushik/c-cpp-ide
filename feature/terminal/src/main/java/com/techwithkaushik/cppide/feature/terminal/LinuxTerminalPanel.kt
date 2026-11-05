@@ -817,7 +817,7 @@ fun LinuxTerminalPanel(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
-                        try { active.send("\r") } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                        try { active.send("\r") } catch (e: Exception) { error = terminalUserMessage(e.message, "Could not send input to the terminal. Please try again.") }
                         command = ""
                     }),
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.Transparent, fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp),
