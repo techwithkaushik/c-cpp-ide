@@ -189,7 +189,6 @@ private object LinuxTerminalSessions {
         val index = tabs.indexOfFirst { it.id == tab.id }
         if (index < 0) return
         tabs.removeAt(index)
-        outputHandler.removeCallbacksAndMessages(null)
         pendingOutput.remove(tab.id)
         scheduledFlushes.remove(tab.id)
         runCatching { tab.session.close() }
