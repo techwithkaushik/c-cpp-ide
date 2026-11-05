@@ -149,6 +149,22 @@ internal class ToolPathPreferences(context: Context) {
         }.apply()
     }
 
+    /** Per-executable overrides are needed when a language has more than one compiler binary. */
+    fun getExecutable(languageId: String, executable: String): String? =
+        preferences.getString(executableKey(languageId, executable), null)?.takeIf { it.isNotBlank() }
+
+    fun setExecutable(languageId: String, executable: String, absolutePath: String?) {
+        require(executable.matches(Regex("[A-Za-z0-9_+.-]{1,64}"))) { "Invalid executable name." }
+        val normalized = absolutePath?.trim()?.takeIf { it.isNotEmpty() }
+        if (normalized != null) {
+            require(File(normalized).isAbsolute) { "Tool paths must be absolute." }
+        }
+        preferences.edit().apply {
+            if (normalized == null) remove(executableKey(languageId, executable))
+            else putString(executableKey(languageId, executable), normalized)
+        }.apply()
+    }
+
     data class ResolvedToolPath(
         val configuredPath: String,
         val hostExecutable: File? = null,
@@ -181,6 +197,9 @@ internal class ToolPathPreferences(context: Context) {
 
     private fun key(languageId: String, role: LanguageToolingCatalog.Role) =
         "tool_path.${languageId.lowercase()}.${role.name.lowercase()}"
+
+    private fun executableKey(languageId: String, executable: String) =
+        "tool_path.${languageId.lowercase()}.executable.${executable.lowercase()}"
 
     private companion object {
         const val PREFERENCES_NAME = "language_tool_paths"
