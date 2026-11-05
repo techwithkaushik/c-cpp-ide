@@ -1,6 +1,6 @@
 package com.techwithkaushik.cppide
 
-import com.techwithkaushik.cppide.feature.terminal.LinuxTerminalPanel
+import com.techwithkaushik.cppide.feature.terminal.TermuxLinuxTerminalPanel
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
@@ -1938,7 +1938,7 @@ private fun ToolPanelContent(
         }
         when (selected) {
             ToolPanel.Terminal -> {
-                LinuxTerminalPanel(
+                TermuxLinuxTerminalPanel(
                     Modifier.weight(1f).fillMaxWidth(),
                     onOpenSettings = onOpenSettings,
                     onCloseTerminal = onClose
