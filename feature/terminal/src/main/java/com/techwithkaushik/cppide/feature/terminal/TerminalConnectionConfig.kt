@@ -1,16 +1,26 @@
 package com.techwithkaushik.cppide.feature.terminal
 
-/**
- * One-process SSH credential handoff from Terminal Settings to the terminal.
- * Secrets are deliberately not persisted to SharedPreferences or disk.
- */
+/** In-process SSH credential handoff; secrets are not persisted. */
 object TerminalConnectionConfig {
-    @Volatile
-    var sshPassword: String = ""
+    @Volatile var sshPassword: String = ""
+    @Volatile var sshPrivateKeyPassphrase: String = ""
+    @Volatile private var privateKeyBytes: ByteArray? = null
 
-    @Volatile
-    var sshPrivateKey: ByteArray? = null
+    var sshPrivateKey: ByteArray?
+        get() = privateKeyBytes?.copyOf()
+        set(value) = replacePrivateKey(value)
 
-    @Volatile
-    var sshPrivateKeyPassphrase: String = ""
+    @Synchronized
+    fun replacePrivateKey(newKey: ByteArray?) {
+        privateKeyBytes?.fill(0)
+        privateKeyBytes = newKey?.copyOf()
+    }
+
+    @Synchronized
+    fun clearCredentials() {
+        sshPassword = ""
+        privateKeyBytes?.fill(0)
+        privateKeyBytes = null
+        sshPrivateKeyPassphrase = ""
+    }
 }
