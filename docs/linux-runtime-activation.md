@@ -13,6 +13,9 @@ The IDE owns its Linux userspace inside its private app directory. It must never
 - The local shell uses the native PTY bridge in `:core:jni`, the Android system linker, and the app-owned PRoot/rootfs paths.
 - Interactive Ubuntu login shells start with PRoot's `--link2symlink` compatibility mode. This is required for Linux package operations that create hard links: PRoot translates guest hard-link requests into symlinks where Android's app-private filesystem cannot provide the expected Linux hard-link semantics. The smoke test uses the same launch option.
 - PRoot seccomp acceleration remains disabled by default for compatibility with Android 10/vendor kernels that previously terminated guest processes with SIGSYS. This favors reliable package installation over raw execution speed; only enable acceleration after device-level apt and shell stress tests prove it safe.
+- The readiness smoke test now checks the guest dpkg architecture, `dpkg --audit`, `apt-get check`, and a real hard-link creation probe. With `--link2symlink`, the probe must observe the resulting guest path as a symlink before the runtime is marked ready.
+- Android DNS discovery uses one `getprop` snapshot per shell start instead of four separate process launches, and the resolver file is rewritten only when its content changes.
+- Rootfs extraction writes through a 256 KiB buffer to reduce small filesystem writes on device flash storage. This improves installation throughput, not PRoot runtime syscall speed.
 - The runtime setup screen runs a real shell smoke test before reporting the runtime as ready.
 - SSH opens a shell channel directly from the terminal panel. First-use host keys require explicit SHA-256 fingerprint confirmation; changed pinned keys are rejected.
 
