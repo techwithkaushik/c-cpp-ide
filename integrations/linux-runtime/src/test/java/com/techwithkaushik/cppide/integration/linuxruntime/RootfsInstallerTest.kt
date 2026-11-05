@@ -122,15 +122,15 @@ class RootfsInstallerTest {
     @Test fun repairsTemporaryDirectoryPermissionsInExistingRootfs() {
         val files = temporaryFolder.newFolder("existing-rootfs")
         val root = File(files, "rootfs")
-        val tmp = File(files, "ubuntu/tmp").apply { mkdirs() }
-        val varTmp = File(files, "ubuntu/var/tmp").apply { mkdirs() }
+        val tmp = File(root, "tmp").apply { mkdirs() }
+        val varTmp = File(root, "var/tmp").apply { mkdirs() }
         val ownerOnly = setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
         Files.setPosixFilePermissions(tmp.toPath(), ownerOnly)
         Files.setPosixFilePermissions(varTmp.toPath(), ownerOnly)
 
         LinuxRuntimePaths(files).ensureDirectories()
 
-        listOf(tmp, varTmp).forEach { directory ->
+        listOf(File(files, "ubuntu/tmp"), File(files, "ubuntu/var/tmp")).forEach { directory ->
             val permissions = Files.getPosixFilePermissions(directory.toPath())
             assertTrue("temporary directory must be writable by apt sandbox users", permissions.contains(PosixFilePermission.OTHERS_WRITE))
             assertTrue("temporary directory must be searchable by apt sandbox users", permissions.contains(PosixFilePermission.OTHERS_EXECUTE))
