@@ -44,8 +44,8 @@ class RootfsInstallerTest {
                     tar.write(bytes)
                     tar.closeArchiveEntry()
                 }
-                file("etc/os-release", "NAME=Ubuntu\\nID=ubuntu\\n")
-                file("etc/group", "root:x:0:\\n")
+                file("etc/os-release", "NAME=Ubuntu\nID=ubuntu\n")
+                file("etc/group", "root:x:0:\n")
                 val binAlias = TarArchiveEntry("bin", TarArchiveEntry.LF_SYMLINK)
                     .apply { linkName = "usr/bin" }
                 tar.putArchiveEntry(binAlias)
@@ -104,7 +104,7 @@ class RootfsInstallerTest {
         val root = temporaryFolder.newFolder("ubuntu-root")
         val etc = File(root, "etc").apply { mkdirs() }
         val group = File(etc, "group").apply {
-            writeText("root:x:0:\\nusers:x:100:\\n")
+            writeText("root:x:0:\nusers:x:100:\n")
         }
 
         LocalLinuxSession.ensureSupplementaryGroupNames(root)
@@ -123,9 +123,9 @@ class RootfsInstallerTest {
         val root = File(files, "rootfs")
         File(root, "etc").mkdirs()
         File(root, "bin").mkdirs()
-        File(root, "etc/os-release").writeText("NAME=Ubuntu\\nID=ubuntu\\n")
+        File(root, "etc/os-release").writeText("NAME=Ubuntu\nID=ubuntu\n")
         File(root, "bin/sh").writeText("shell-placeholder")
-        File(files, "runtime.properties").writeText("installerVersion=4\\nroot=${root.absolutePath}\\nentries=2\\n")
+        File(files, "runtime.properties").writeText("installerVersion=4\nroot=${root.absolutePath}\nentries=2\n")
 
         val paths = LinuxRuntimePaths(files)
         assertTrue("Earlier compatible installer marker should remain valid", paths.hasRootfs())
@@ -137,9 +137,9 @@ class RootfsInstallerTest {
         val root = File(files, "rootfs")
         File(root, "etc").mkdirs()
         File(root, "bin").mkdirs()
-        File(root, "etc/os-release").writeText("NAME=Ubuntu\\nID=ubuntu\\n")
+        File(root, "etc/os-release").writeText("NAME=Ubuntu\nID=ubuntu\n")
         File(root, "bin/sh").writeText("shell-placeholder")
-        File(files, "runtime.properties").writeText("installerVersion=99\\n")
+        File(files, "runtime.properties").writeText("installerVersion=99\n")
 
         assertFalse(LinuxRuntimePaths(files).hasRootfs())
     }
