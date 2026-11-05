@@ -3,7 +3,6 @@ package com.techwithkaushik.cppide.core.logging
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -89,7 +88,7 @@ object DeveloperLog {
         }
         val safe = redactSensitiveValues(details).take(24_000)
         val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).format(Date())
-        val line = "$timestamp $level/$tag [pid=${Process.myPid()} thread=${Thread.currentThread().name}]: $safe\n"
+        val line = "$timestamp $level/$tag [thread=${Thread.currentThread().name}]: $safe\n"
         val bytes = line.toByteArray(Charsets.UTF_8)
         synchronized(lock) {
             runCatching {
