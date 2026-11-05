@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.feature.terminal
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertTrue
