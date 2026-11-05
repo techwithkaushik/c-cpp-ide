@@ -417,13 +417,22 @@ private object TerminalSessionRegistry {
     }
 }
 
+private const val DEFAULT_CURSOR_BLINK_RATE_MS = 530
+
 private class IdeTermuxSessionClient(
     private val context: Context
 ) : TerminalSessionClient {
     @Volatile private var terminalView: TerminalView? = null
 
     fun attach(view: TerminalView?) {
+        val previous = terminalView
+        if (previous !== view) {
+            // A detached bottom-sheet view must not keep a Handler callback
+            // alive or continue invalidating an off-screen view.
+            previous?.setTerminalCursorBlinkerState(false, false)
+        }
         terminalView = view
+        view?.setTerminalCursorBlinkerRate(DEFAULT_CURSOR_BLINK_RATE_MS)
     }
 
     override fun onTextChanged(changedSession: TerminalSession) {
@@ -454,9 +463,21 @@ private class IdeTermuxSessionClient(
         if (text != null && session?.isRunning == true) session.write(text.toString())
     }
 
-    override fun onBell(session: TerminalSession) = Unit
-    override fun onColorsChanged(session: TerminalSession) = Unit
-    override fun onTerminalCursorStateChange(state: Boolean) = Unit
+    override fun onBell(session: TerminalSession) {
+        // Bell handling is intentionally non-audio, but still refresh the view
+        // in case the terminal changed visual state with the bell sequence.
+        terminalView?.post { terminalView?.invalidate() }
+    }
+
+    override fun onColorsChanged(session: TerminalSession) {
+        terminalView?.post { terminalView?.invalidate() }
+    }
+
+    override fun onTerminalCursorStateChange(state: Boolean) {
+        terminalView?.post {
+            terminalView?.setTerminalCursorBlinkerState(state, true)
+        }
+    }
     override fun setTerminalShellPid(session: TerminalSession, pid: Int) = Unit
     override fun getTerminalCursorStyle(): Int? = null
     override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
@@ -510,7 +531,12 @@ private class IdeTermuxViewClient(
     override fun readShiftKey(): Boolean = false
     override fun readFnKey(): Boolean = false
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
-    override fun onEmulatorSet() = Unit
+    override fun onEmulatorSet() {
+        terminalView?.let { view ->
+            view.setTerminalCursorBlinkerRate(DEFAULT_CURSOR_BLINK_RATE_MS)
+            view.setTerminalCursorBlinkerState(true, true)
+        }
+    }
     override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
     override fun logWarn(tag: String, message: String): Unit { android.util.Log.w(tag, message) }
     override fun logInfo(tag: String, message: String): Unit { android.util.Log.i(tag, message) }
