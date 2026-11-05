@@ -225,10 +225,11 @@ private object LinuxTerminalSessions {
                     }
                     if (shouldStartWorker) {
                         renderExecutor.execute {
-                            // Drain all output accumulated while the previous render was
-                            // running. A slow frame never leaves an unbounded executor
-                            // backlog when apt/dpkg produces output faster than Compose
-                            // can lay it out.
+                            // Merge every batch that arrived during this worker turn
+                            // before building a Compose snapshot. Rendering the complete
+                            // scrollback once per tiny batch would still monopolize the
+                            // CPU during package installs, even with a bounded queue.
+                            var receivedOutput = false
                             while (activeTabIds.contains(tab.id)) {
                                 val nextBatch = synchronized(outputLock) {
                                     val value = readyOutput.remove(tab.id)?.toString().orEmpty()
@@ -237,13 +238,14 @@ private object LinuxTerminalSessions {
                                 }
                                 if (nextBatch.isEmpty()) break
                                 tab.screen.append(nextBatch)
-                                if (selectedId == tab.id) {
-                                    val rendered = tab.screen.renderAnnotated()
-                                    outputHandler.post {
-                                        if (selectedId == tab.id && activeTabIds.contains(tab.id)) {
-                                            tab.output.value = rendered
-                                            tab.outputRevision.value++
-                                        }
+                                receivedOutput = true
+                            }
+                            if (receivedOutput && activeTabIds.contains(tab.id) && selectedId == tab.id) {
+                                val rendered = tab.screen.renderAnnotated()
+                                outputHandler.post {
+                                    if (selectedId == tab.id && activeTabIds.contains(tab.id)) {
+                                        tab.output.value = rendered
+                                        tab.outputRevision.value++
                                     }
                                 }
                             }
