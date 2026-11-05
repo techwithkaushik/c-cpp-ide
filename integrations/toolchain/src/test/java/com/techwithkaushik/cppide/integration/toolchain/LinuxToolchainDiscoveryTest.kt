@@ -14,6 +14,26 @@ class LinuxToolchainDiscoveryTest {
     val temp = TemporaryFolder()
 
     @Test
+    fun discoversClangdFormatterLinterAndDebuggerExecutables() {
+        val root = createRoot()
+        executable(root, "usr/bin/clang")
+        executable(root, "usr/bin/clang++")
+        executable(root, "usr/bin/clangd")
+        executable(root, "usr/bin/clang-format")
+        executable(root, "usr/bin/clang-tidy")
+        executable(root, "usr/bin/lldb")
+
+        val inventory = LinuxToolchainDiscovery().discover(root)
+
+        assertNotNull(inventory.find("clang"))
+        assertNotNull(inventory.find("clang++"))
+        assertNotNull(inventory.find("clangd"))
+        assertNotNull(inventory.find("clang-format"))
+        assertNotNull(inventory.find("clang-tidy"))
+        assertNotNull(inventory.find("lldb"))
+    }
+
+    @Test
     fun discoversDistroAndManualToolsFromRootfsPath() {
         val root = createRoot()
         val clang = executable(root, "usr/bin/clang")
