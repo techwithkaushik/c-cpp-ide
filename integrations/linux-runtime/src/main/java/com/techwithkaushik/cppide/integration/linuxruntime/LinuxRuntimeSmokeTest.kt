@@ -3,29 +3,37 @@ package com.techwithkaushik.cppide.integration.linuxruntime
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 
 /** Executes a real command inside Ubuntu before the setup UI declares the runtime ready. */
 class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
     data class Result(val success: Boolean, val exitCode: Int?, val output: String, val error: String?)
 
     fun run(timeoutSeconds: Long = 20): Result {
+        val startedAt = System.nanoTime()
+        fun failed(stage: String, result: Result): Result {
+            DeveloperLog.event("UbuntuSmokeTest", "runtime_validation_failed", mapOf("stage" to stage, "exitCode" to result.exitCode, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000, "error" to result.error?.take(500)))
+            return result
+        }
+        DeveloperLog.event("UbuntuSmokeTest", "runtime_validation_started", mapOf("rootfsPresent" to paths.hasRootfs(), "prootPresent" to paths.hasProot(), "timeoutSeconds" to timeoutSeconds))
+        try {
         paths.ensureDirectories()
-        if (!paths.hasRootfs()) return Result(false, null, "", "Ubuntu rootfs is missing or incomplete.")
-        if (!paths.hasProot()) return Result(false, null, "", "PRoot or its bundled loader is missing from files/usr/bin.")
+        if (!paths.hasRootfs()) return failed("rootfs_check", Result(false, null, "", "Ubuntu rootfs is missing or incomplete."))
+        if (!paths.hasProot()) return failed("proot_check", Result(false, null, "", "PRoot or its bundled loader is missing from files/usr/bin."))
         // Keep host Android supplementary GIDs named inside Ubuntu, just as the
         // interactive session does, so `groups` and login scripts stay clean.
         LocalLinuxSession.ensureSupplementaryGroupNames(paths.ubuntuRoot)
         val root = paths.ubuntuRoot.absolutePath
         val hostTemp = paths.usrTmp.apply {
-            if (!exists() && !mkdirs()) return Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath")
-            if (!isDirectory || !canWrite()) return Result(false, null, "", "PRoot host temporary directory is not writable: $absolutePath")
+            if (!exists() && !mkdirs()) return failed("host_temp_create", Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath"))
+            if (!isDirectory || !canWrite()) return failed("host_temp_validate", Result(false, null, "", "PRoot host temporary directory is not writable: $absolutePath"))
         }
         // Keep Ubuntu's resolver untouched on disk; provide Android DNS through a
         // temporary host file bind-mounted only for this PRoot process.
         val resolver = try {
             HostResolverConfig.prepare(hostTemp)
         } catch (e: Exception) {
-            return Result(false, null, "", "Could not prepare host DNS config: ${e.message}")
+            return failed("dns_prepare", Result(false, null, "", "Could not prepare host DNS config: ${e.message}"))
         }
         // Validate the login shell without -i: this process uses pipes, not a PTY.
         // Interactive job-control diagnostics are tested only by the real PTY session.
@@ -87,7 +95,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             val hint = if (isAndroidExecDenied("", detail)) {
                 " Android denied execution of the bundled PRoot binary. Verify libproot.so and libproot-loader.so are packaged in nativeLibraryDir; chmod and disabling SELinux are not valid fixes."
             } else ""
-            return Result(false, null, "", "Could not launch PRoot: $detail.$hint")
+            return failed("proot_launch", Result(false, null, "", "Could not launch PRoot: $detail.$hint"))
         }
         val output = StringBuilder()
         val errors = StringBuilder()
@@ -101,7 +109,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             process.destroyForcibly()
             stdout.join(300)
             stderr.join(300)
-            return Result(false, null, synchronized(output) { output.toString() }, "Ubuntu shell smoke test timed out.")
+            return failed("shell_timeout", Result(false, null, synchronized(output) { output.toString() }, "Ubuntu shell smoke test timed out."))
         }
         stdout.join(500)
         stderr.join(500)
@@ -122,7 +130,14 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 ?: "PRoot stdout was empty.",
             "Loader: ${paths.prootLoader.absolutePath} (exists=${paths.prootLoader.isFile}); rootfs=$root; shell=$shell"
         ).filterNotNull().joinToString(" ")
-        return Result(success, exit, out, if (success) null else failure)
+        val result = Result(success, exit, out, if (success) null else failure)
+        if (success) DeveloperLog.event("UbuntuSmokeTest", "runtime_validation_passed", mapOf("exitCode" to exit, "shell" to shell, "stdoutChars" to out.length, "stderrChars" to err.length, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+        else failed("shell_exit", result)
+        return result
+        } catch (error: Exception) {
+            DeveloperLog.failure("UbuntuSmokeTest", "runtime_validation_crashed", error, mapOf("durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+            throw error
+        }
     }
 
     private fun isAndroidExecDenied(stdout: String, stderrOrLaunchError: String): Boolean {

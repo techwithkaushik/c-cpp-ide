@@ -56,6 +56,28 @@ object DeveloperLog {
     fun warn(tag: String, message: String, error: Throwable? = null) { appContext?.let { warn(it, tag, message, error) } }
     fun error(tag: String, message: String, error: Throwable? = null) { appContext?.let { error(it, tag, message, error) } }
 
+    /** Writes stable key/value events for later diagnostics and regression analysis. */
+    fun event(tag: String, event: String, fields: Map<String, Any?> = emptyMap()) {
+        val safeEvent = event.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(80)
+        val fieldText = fields.toSortedMap().entries.joinToString(" ") { entry ->
+            val key = entry.key.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(64)
+            val value = (entry.value?.toString() ?: "null").replace(Regex("\\s+"), "_").replace("|", "_").take(512)
+            "$key=$value"
+        }
+        info(tag, if (fieldText.isBlank()) "event=$safeEvent" else "event=$safeEvent $fieldText")
+    }
+
+    fun failure(tag: String, event: String, error: Throwable, fields: Map<String, Any?> = emptyMap()) {
+        val safeEvent = event.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(80)
+        val fieldText = fields.toSortedMap().entries.joinToString(" ") { entry ->
+            val key = entry.key.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(64)
+            val value = (entry.value?.toString() ?: "null").replace(Regex("\\s+"), "_").replace("|", "_").take(512)
+            "$key=$value"
+        }
+        val message = "event=$safeEvent $fieldText exceptionType=${error.javaClass.name} exceptionMessage=${error.message ?: "(no message)"}"
+        error(tag, message, error)
+    }
+
     private fun write(context: Context, level: String, tag: String, message: String, error: Throwable? = null) {
         val app = context.applicationContext
         if (!isEnabled(app)) return

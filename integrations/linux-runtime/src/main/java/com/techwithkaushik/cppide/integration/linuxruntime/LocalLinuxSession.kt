@@ -8,9 +8,10 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.UUID
 
 /** Persistent Ubuntu shell attached to a real kernel PTY. */
-class LocalLinuxSession private constructor(private val pty: NativePtyProcess) : AutoCloseable {
+class LocalLinuxSession private constructor(private val pty: NativePtyProcess, private val sessionId: String) : AutoCloseable {
     val input: OutputStream = object : OutputStream() {
         override fun write(value: Int) = pty.write(byteArrayOf(value.toByte()))
         override fun write(bytes: ByteArray, offset: Int, length: Int) {
@@ -47,16 +48,19 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
                     }
                 }
             } catch (error: Exception) {
-                DeveloperLog.warn("UbuntuPTY", "PTY output reader stopped", error)
+                DeveloperLog.failure("UbuntuPTY", "pty_output_reader_failed", error, mapOf("sessionId" to sessionId))
             }
             val exit = runCatching { pty.waitForExit() }.getOrDefault(-1)
-            DeveloperLog.info("UbuntuPTY", "PTY process exited; code=$exit")
+            DeveloperLog.event("UbuntuPTY", "session_process_exited", mapOf("sessionId" to sessionId, "exitCode" to exit))
             onExit(exit)
         }, "ubuntu-pty-reader").apply { isDaemon = true; start() }
     }
 
-    fun interrupt() { try { pty.write(byteArrayOf(3)) } catch (_: Exception) { } }
-    fun resize(columns: Int, rows: Int) = pty.resize(columns, rows)
+    fun interrupt() { try { pty.write(byteArrayOf(3)); DeveloperLog.event("UbuntuPTY", "interrupt_sent", mapOf("sessionId" to sessionId)) } catch (error: Exception) { DeveloperLog.failure("UbuntuPTY", "interrupt_failed", error, mapOf("sessionId" to sessionId)) } }
+    fun resize(columns: Int, rows: Int) {
+        try { pty.resize(columns, rows); DeveloperLog.event("UbuntuPTY", "terminal_resized", mapOf("sessionId" to sessionId, "columns" to columns, "rows" to rows)) }
+        catch (error: Exception) { DeveloperLog.failure("UbuntuPTY", "terminal_resize_failed", error, mapOf("sessionId" to sessionId, "columns" to columns, "rows" to rows)); throw error }
+    }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
@@ -88,20 +92,27 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
         }
 
         fun start(paths: LinuxRuntimePaths): LocalLinuxSession {
-            DeveloperLog.info("UbuntuPTY", "Starting local Ubuntu shell; rootfsPresent=${paths.hasRootfs()}; prootPresent=${paths.proot.isFile}")
+            val sessionId = UUID.randomUUID().toString().take(8)
+            val startedAt = System.nanoTime()
+            DeveloperLog.event("UbuntuPTY", "session_start_requested", mapOf("sessionId" to sessionId, "rootfsPresent" to paths.hasRootfs(), "prootPresent" to paths.proot.isFile))
+            try {
             paths.ensureDirectories()
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed or incomplete. ${paths.rootfsDiagnostic()}")
             ensureSupplementaryGroupNames(paths.ubuntuRoot)
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
             val shell = if (File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
             val temp = paths.usrTmp.apply { if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.") }
-            HostResolverConfig.prepare(temp)
+            HostResolverConfig.prepare(temp, sessionId)
             val pty = NativePtyProcess.launch(
                 proot = paths.proot.absolutePath, rootfs = paths.ubuntuRoot.absolutePath,
                 shell = shell, tempDirectory = temp.absolutePath
             )
-            DeveloperLog.info("UbuntuPTY", "Local Ubuntu PTY launched; shell=$shell")
-            return LocalLinuxSession(pty)
+            DeveloperLog.event("UbuntuPTY", "session_started", mapOf("sessionId" to sessionId, "shell" to shell, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+            return LocalLinuxSession(pty, sessionId)
+            } catch (error: Exception) {
+                DeveloperLog.failure("UbuntuPTY", "session_start_failed", error, mapOf("sessionId" to sessionId, "rootfsPresent" to paths.hasRootfs(), "prootPresent" to paths.proot.isFile, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+                throw error
+            }
         }
     }
 }
