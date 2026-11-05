@@ -45,6 +45,16 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
                     "echo '=== libc ==='; /usr/bin/ldd --version; " +
                     "echo '=== apt ==='; /usr/bin/apt --version; " +
+                    "echo '=== dpkg architecture ==='; /usr/bin/dpkg --print-architecture; " +
+                    "echo '=== dpkg consistency ==='; /usr/bin/dpkg --audit; " +
+                    "echo '=== apt package database ==='; /usr/bin/apt-get check; " +
+                    "echo '=== PRoot hard-link compatibility ==='; " +
+                    "probe_dir=\$(mktemp -d /tmp/cppide-link-test.XXXXXX); " +
+                    "trap 'rm -rf \"\$probe_dir\"' EXIT; " +
+                    "printf x > \"\$probe_dir/source\"; " +
+                    "ln \"\$probe_dir/source\" \"\$probe_dir/link\"; " +
+                    "test -L \"\$probe_dir/link\"; " +
+                    "printf 'link2symlink=ok\\n'; " +
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.ubuntuRoot).apply {
                 environment()["HOME"] = "/root"
