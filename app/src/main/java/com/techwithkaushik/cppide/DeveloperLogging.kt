@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +28,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -156,13 +158,17 @@ internal fun DeveloperOptionsPanel() {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)) {
-        SettingsSwitch(
-            "Developer logging",
-            "Save app diagnostics and unexpected crashes locally. Logging is off by default.",
-            enabled
-        ) {
-            enabled = it
-            DeveloperLog.setEnabled(context, it)
+        Card(colors = CardDefaults.cardColors(containerColor = IdeDesignTokens.Color.Surface)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Developer logging", color = IdeDesignTokens.Color.TextPrimary, fontSize = 13.sp)
+                    Text("Save app diagnostics and unexpected crashes locally. Logging is off by default.", color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
+                }
+                Switch(checked = enabled, onCheckedChange = {
+                    enabled = it
+                    DeveloperLog.setEnabled(context, it)
+                })
+            }
         }
         Text(
             "Logs stay in private app storage. Passwords, tokens and private keys are redacted. Android does not allow ordinary apps to read the complete system Logcat, so this collects app-instrumented events and uncaught app-process crashes.",
