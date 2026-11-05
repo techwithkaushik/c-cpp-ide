@@ -794,7 +794,7 @@ fun LinuxTerminalPanel(
                                     else -> null
                                 }
                                 if (control != null) {
-                                    try { active.send(control) } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                                    try { active.send(control) } catch (e: Exception) { error = terminalUserMessage(e.message, "Could not send input to the terminal. Please try again.") }
                                     return@onPreviewKeyEvent true
                                 }
                             }
@@ -868,7 +868,7 @@ fun LinuxTerminalPanel(
                         when (key) {
                             "CTRL" -> ctrlMode = !ctrlMode
                             "ALT" -> altMode = !altMode
-                            else -> runCatching { active.send(sequence) }.onFailure { error = it.message ?: "Terminal input failed." }
+                            else -> runCatching { active.send(sequence) }.onFailure { error = terminalUserMessage(it.message, "Could not send input to the terminal. Please try again.") }
                         }
                         terminalInputFocusRequester.requestFocus()
                     }) {
@@ -888,7 +888,7 @@ fun LinuxTerminalPanel(
                                     "ESC" -> 27.toChar().toString(); "TAB" -> 9.toChar().toString()
                                     "ENTER" -> 13.toChar().toString(); else -> sequence
                                 }
-                                runCatching { active.send(payload) }.onFailure { error = it.message ?: "Custom key failed." }
+                                runCatching { active.send(payload) }.onFailure { error = terminalUserMessage(it.message, "Could not send this key to the terminal.") }
                                 terminalInputFocusRequester.requestFocus()
                             }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
                         }
