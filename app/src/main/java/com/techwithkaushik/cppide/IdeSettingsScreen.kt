@@ -140,7 +140,7 @@ internal fun IdeSettingsScreen(
         Divider(color = IdeDesignTokens.Color.Divider)
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(category, color = SettingsAccent, modifier = Modifier.weight(1f))
-            if (category != "Runtime & Bootstrap") TextButton(onClick = {
+            if (category != "Runtime & Bootstrap" && category != "Developer Options") TextButton(onClick = {
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
