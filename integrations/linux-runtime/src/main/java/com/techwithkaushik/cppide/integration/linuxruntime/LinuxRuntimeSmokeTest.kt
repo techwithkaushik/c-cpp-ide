@@ -51,13 +51,13 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                     "echo '=== PRoot hard-link compatibility ==='; " +
                     // Use /root rather than /tmp: minimal rootfs archives can have
                     // a non-standard /tmp mode, which is unrelated to PRoot link support.
-                    "probe_file=/root/.cppide-link-test.\\$\\$; " +
-                    "probe_link=\\${probe_file}.link; " +
-                    "printf x > \"\\$probe_file\" || { echo 'link-test: cannot create probe file in /root'; exit 31; }; " +
-                    "if ! ln \"\\$probe_file\" \"\\$probe_link\"; then echo 'link-test: ln could not create a link (PRoot --link2symlink)'; exit 32; fi; " +
-                    "if ! test -e \"\\$probe_link\"; then echo 'link-test: created link is not accessible'; exit 33; fi; " +
-                    "if [ \"\\$(cat \"\\$probe_link\")\" != x ]; then echo 'link-test: linked file content does not match'; exit 34; fi; " +
-                    "unlink \"\\$probe_link\" 2>/dev/null || true; unlink \"\\$probe_file\" 2>/dev/null || true; " +
+                    "probe_file=/root/.cppide-link-test.\$\$; " +
+                    "probe_link=\${probe_file}.link; " +
+                    "printf x > \"\$probe_file\" || { echo 'link-test: cannot create probe file in /root'; exit 31; }; " +
+                    "if ! ln \"\$probe_file\" \"\$probe_link\"; then echo 'link-test: ln could not create a link (PRoot --link2symlink)'; exit 32; fi; " +
+                    "if ! test -e \"\$probe_link\"; then echo 'link-test: created link is not accessible'; exit 33; fi; " +
+                    "if [ \"\$(cat \"\$probe_link\")\" != x ]; then echo 'link-test: linked file content does not match'; exit 34; fi; " +
+                    "unlink \"\$probe_link\" 2>/dev/null || true; unlink \"\$probe_file\" 2>/dev/null || true; " +
                     "printf 'link2symlink=ok\\n'; " +
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.ubuntuRoot).apply {
