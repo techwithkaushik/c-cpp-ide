@@ -573,7 +573,7 @@ fun LinuxTerminalPanel(
                                     val next = breaker.following(cursorOffset)
                                     if (next != BreakIterator.DONE) {
                                         val cluster = source.substring(cursorOffset, next)
-                                        if (cluster.isNotEmpty() && cluster.none { it == '\\n' || it == '\\r' }) {
+                                        if (cluster.isNotEmpty() && cluster.none { it == '\n' || it == '\r' }) {
                                             blockGlyph = terminalTextMeasurer.measure(
                                                 AnnotatedString(cluster),
                                                 style = TextStyle(
