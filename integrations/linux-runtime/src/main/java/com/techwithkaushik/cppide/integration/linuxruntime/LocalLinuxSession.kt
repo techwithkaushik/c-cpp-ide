@@ -87,8 +87,10 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
                 9997 to "android_everybody",
                 20490 to "android_shared_legacy",
                 20491 to "android_shared",
+                20494 to "android_shared_legacy_extra",
                 50490 to "android_user_legacy",
-                50491 to "android_user"
+                50491 to "android_user",
+                50494 to "android_user_legacy_extra"
             )
             val lines = runCatching { group.readLines(Charsets.UTF_8) }.getOrNull() ?: return
             val existingGids = lines.mapNotNull { line ->
