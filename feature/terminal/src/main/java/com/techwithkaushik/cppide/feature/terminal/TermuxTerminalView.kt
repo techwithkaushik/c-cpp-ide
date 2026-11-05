@@ -51,6 +51,7 @@ internal fun TermuxTerminalView(
 }
 
 internal fun createTermuxSessionClient(
+    context: Context,
     onSessionFinished: (TerminalSession) -> Unit = {},
 ): TerminalSessionClient = object : TerminalSessionClient {
     override fun onTextChanged(changedSession: TerminalSession) = Unit
@@ -63,7 +64,14 @@ internal fun createTermuxSessionClient(
         DeveloperLog.debug("TermuxTerminal", "Terminal requested clipboard copy (0 chars)")
     }
 
-    override fun onPasteTextFromClipboard(session: TerminalSession) = Unit
+    override fun onPasteTextFromClipboard(session: TerminalSession) {
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        val text = clipboard?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)
+        if (text != null) {
+            val bytes = text.toString().toByteArray(Charsets.UTF_8)
+            session.write(bytes, 0, bytes.size)
+        }
+    }
     override fun onBell(session: TerminalSession) = Unit
     override fun onColorsChanged(session: TerminalSession) = Unit
     override fun onTerminalCursorStateChange(state: Boolean) = Unit
