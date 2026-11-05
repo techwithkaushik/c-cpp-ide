@@ -198,8 +198,22 @@ fun LinuxTerminalPanel(
     }
     val terminalPreferences = remember(context) { context.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE) }
     var terminalFontSize by remember { mutableIntStateOf(terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 28)) }
-    val scrollbackLines = terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)
-    val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
+    var scrollbackLines by remember { mutableIntStateOf(terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)) }
+    var autoShowKeyboard by remember { mutableStateOf(terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)) }
+    var cursorBlink by remember { mutableStateOf(terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK, true)) }
+
+    DisposableEffect(terminalPreferences) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            when (key) {
+                IdeDesignTokens.Preference.TERMINAL_FONT_SIZE -> terminalFontSize = prefs?.getInt(key, 13)?.coerceIn(10, 28) ?: 13
+                "terminal_scrollback_lines" -> scrollbackLines = prefs?.getInt(key, 5_000)?.coerceIn(1_000, 10_000) ?: 5_000
+                IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD -> autoShowKeyboard = prefs?.getBoolean(key, true) ?: true
+                IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK -> cursorBlink = prefs?.getBoolean(key, true) ?: true
+            }
+        }
+        terminalPreferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { terminalPreferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     val connectionMode = terminalPreferences.getString("terminal_connection_mode", "ubuntu") ?: "ubuntu"
     val terminalInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -429,12 +443,12 @@ fun LinuxTerminalPanel(
             // 530ms caused visible text flicker; Termux blinks only the cursor
             // in its Canvas renderer, not the terminal text buffer.
             var cursorBlinkTick by remember(active.id) { mutableIntStateOf(0) }
-            LaunchedEffect(active.id) {
+            LaunchedEffect(active.id, cursorBlink) {
                 active.screen.setCursorBlinkPhase(true)
-                while (true) {
-                    delay(530)
-                    if (active.screen.advanceCursorBlinkPhase()) {
-                        cursorBlinkTick++
+                if (cursorBlink) {
+                    while (true) {
+                        delay(530)
+                        if (active.screen.advanceCursorBlinkPhase()) cursorBlinkTick++
                     }
                 }
             }
