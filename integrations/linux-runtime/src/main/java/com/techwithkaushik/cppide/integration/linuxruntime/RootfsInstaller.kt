@@ -43,6 +43,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             TarArchiveInputStream(decoded).use { tar ->
                 val buffer = ByteArray(32 * 1024)
                 while (true) {
+                    if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException("Rootfs extraction cancelled.")
                     val entry = tar.nextTarEntry ?: break
                     count++
                     if (count > MAX_ENTRIES) throw IOException("Archive contains too many entries.")
@@ -70,6 +71,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             BufferedOutputStream(target.outputStream(), 256 * 1024).use { out ->
                                 var copied = 0L
                                 while (true) {
+                                    if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException("Rootfs extraction cancelled.")
                                     val n = tar.read(buffer)
                                     if (n < 0) break
                                     copied += n
@@ -86,6 +88,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                 }
             }
             directoryModes.forEach { (directory, mode) -> applyMode(directory, mode) }
+            requireValidUbuntuRootfs(stage)
             val old = File(paths.staging, "distro-previous")
             if (old.exists() && !old.deleteRecursively()) throw IOException("Cannot remove previous extraction backup.")
             if (paths.ubuntuRoot.exists() && !paths.ubuntuRoot.renameTo(old)) throw IOException("Cannot replace existing distro directory.")
@@ -101,6 +104,19 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
             DeveloperLog.error("UbuntuInstaller", "Rootfs extraction failed; entries=$count; expandedBytes=$expanded", error)
             stage.deleteRecursively()
             throw error
+        }
+    }
+
+    private fun requireValidUbuntuRootfs(root: File) {
+        val osRelease = File(root, "etc/os-release")
+        val shell = listOf(File(root, "bin/sh"), File(root, "usr/bin/sh")).firstOrNull { it.isFile }
+        if (!osRelease.isFile || shell == null) {
+            throw IOException("Selected archive is not a complete Linux rootfs: /etc/os-release or /bin/sh is missing.")
+        }
+        if (!shell.canExecute()) {
+            if (!shell.setExecutable(true, false) || !shell.canExecute()) {
+                throw IOException("Ubuntu shell is not executable after extraction.")
+            }
         }
     }
 
