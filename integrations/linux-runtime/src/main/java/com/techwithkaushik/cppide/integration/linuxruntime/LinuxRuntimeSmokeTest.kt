@@ -24,8 +24,8 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         } catch (e: Exception) {
             return Result(false, null, "", "Could not prepare host DNS config: ${e.message}")
         }
-        // Validate the same interactive shell the terminal will launch. A /bin/sh-only
-        // smoke test can pass even when /bin/bash has incompatible libc/libtinfo libraries.
+        // Validate the login shell without -i: this process uses pipes, not a PTY.
+        // Interactive job-control diagnostics are tested only by the real PTY session.
         val shell = when {
             File(paths.ubuntuRoot, "bin/bash").isFile -> "/bin/bash"
             File(paths.ubuntuRoot, "bin/sh").isFile -> "/bin/sh"
@@ -34,14 +34,11 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val process = try {
             ProcessBuilder(
                 paths.proot.absolutePath,
-                // Keep PRoot quiet; the smoke test reports the shell exit and captured stderr.
                 "-0", "-v", "0", "--link2symlink",
                 "-r", root, "-w", "/root",
                 "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
                 "-b", "${resolver.absolutePath}:/etc/resolv.conf",
-                // Match the interactive login mode used by the terminal so the
-                // startup path is exercised during the runtime readiness check.
-                shell, "--login", "-i", "-c",
+                shell, "--login", "-c",
                 "set -e; echo '=== Bash ==='; /bin/bash --version; " +
                     "echo '=== libc ==='; /usr/bin/ldd --version; " +
                     "echo '=== apt ==='; /usr/bin/apt --version; " +
@@ -49,11 +46,12 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                     "echo '=== dpkg consistency ==='; /usr/bin/dpkg --audit; " +
                     "echo '=== apt package database ==='; /usr/bin/apt-get check; " +
                     "echo '=== PRoot hard-link compatibility ==='; " +
-                    "probe_dir=\$(mktemp -d /tmp/cppide-link-test.XXXXXX); " +
-                    "trap 'rm -rf \"\$probe_dir\"' EXIT; " +
-                    "printf x > \"\$probe_dir/source\"; " +
-                    "ln \"\$probe_dir/source\" \"\$probe_dir/link\"; " +
-                    "test -L \"\$probe_dir/link\"; " +
+                    "probe_file=\$(mktemp /tmp/cppide-link-test.XXXXXX); " +
+                    "probe_link=\${probe_file}.link; " +
+                    "trap 'unlink \"\$probe_link\" 2>/dev/null || true; unlink \"\$probe_file\" 2>/dev/null || true' EXIT; " +
+                    "printf x > \"\$probe_file\"; " +
+                    "ln \"\$probe_file\" \"\$probe_link\"; " +
+                    "test -L \"\$probe_link\"; " +
                     "printf 'link2symlink=ok\\n'; " +
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.ubuntuRoot).apply {
@@ -66,7 +64,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment().remove("LD_LIBRARY_PATH")
                 environment().remove("PREFIX")
                 environment().remove("BOOTSTRAP_ROOT")
-                // PRoot runs on Android: its loader temp files must use an existing host path.
+                // PRoot loader temp files must use an existing host path.
                 environment()["TMPDIR"] = paths.usrTmp.absolutePath
                 environment()["TMP"] = paths.usrTmp.absolutePath
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -79,7 +77,11 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                 environment()["PROOT_LOADER"] = paths.prootLoader.absolutePath
             }.start()
         } catch (e: Exception) {
-            return Result(false, null, "", "Could not launch PRoot: ${e.message ?: e.javaClass.simpleName}")
+            val detail = e.message ?: e.javaClass.simpleName
+            val hint = if (isAndroidExecDenied("", detail)) {
+                " Android denied execution of the bundled PRoot binary. Verify libproot.so and libproot-loader.so are packaged in nativeLibraryDir; chmod and disabling SELinux are not valid fixes."
+            } else ""
+            return Result(false, null, "", "Could not launch PRoot: $detail.$hint")
         }
         val output = StringBuilder()
         val errors = StringBuilder()
@@ -101,20 +103,13 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         val err = synchronized(errors) { errors.toString() }
         val exit = process.exitValue()
         val success = exit == 0 && out.contains("CPPIDE_UBUNTU_RUNTIME_OK")
-        val androidExecBlocker = if (
-            !success && (err.contains("EACCES") || err.contains("Permission denied", ignoreCase = true))
-        ) {
-            "Android denied execution of the Ubuntu shell from app-private storage. " +
-                "On Android 10+ with targetSdk 29 or higher, W^X execution restrictions can block this " +
-                "PRoot launcher. Verify the APK bundles libproot.so and libproot-loader.so in nativeLibraryDir; " +
-                "chmod or disabling SELinux is not a valid fix."
-        } else {
-            null
-        }
+        val androidExecBlocker = if (!success && isAndroidExecDenied(out, err)) {
+            "Android denied execution of the bundled PRoot binary. Verify the APK bundles libproot.so and libproot-loader.so in nativeLibraryDir; chmod or disabling SELinux is not a valid fix."
+        } else null
         val failure = listOf(
             "Ubuntu shell exited with code $exit.",
             androidExecBlocker,
-            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 --link2symlink -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --login -i -c <smoke-test>",
+            "PRoot command: ${paths.proot.absolutePath} -0 -v 0 --link2symlink -r $root -w /root -b /dev:/dev -b /proc:/proc -b /sys:/sys $shell --login -c <smoke-test>",
             err.takeIf { it.isNotBlank() }?.let { "PRoot stderr (tail): ${it.takeLast(6000)}" }
                 ?: "PRoot stderr was empty.",
             out.takeIf { it.isNotBlank() }?.let { "PRoot stdout (tail): ${it.takeLast(2000)}" }
@@ -122,6 +117,15 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
             "Loader: ${paths.prootLoader.absolutePath} (exists=${paths.prootLoader.isFile}); rootfs=$root; shell=$shell"
         ).filterNotNull().joinToString(" ")
         return Result(success, exit, out, if (success) null else failure)
+    }
+
+    private fun isAndroidExecDenied(stdout: String, stderrOrLaunchError: String): Boolean {
+        // Shell-level "Permission denied" messages are not evidence of Android W^X:
+        // Bash can emit them for job-control setup after it has already executed.
+        if (stdout.isNotBlank()) return false
+        return stderrOrLaunchError.contains("Could not execute bundled PRoot: Permission denied", ignoreCase = true) ||
+            stderrOrLaunchError.contains("error=13", ignoreCase = true) ||
+            stderrOrLaunchError.contains("EACCES", ignoreCase = true)
     }
 
     private fun pump(input: InputStream, destination: StringBuilder): Thread = Thread({
