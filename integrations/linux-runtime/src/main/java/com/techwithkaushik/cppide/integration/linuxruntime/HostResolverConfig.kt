@@ -7,8 +7,8 @@ import java.io.File
  * automatically inherit Android's per-network DNS resolver inside Ubuntu.
  */
 internal object HostResolverConfig {
-    private val propertyPattern = Regex("""\\[net\\.dns[1-4]\\]: \\[([^]]+)]""")
-    private val ipv4Pattern = Regex("""(?:[0-9]{1,3}\\.){3}[0-9]{1,3}""")
+    private val propertyPattern = Regex("""\[net\.dns[1-4]\]: \[([^]]+)]""")
+    private val ipv4Pattern = Regex("""(?:[0-9]{1,3}\.){3}[0-9]{1,3}""")
     private val ipv6Pattern = Regex("""[0-9a-fA-F:]+""")
 
     fun prepare(hostTemp: File): File {
@@ -39,8 +39,8 @@ internal object HostResolverConfig {
             servers += "1.1.1.1"
             servers += "8.8.8.8"
         }
-        val content = servers.joinToString(separator = "\\n", postfix = "\\n") { "nameserver $it" } +
-            "options timeout:3 attempts:2\\n"
+        val content = servers.joinToString(separator = "\n", postfix = "\n") { "nameserver $it" } +
+            "options timeout:3 attempts:2\n"
         val file = File(hostTemp, "resolv.conf")
         if (!file.isFile || runCatching { file.readText() != content }.getOrDefault(true)) {
             file.writeText(content)
