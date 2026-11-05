@@ -41,7 +41,7 @@ internal data class CppToolchainReport(
 }
 
 /**
- * Reads the IDE-owned Termux prefix and verifies each C/C++ executable by actually
+ * Reads the selected Ubuntu rootfs and verifies each C/C++ executable by actually
  * invoking its version command through Android's system linker and the installed shell.
  * It never installs packages and never treats a file existing on disk as proof it runs.
  */
@@ -125,7 +125,6 @@ internal class CcppToolchainInspector(context: Context) {
     }
 
     private fun probe(executable: String): Triple<Boolean, String?, String?> {
-        val safePath = "'" + executable.replace("'", "'\\''") + "'"
         val process = try {
             ProcessBuilder(
                 runtime.proot.absolutePath,
