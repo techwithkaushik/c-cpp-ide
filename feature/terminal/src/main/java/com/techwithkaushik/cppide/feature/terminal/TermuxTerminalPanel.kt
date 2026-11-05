@@ -180,7 +180,6 @@ fun TermuxTerminalPanel(
         terminalFontSizeSp.toFloat(),
         appContext.resources.displayMetrics
     ).toInt().coerceAtLeast(1)
-    val autoShowKeyboard = terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true)
 
     if (!runtimeStatus.ready || shell == null) {
         val message = if (runtimeStatus.ready) {
