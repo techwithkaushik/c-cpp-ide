@@ -144,7 +144,7 @@ internal fun IdeSettingsScreen(
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
                             prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, it.toInt()).apply()
-                        }, valueRange = 10f..22f, steps = 11)
+                        }, valueRange = IdeDesignTokens.Metrics.MIN_TERMINAL_FONT_SIZE.toFloat()..IdeDesignTokens.Metrics.MAX_TERMINAL_FONT_SIZE.toFloat(), steps = IdeDesignTokens.Metrics.MAX_TERMINAL_FONT_SIZE - IdeDesignTokens.Metrics.MIN_TERMINAL_FONT_SIZE - 1)
                         SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when a terminal session opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
                         }
