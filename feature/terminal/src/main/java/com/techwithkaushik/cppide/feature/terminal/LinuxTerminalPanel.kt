@@ -129,7 +129,9 @@ private object LinuxTerminalSessions {
     }
     private val outputLock = Any()
     private val pendingOutput = HashMap<Int, StringBuilder>()
+    private val readyOutput = HashMap<Int, StringBuilder>()
     private val scheduledFlushes = HashSet<Int>()
+    private val scheduledRenders = HashSet<Int>()
     private val activeTabIds = ConcurrentHashMap.newKeySet<Int>()
     private const val OUTPUT_FRAME_INTERVAL_MS = 32L
 
@@ -217,15 +219,32 @@ private object LinuxTerminalSessions {
                     pendingOutput.remove(tab.id)?.toString().orEmpty()
                 }
                 if (batch.isNotEmpty() && activeTabIds.contains(tab.id)) {
-                    val renderForVisibleTab = selectedId == tab.id
-                    renderExecutor.execute {
-                        tab.screen.append(batch)
-                        if (renderForVisibleTab) {
-                            val rendered = tab.screen.renderAnnotated()
-                            outputHandler.post {
-                                if (selectedId == tab.id && activeTabIds.contains(tab.id)) {
-                                    tab.output.value = rendered
-                                    tab.outputRevision.value++
+                    val shouldStartWorker = synchronized(outputLock) {
+                        readyOutput.getOrPut(tab.id) { StringBuilder() }.append(batch)
+                        scheduledRenders.add(tab.id)
+                    }
+                    if (shouldStartWorker) {
+                        renderExecutor.execute {
+                            // Drain all output accumulated while the previous render was
+                            // running. A slow frame never leaves an unbounded executor
+                            // backlog when apt/dpkg produces output faster than Compose
+                            // can lay it out.
+                            while (activeTabIds.contains(tab.id)) {
+                                val nextBatch = synchronized(outputLock) {
+                                    val value = readyOutput.remove(tab.id)?.toString().orEmpty()
+                                    if (value.isEmpty()) scheduledRenders.remove(tab.id)
+                                    value
+                                }
+                                if (nextBatch.isEmpty()) break
+                                tab.screen.append(nextBatch)
+                                if (selectedId == tab.id) {
+                                    val rendered = tab.screen.renderAnnotated()
+                                    outputHandler.post {
+                                        if (selectedId == tab.id && activeTabIds.contains(tab.id)) {
+                                            tab.output.value = rendered
+                                            tab.outputRevision.value++
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -242,7 +261,9 @@ private object LinuxTerminalSessions {
         activeTabIds.remove(tab.id)
         synchronized(outputLock) {
             pendingOutput.remove(tab.id)
+            readyOutput.remove(tab.id)
             scheduledFlushes.remove(tab.id)
+            scheduledRenders.remove(tab.id)
         }
         runCatching { tab.session.close() }
         if (tabs.isEmpty()) {
