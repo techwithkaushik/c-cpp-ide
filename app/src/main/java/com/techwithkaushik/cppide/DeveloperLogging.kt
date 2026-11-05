@@ -79,7 +79,7 @@ internal fun DeveloperOptionsPanel() {
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
             OutlinedButton(
-                enabled = enabled && !exporting,
+                enabled = DeveloperLog.hasLogs(context) && !exporting,
                 onClick = {
                     val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
                     exportPicker.launch("code-studio-logs-$stamp.zip")
