@@ -110,7 +110,9 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess) :
 
         fun start(paths: LinuxRuntimePaths): LocalLinuxSession {
             paths.ensureDirectories()
-            if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed.")
+            if (!paths.hasRootfs()) {
+                throw IllegalStateException("Ubuntu rootfs is not installed or incomplete. ${paths.rootfsDiagnostic()}")
+            }
             ensureSupplementaryGroupNames(paths.ubuntuRoot)
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
             val shell = if (java.io.File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
