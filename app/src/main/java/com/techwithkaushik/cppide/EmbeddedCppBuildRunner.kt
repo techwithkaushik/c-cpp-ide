@@ -7,7 +7,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Runs a C/C++ build inside the IDE-owned Termux prefix.
+ * Runs a C/C++ build inside the selected Ubuntu rootfs through the bundled PRoot runtime.
  *
  * The system linker starts the embedded shell (Android 10+ app-data exec restriction); the shell
  * resolves clang from the configured guest path/PATH. All user/compiler values are individually
