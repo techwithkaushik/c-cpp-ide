@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
 import com.jcraft.jsch.ChannelShell
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.jcraft.jsch.HostKey
 import com.jcraft.jsch.HostKeyRepository
 import com.jcraft.jsch.JSch
@@ -14,12 +15,8 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class SshHost(
-    val host: String,
-    val port: Int = 22,
-    val username: String,
-    val password: String? = null,
-    val privateKey: ByteArray? = null,
-    val privateKeyPassphrase: String? = null,
+    val host: String, val port: Int = 22, val username: String, val password: String? = null,
+    val privateKey: ByteArray? = null, val privateKeyPassphrase: String? = null,
     val expectedSha256Fingerprint: String? = null,
 ) {
     fun validate() {
@@ -30,25 +27,17 @@ data class SshHost(
         expectedSha256Fingerprint?.let { require(it.startsWith("SHA256:") && it.length >= 20) { "Invalid SSH fingerprint." } }
     }
 }
-
-class HostKeyConfirmationRequired(val fingerprint: String) :
-    SecurityException("Confirm the SSH server host key before connecting: $fingerprint")
+class HostKeyConfirmationRequired(val fingerprint: String) : SecurityException("Confirm the SSH server host key before connecting: $fingerprint")
 
 /** Direct SSH shell with fingerprint pinning; unknown keys fail before authentication. */
 class SshShellSession private constructor(private val session: Session, private val channel: ChannelShell) : AutoCloseable {
     val input: OutputStream = channel.outputStream
     private val closed = AtomicBoolean(false)
-
-    /** Keep the remote PTY dimensions in sync with the terminal viewport. */
-    fun resize(columns: Int, rows: Int) {
-        channel.setPtySize(columns.coerceIn(20, 300), rows.coerceIn(5, 120), columns * 8, rows * 16)
-    }
+    fun resize(columns: Int, rows: Int) = channel.setPtySize(columns.coerceIn(20,300), rows.coerceIn(5,120), columns * 8, rows * 16)
 
     fun readOutput(onChunk: (String) -> Unit, onExit: (Int) -> Unit) {
         Thread({
             val reader = Thread {
-                // Preserve UTF-8 decoder state when a multibyte character is split
-                // across SSH packet reads.
                 try {
                     InputStreamReader(channel.inputStream, StandardCharsets.UTF_8).use { input ->
                         val chars = CharArray(2048)
@@ -58,10 +47,13 @@ class SshShellSession private constructor(private val session: Session, private 
                             if (count > 0) onChunk(String(chars, 0, count))
                         }
                     }
-                } catch (_: Exception) {}
+                } catch (error: Exception) {
+                    DeveloperLog.warn("SSH", "SSH output reader stopped", error)
+                }
             }.apply { isDaemon = true; start() }
             while (channel.isConnected && !channel.isClosed) Thread.sleep(150)
             reader.join(500)
+            DeveloperLog.info("SSH", "SSH shell channel exited; code=${channel.exitStatus}")
             onExit(channel.exitStatus)
         }, "ssh-shell-exit").apply { isDaemon = true; start() }
     }
@@ -74,6 +66,7 @@ class SshShellSession private constructor(private val session: Session, private 
 
     companion object {
         fun connect(host: SshHost): SshShellSession {
+            DeveloperLog.info("SSH", "Opening SSH connection; port=${host.port}")
             host.validate()
             val jsch = JSch()
             val repository = PinningHostKeyRepository(host.expectedSha256Fingerprint)
@@ -90,6 +83,7 @@ class SshShellSession private constructor(private val session: Session, private 
             try {
                 session.connect(15_000)
             } catch (error: Exception) {
+                DeveloperLog.warn("SSH", "SSH transport or authentication failed", error)
                 session.disconnect()
                 repository.presentedFingerprint?.let { presented ->
                     if (host.expectedSha256Fingerprint == null) throw HostKeyConfirmationRequired(presented)
@@ -102,6 +96,7 @@ class SshShellSession private constructor(private val session: Session, private 
             val channel = session.openChannel("shell") as ChannelShell
             channel.setPtyType("xterm-256color", 100, 30, 800, 600)
             channel.connect(10_000)
+            DeveloperLog.info("SSH", "SSH shell channel connected")
             return SshShellSession(session, channel)
         }
     }
@@ -110,10 +105,8 @@ class SshShellSession private constructor(private val session: Session, private 
 private class PinningHostKeyRepository(private val expected: String?) : HostKeyRepository {
     @Volatile var presentedFingerprint: String? = null
         private set
-
     override fun check(host: String, key: ByteArray): Int {
-        val fingerprint = "SHA256:" + Base64.getEncoder().withoutPadding()
-            .encodeToString(MessageDigest.getInstance("SHA-256").digest(key))
+        val fingerprint = "SHA256:" + Base64.getEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256").digest(key))
         presentedFingerprint = fingerprint
         return when {
             expected == null -> HostKeyRepository.NOT_INCLUDED

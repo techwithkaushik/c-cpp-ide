@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -394,6 +395,7 @@ fun LinuxTerminalPanel(
             .apply()
         busy = true
         error = null
+        DeveloperLog.info(context, "SSH", "SSH connection requested; port=${sshHost.port}")
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 try { Result.success(SshShellSession.connect(sshHost)) }
@@ -406,8 +408,9 @@ fun LinuxTerminalPanel(
                 val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, resize = session::resize, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> LinuxTerminalSessions.append(tab, chunk) },
-                    onExit = { code -> handler.post {
-                        LinuxTerminalSessions.closeTab(tab.id)
+                    onExit = { code ->
+                        DeveloperLog.info(context, "SSH", "SSH session exited with code=$code")
+                        handler.post { LinuxTerminalSessions.closeTab(tab.id) }
                     } }
                 )
                 password = ""
@@ -485,8 +488,9 @@ fun LinuxTerminalPanel(
                 val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, resize = session::resize, initialOutput = "", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> LinuxTerminalSessions.append(tab, chunk) },
-                    onExit = { code -> handler.post {
-                        LinuxTerminalSessions.closeTab(tab.id)
+                    onExit = { code ->
+                        DeveloperLog.info(context, "Ubuntu", "Local shell exited with code=$code")
+                        handler.post { LinuxTerminalSessions.closeTab(tab.id) }
                     } }
                 )
             }.onFailure { failure ->
@@ -497,6 +501,7 @@ fun LinuxTerminalPanel(
     }
 
     LaunchedEffect(connectionMode) {
+        DeveloperLog.info(context, "Terminal", "Terminal panel opened; connection mode=$connectionMode")
         // Reopening the terminal must reuse the process kept in the session registry.
         if (LinuxTerminalSessions.tabs.isNotEmpty()) return@LaunchedEffect
         if (connectionMode == "ssh") {

@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
@@ -15,20 +16,18 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
 
-/**
- * Extracts a tar archive without distro-specific edits. The resulting files are
- * used in-place at paths.ubuntuRoot, just as with: tar -xf archive -C distro.
- */
+/** Extracts a tar archive without distro-specific edits. */
 class RootfsInstaller(private val paths: LinuxRuntimePaths) {
     data class Result(val root: File, val entries: Int, val expandedBytes: Long)
 
     fun install(archive: File, expectedSha256: String? = null): Result {
+        val startedAt = System.currentTimeMillis()
+        DeveloperLog.info("UbuntuInstaller", "Rootfs extraction requested; archive=${archive.name}; bytes=${archive.length()}; checksumProvided=${expectedSha256 != null}")
         require(archive.isFile && archive.length() > 0) { "Rootfs archive is missing or empty." }
         if (expectedSha256 != null) {
             require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "Invalid SHA-256 value." }
             require(sha256(archive).equals(expectedSha256, ignoreCase = true)) { "Rootfs SHA-256 mismatch." }
         }
-
         paths.ensureDirectories()
         val stage = File(paths.staging, "distro-${System.currentTimeMillis()}")
         if (!stage.mkdirs()) throw IOException("Cannot create extraction directory.")
@@ -57,8 +56,6 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             removeEntrySymlink(target)
                             if (!target.exists() && !target.mkdirs()) throw IOException("Cannot create directory: ${entry.name}")
                             if (!target.isDirectory) throw IOException("Directory conflicts with non-directory: ${entry.name}")
-                            // Apply directory modes after extraction: a read-only
-                            // directory entry must not block later child entries.
                             directoryModes += target to entry.mode
                         }
                         entry.isLink -> {
@@ -70,15 +67,9 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             applyMode(target, entry.mode)
                         }
                         entry.isFile -> {
-                            if (entry.size < 0 || entry.size > MAX_EXPANDED_BYTES - expanded) {
-                                throw IOException("Archive exceeds the 4 GiB expanded-size limit.")
-                            }
+                            if (entry.size < 0 || entry.size > MAX_EXPANDED_BYTES - expanded) throw IOException("Archive exceeds the 4 GiB expanded-size limit.")
                             removeEntrySymlink(target)
-                            target.parentFile?.let {
-                                if (!it.exists() && !it.mkdirs()) throw IOException("Cannot create parent directory.")
-                            }
-                            // Rootfs archives contain many large files. A larger output
-                            // buffer reduces small writes during extraction on flash storage.
+                            target.parentFile?.let { if (!it.exists() && !it.mkdirs()) throw IOException("Cannot create parent directory.") }
                             BufferedOutputStream(target.outputStream(), 256 * 1024).use { out ->
                                 var copied = 0L
                                 while (true) {
@@ -94,30 +85,23 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             applyMode(target, entry.mode)
                         }
                     }
+                    if (count % 5000 == 0) DeveloperLog.debug("UbuntuInstaller", "Extraction progress; entries=$count; expandedBytes=$expanded")
                 }
             }
-            // Preserve guest modes after all children have been extracted. /tmp
-            // must remain world-writable for apt's _apt sandbox.
             directoryModes.forEach { (directory, mode) -> applyMode(directory, mode) }
-
-            // Activate the extracted tree at the one canonical distro path.
             val old = File(paths.staging, "distro-previous")
             if (old.exists() && !old.deleteRecursively()) throw IOException("Cannot remove previous extraction backup.")
-            if (paths.ubuntuRoot.exists() && !paths.ubuntuRoot.renameTo(old)) {
-                throw IOException("Cannot replace existing distro directory.")
-            }
+            if (paths.ubuntuRoot.exists() && !paths.ubuntuRoot.renameTo(old)) throw IOException("Cannot replace existing distro directory.")
             if (!stage.renameTo(paths.ubuntuRoot)) {
                 if (old.exists()) old.renameTo(paths.ubuntuRoot)
                 throw IOException("Cannot activate extracted distro directory.")
             }
             old.deleteRecursively()
-            paths.marker.writeText(
-                "installerVersion=$INSTALLER_VERSION\n" +
-                    "root=${paths.ubuntuRoot.absolutePath}\n" +
-                    "entries=$count\nexpandedBytes=$expanded\n"
-            )
+            paths.marker.writeText("installerVersion=$INSTALLER_VERSION\nroot=${paths.ubuntuRoot.absolutePath}\nentries=$count\nexpandedBytes=$expanded\n")
+            DeveloperLog.info("UbuntuInstaller", "Rootfs extraction completed; entries=$count; expandedBytes=$expanded; durationMs=${System.currentTimeMillis() - startedAt}")
             return Result(paths.ubuntuRoot, count, expanded)
         } catch (error: Exception) {
+            DeveloperLog.error("UbuntuInstaller", "Rootfs extraction failed; entries=$count; expandedBytes=$expanded", error)
             stage.deleteRecursively()
             throw error
         }
@@ -135,17 +119,12 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         if (mode and 0x4 != 0) permissions.add(PosixFilePermission.OTHERS_READ)
         if (mode and 0x2 != 0) permissions.add(PosixFilePermission.OTHERS_WRITE)
         if (mode and 0x1 != 0) permissions.add(PosixFilePermission.OTHERS_EXECUTE)
-        try {
-            Files.setPosixFilePermissions(target.toPath(), permissions)
-        } catch (error: Exception) {
-            throw IOException("Cannot preserve Ubuntu permissions for ${target.name}.", error)
-        }
+        try { Files.setPosixFilePermissions(target.toPath(), permissions) }
+        catch (error: Exception) { throw IOException("Cannot preserve Ubuntu permissions for ${target.name}.", error) }
     }
 
     private fun safeTarget(root: File, name: String): File {
-        if (name.startsWith("/") || name.split('/').any { it == ".." }) {
-            throw IOException("Unsafe archive path: $name")
-        }
+        if (name.startsWith("/") || name.split('/').any { it == ".." }) throw IOException("Unsafe archive path: $name")
         val rootPath = root.toPath().toAbsolutePath().normalize()
         val target = rootPath.resolve(name).normalize()
         if (!target.startsWith(rootPath) || target == rootPath) throw IOException("Path escapes extraction directory: $name")
@@ -161,14 +140,9 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         val rootPath = root.toPath().toAbsolutePath().normalize()
         val linkPath = link.toPath().toAbsolutePath().normalize()
         val parent = linkPath.parent ?: throw IOException("Invalid symlink path.")
-        val resolved = if (rawTarget.startsWith("/")) {
-            rootPath.resolve(rawTarget.removePrefix("/")).normalize()
-        } else {
-            parent.resolve(rawTarget).normalize()
-        }
+        val resolved = if (rawTarget.startsWith("/")) rootPath.resolve(rawTarget.removePrefix("/")).normalize()
+            else parent.resolve(rawTarget).normalize()
         if (!resolved.startsWith(rootPath)) throw IOException("Symlink escapes extraction directory: $rawTarget")
-        // Validate the link target, but preserve the archive's exact link text.
-        // PRoot interprets absolute symlinks relative to the guest rootfs.
         if (!parent.toFile().exists() && !parent.toFile().mkdirs()) throw IOException("Cannot create symlink parent.")
         if (Files.exists(linkPath) || Files.isSymbolicLink(linkPath)) Files.delete(linkPath)
         Files.createSymbolicLink(linkPath, java.nio.file.Paths.get(rawTarget))

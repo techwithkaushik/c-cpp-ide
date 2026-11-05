@@ -5,11 +5,9 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
-
 android {
     namespace = "com.techwithkaushik.cppide"
     compileSdk = 36
-
     defaultConfig {
         applicationId = "com.techwithkaushik.cppide"
         minSdk = 26
@@ -17,58 +15,32 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
-
     flavorDimensions += "bootstrapAbi"
     productFlavors {
-        create("arm32") {
-            dimension = "bootstrapAbi"
-            ndk { abiFilters += "armeabi-v7a" }
-            buildConfigField("String", "BOOTSTRAP_ABI", "\"armeabi-v7a\"")
-        }
-        create("arm64") {
-            dimension = "bootstrapAbi"
-            ndk { abiFilters += "arm64-v8a" }
-            buildConfigField("String", "BOOTSTRAP_ABI", "\"arm64-v8a\"")
-        }
-        create("x86") {
-            dimension = "bootstrapAbi"
-            ndk { abiFilters += "x86" }
-            buildConfigField("String", "BOOTSTRAP_ABI", "\"x86\"")
-        }
-        create("x64") {
-            dimension = "bootstrapAbi"
-            ndk { abiFilters += "x86_64" }
-            buildConfigField("String", "BOOTSTRAP_ABI", "\"x86_64\"")
-        }
+        create("arm32") { dimension = "bootstrapAbi"; ndk { abiFilters += "armeabi-v7a" }; buildConfigField("String", "BOOTSTRAP_ABI", "\"armeabi-v7a\"") }
+        create("arm64") { dimension = "bootstrapAbi"; ndk { abiFilters += "arm64-v8a" }; buildConfigField("String", "BOOTSTRAP_ABI", "\"arm64-v8a\"") }
+        create("x86") { dimension = "bootstrapAbi"; ndk { abiFilters += "x86" }; buildConfigField("String", "BOOTSTRAP_ABI", "\"x86\"") }
+        create("x64") { dimension = "bootstrapAbi"; ndk { abiFilters += "x86_64" }; buildConfigField("String", "BOOTSTRAP_ABI", "\"x86_64\"") }
     }
-
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
     signingConfigs {
         create("release") {
-            val signingStore = System.getenv("SIGN_KEY_STORE")
-                ?: error("SIGN_KEY_STORE must point to the restored repository keystore")
-            val signingAlias = System.getenv("SIGNING_KEY_ALIAS")
-                ?: error("SIGNING_KEY_ALIAS repository secret is required")
-            val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-                ?: error("SIGNING_KEY_PASSWORD repository secret is required")
-            val signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                ?: error("SIGNING_STORE_PASSWORD repository secret is required")
+            val signingStore = System.getenv("SIGN_KEY_STORE") ?: error("SIGN_KEY_STORE must point to the restored repository keystore")
+            val signingAlias = System.getenv("SIGNING_KEY_ALIAS") ?: error("SIGNING_KEY_ALIAS repository secret is required")
+            val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: error("SIGNING_KEY_PASSWORD repository secret is required")
+            val signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: error("SIGNING_STORE_PASSWORD repository secret is required")
             val keystoreFile = file(signingStore)
-            require(keystoreFile.isFile) {
-                "Release keystore does not exist: $signingStore"
-            }
+            require(keystoreFile.isFile) { "Release keystore does not exist: $signingStore" }
             storeFile = keystoreFile
             keyAlias = signingAlias
             keyPassword = signingKeyPassword
             storePassword = signingStorePassword
         }
     }
-
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
@@ -77,26 +49,14 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
+    buildFeatures { compose = true; buildConfig = true }
 }
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
-
-configurations.configureEach {
-    exclude(group = "com.google.guava", module = "listenablefuture")
-}
-
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+configurations.configureEach { exclude(group = "com.google.guava", module = "listenablefuture") }
 dependencies {
     implementation(project(":core:aidl"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:logging"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:terminal"))
     implementation(project(":feature:explorer"))

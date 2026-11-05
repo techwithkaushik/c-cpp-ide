@@ -16,6 +16,7 @@ android {
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:logging"))
     implementation(project(":core:jni"))
     implementation(project(":core:aidl"))
     implementation(project(":integrations:linux-runtime"))

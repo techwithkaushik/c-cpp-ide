@@ -14,6 +14,7 @@ android {
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     implementation(project(":core:jni"))
+    implementation(project(":core:logging"))
     implementation(libs.commons.compress)
     implementation(libs.xz)
     implementation(libs.jsch)
