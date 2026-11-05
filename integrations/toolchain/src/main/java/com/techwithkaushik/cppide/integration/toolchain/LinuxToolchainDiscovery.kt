@@ -34,7 +34,10 @@ data class LinuxToolchainInventory(
  * must translate them to rootfs paths when invoking the Linux runtime.
  */
 class LinuxToolchainDiscovery {
-    private val recommended = listOf("sh", "clang", "clang++", "cmake", "make", "gdb")
+    private val recommended = listOf(
+        "sh", "clang", "clang++", "clangd", "clang-format", "clang-tidy",
+        "lldb", "lldb-dap", "cmake", "make", "gdb"
+    )
 
     fun discover(rootfs: File, environmentPath: String? = null): LinuxToolchainInventory {
         require(rootfs.isDirectory) { "Root filesystem directory does not exist" }
