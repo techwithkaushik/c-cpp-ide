@@ -59,8 +59,19 @@ private class TerminalZoomController(
     private val resizeListener: PtyResizeListener,
     initialFontSizeSp: Int,
 ) {
+    private var configuredFontSizeSp = initialFontSizeSp
     private var fontSizeSp = initialFontSizeSp.coerceIn(MIN_FONT_SP, MAX_FONT_SP)
     private var lastScale = 1f
+
+    fun updateConfiguredFontSize(newFontSizeSp: Int) {
+        if (newFontSizeSp == configuredFontSizeSp) return
+        configuredFontSizeSp = newFontSizeSp
+        fontSizeSp = newFontSizeSp.coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+        lastScale = 1f
+        view.setTextSize(fontSizeSp)
+        resizeListener.setFontSize(fontSizeSp)
+        view.requestLayout()
+    }
 
     fun onScale(cumulativeScale: Float): Float {
         val targetScale = cumulativeScale.coerceIn(MIN_SCALE, MAX_SCALE)
@@ -109,12 +120,10 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
             }
         },
         update = { view ->
-            val resizeListener = view.getTag(android.R.id.content) as? PtyResizeListener
-            resizeListener?.setFontSize(fontSizeSp)
+            (view.getTag(android.R.id.custom) as? TerminalZoomController)?.updateConfiguredFontSize(fontSizeSp)
             if (view.mTermSession !== session) view.attachSession(session)
             view.isFocusable = true
             view.isFocusableInTouchMode = true
-            view.setTextSize(fontSizeSp)
             view.requestFocus()
         },
         onRelease = { view ->
