@@ -117,6 +117,15 @@ private data class LinuxTerminalTab(
 )
 
 private object LinuxTerminalSessions {
+    // PTY readers can produce hundreds of small chunks per second (apt/dpkg is
+    // particularly chatty). Coalesce them before touching Compose state or
+    // rebuilding the annotated scrollback. All screen/state mutations remain
+    // confined to the main thread.
+    private val outputHandler = Handler(Looper.getMainLooper())
+    private val pendingOutput = HashMap<Int, StringBuilder>()
+    private val scheduledFlushes = HashSet<Int>()
+    private const val OUTPUT_FRAME_INTERVAL_MS = 32L
+
     val tabs = mutableStateListOf<LinuxTerminalTab>()
     var selectedId by mutableIntStateOf(0)
         private set
@@ -160,16 +169,29 @@ private object LinuxTerminalSessions {
     }
 
     fun append(tab: LinuxTerminalTab, text: String) {
-        if (tabs.none { it.id == tab.id }) return
-        tab.screen.append(text)
-        tab.output.value = tab.screen.renderAnnotated()
-        tab.outputRevision.value++
+        if (text.isEmpty() || tabs.none { it.id == tab.id }) return
+        val pending = pendingOutput.getOrPut(tab.id) { StringBuilder() }
+        pending.append(text)
+        if (!scheduledFlushes.add(tab.id)) return
+
+        outputHandler.postDelayed({
+            scheduledFlushes.remove(tab.id)
+            val batch = pendingOutput.remove(tab.id)?.toString().orEmpty()
+            if (batch.isNotEmpty() && tabs.any { it.id == tab.id } && !tab.ended.get()) {
+                tab.screen.append(batch)
+                tab.output.value = tab.screen.renderAnnotated()
+                tab.outputRevision.value++
+            }
+        }, OUTPUT_FRAME_INTERVAL_MS)
     }
 
     fun finish(tab: LinuxTerminalTab) {
         val index = tabs.indexOfFirst { it.id == tab.id }
         if (index < 0) return
         tabs.removeAt(index)
+        outputHandler.removeCallbacksAndMessages(null)
+        pendingOutput.remove(tab.id)
+        scheduledFlushes.remove(tab.id)
         runCatching { tab.session.close() }
         if (tabs.isEmpty()) {
             selectedId = 0
