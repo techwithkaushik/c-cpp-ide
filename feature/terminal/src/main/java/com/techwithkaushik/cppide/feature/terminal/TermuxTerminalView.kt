@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.termux.terminal.TerminalSession
@@ -51,6 +52,22 @@ private class PtyResizeListener(
         lastRows = rows
         session.updateSize(columns, rows)
     }
+
+    fun resize(view: View) {
+        onLayoutChange(view, view.left, view.top, view.right, view.bottom,
+            view.left, view.top, view.right, view.bottom)
+    }
+}
+
+/** Compose-owned holder avoids View.setTag(Int, ...) resource-ID requirements. */
+private class TerminalViewControllerHolder {
+    var resizeListener: PtyResizeListener? = null
+    var zoomController: TerminalZoomController? = null
+
+    fun clear() {
+        resizeListener = null
+        zoomController = null
+    }
 }
 
 /** TerminalView supplies a cumulative pinch scale; convert it to incremental font changes. */
@@ -71,6 +88,7 @@ private class TerminalZoomController(
         view.setTextSize(fontSizeSp)
         resizeListener.setFontSize(fontSizeSp)
         view.requestLayout()
+        resizeListener.resize(view)
     }
 
     fun onScale(cumulativeScale: Float): Float {
@@ -83,6 +101,7 @@ private class TerminalZoomController(
                 view.setTextSize(fontSizeSp)
                 resizeListener.setFontSize(fontSizeSp)
                 view.requestLayout()
+                resizeListener.resize(view)
             }
         }
         lastScale = targetScale
@@ -100,6 +119,7 @@ private class TerminalZoomController(
 
 @Composable
 internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = Modifier, fontSizeSp: Int = 14, onSessionFinished: (TerminalSession) -> Unit = {}) {
+    val controllers = remember(session) { TerminalViewControllerHolder() }
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -108,8 +128,8 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
                 setTypeface(Typeface.MONOSPACE)
                 val resizeListener = PtyResizeListener(session, resources.displayMetrics.density, fontSizeSp)
                 val zoomController = TerminalZoomController(this, resizeListener, fontSizeSp)
-                setTag(android.R.id.content, resizeListener)
-                setTag(android.R.id.custom, zoomController)
+                controllers.resizeListener = resizeListener
+                controllers.zoomController = zoomController
                 setTerminalViewClient(createTerminalViewClient(context, this, zoomController))
                 addOnLayoutChangeListener(resizeListener)
                 attachSession(session)
@@ -120,16 +140,15 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
             }
         },
         update = { view ->
-            (view.getTag(android.R.id.custom) as? TerminalZoomController)?.updateConfiguredFontSize(fontSizeSp)
+            controllers.zoomController?.updateConfiguredFontSize(fontSizeSp)
             if (view.mTermSession !== session) view.attachSession(session)
             view.isFocusable = true
             view.isFocusableInTouchMode = true
             view.requestFocus()
         },
         onRelease = { view ->
-            (view.getTag(android.R.id.content) as? PtyResizeListener)?.let(view::removeOnLayoutChangeListener)
-            view.setTag(android.R.id.content, null)
-            view.setTag(android.R.id.custom, null)
+            controllers.resizeListener?.let(view::removeOnLayoutChangeListener)
+            controllers.clear()
             if (view.mTermSession === session) view.attachSession(null)
         }
     )
