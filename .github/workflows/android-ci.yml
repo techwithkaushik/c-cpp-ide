@@ -26,6 +26,9 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          # Gradle derives versionCode from the complete branch history.
+          fetch-depth: 0
 
       - name: Restore repository signing keystore
         id: keystore
