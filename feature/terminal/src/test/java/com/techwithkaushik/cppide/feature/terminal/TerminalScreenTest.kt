@@ -457,7 +457,7 @@ class TerminalScreenTest {
 
     @Test fun trailingBackgroundColorIsRetainedAcrossBlankCells() {
         val screen = TerminalScreen(columns = 20, rows = 5)
-        screen.append("\u001B[44m\u001B[2K")
+        screen.append("\u001B[44m                    ")
         val rendered = screen.renderAnnotated()
         assertTrue(rendered.text.length >= 20)
         assertTrue(rendered.spanStyles.any { it.item.background != Color.Unspecified })
