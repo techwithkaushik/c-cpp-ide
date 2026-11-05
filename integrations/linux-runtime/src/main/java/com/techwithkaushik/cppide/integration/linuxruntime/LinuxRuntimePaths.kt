@@ -2,14 +2,13 @@ package com.techwithkaushik.cppide.integration.linuxruntime
 
 import java.io.File
 import java.nio.file.Files
-import android.os.Process
 
 /** Simple app-private paths for the extracted distro and bundled Android PRoot. */
 class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) {
     val base = filesDir
     val distro = File(filesDir, "ubuntu")
     private val legacyDistro = File(filesDir, "rootfs")
-    val ubuntuArchitecture: String = if (Process.is64Bit()) "arm64" else "armhf"
+    val ubuntuArchitecture: String = if (System.getProperty("os.arch", "").contains("64")) "arm64" else "armhf"
     val ubuntuRoot: File get() = distro
     val usr = File(filesDir, "usr")
     val usrTmp = File(usr, "tmp")
