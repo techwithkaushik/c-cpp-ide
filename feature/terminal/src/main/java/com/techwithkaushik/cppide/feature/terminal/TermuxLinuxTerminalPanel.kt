@@ -101,7 +101,7 @@ fun TermuxLinuxTerminalPanel(
             ?.takeIf { it.isNotBlank() } ?: "ubuntu.tar"
     }
 
-    fun installLocalRootfs(uri: Uri, allowArchitectureMismatch: Boolean) {
+    fun installLocalRootfs(uri: Uri) {
         if (busy) return
         busy = true
         error = null
@@ -110,10 +110,13 @@ fun TermuxLinuxTerminalPanel(
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    RootfsInstaller(paths).install(
+                    val installed = RootfsInstaller(paths).install(
                         open = { context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot open the selected archive.") },
                         archiveName = archiveName
                     )
+                    val smoke = LinuxRuntimeSmokeTest(paths).run()
+                    check(smoke.success) { smoke.error ?: smoke.output.ifBlank { "Imported rootfs failed the Ubuntu shell smoke test." } }
+                    installed
                 }
             }
             busy = false
@@ -148,7 +151,7 @@ fun TermuxLinuxTerminalPanel(
                 if (mismatch) {
                     pendingArchitectureWarning = uri to "Detected ${report.architecture} rootfs, but this app process requires ${paths.ubuntuArchitecture}. ELF files: arm64=${report.arm64Executables}, armhf=${report.armhfExecutables}, other=${report.otherExecutables}. Installing an incompatible rootfs may make Ubuntu unable to start."
                 } else {
-                    installLocalRootfs(uri, allowArchitectureMismatch = false)
+                    installLocalRootfs(uri)
                 }
             }.onFailure { error = it.message ?: "Could not inspect this rootfs archive." }
         }
@@ -235,7 +238,7 @@ fun TermuxLinuxTerminalPanel(
             title = { Text("Rootfs architecture mismatch") },
             text = { Text("$warning\n\nContinue only if you understand the risk.") },
             confirmButton = {
-                TextButton(onClick = { pendingArchitectureWarning = null; installLocalRootfs(uri, allowArchitectureMismatch = true) }) {
+                TextButton(onClick = { pendingArchitectureWarning = null; installLocalRootfs(uri) }) {
                     Text("Install anyway")
                 }
             },
