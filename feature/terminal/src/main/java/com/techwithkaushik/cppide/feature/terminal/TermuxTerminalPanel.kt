@@ -325,9 +325,9 @@ fun TermuxTerminalPanel(
                         setTerminalViewClient(terminalViewClient)
                         terminalViewClient.attachView(this)
                         activeTab.client.attach(this)
-                        activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                         terminalViewRef.value = this
                         attachSession(activeTab.session)
+                        activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                         isFocusable = true
                         isFocusableInTouchMode = true
                         post {
@@ -344,9 +344,9 @@ fun TermuxTerminalPanel(
                 },
                 update = { view ->
                     activeTab.client.attach(view)
-                    activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                     terminalViewRef.value = view
                     if (view.mTermSession !== activeTab.session) view.attachSession(activeTab.session)
+                    activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                     view.setTextSize(terminalFontSizePx)
                 }
             )
@@ -670,12 +670,7 @@ private class IdeTermuxViewClient(
     override fun readShiftKey(): Boolean = shiftPressed
     override fun readFnKey(): Boolean = fnPressed
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
-    override fun onEmulatorSet() {
-        terminalView?.let { view ->
-            view.setTerminalCursorBlinkerRate(if (cursorBlinkEnabled) DEFAULT_CURSOR_BLINK_RATE_MS else 0)
-            view.setTerminalCursorBlinkerState(cursorBlinkEnabled, true)
-        }
-    }
+    override fun onEmulatorSet() = Unit
     override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
     override fun logWarn(tag: String, message: String): Unit { android.util.Log.w(tag, message) }
     override fun logInfo(tag: String, message: String): Unit { android.util.Log.i(tag, message) }
