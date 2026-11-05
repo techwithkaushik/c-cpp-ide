@@ -68,6 +68,7 @@ internal class TerminalScreen(
     private var pendingHighSurrogate: Char? = null
 
     /** Return the correct cursor-key sequence for the active terminal mode. */
+    @Synchronized
     fun cursorKeySequence(key: String): String {
         val final = when (key) {
             "UP" -> "A"
@@ -80,11 +81,13 @@ internal class TerminalScreen(
     }
 
     /** Applications can request bracketed paste using DEC private mode 2004. */
+    @Synchronized
     fun pasteSequence(text: String): String =
         if (bracketedPasteEnabled) "\u001B[200~$text\u001B[201~" else text
     private var scrollTop = 0
     private var scrollBottom = rows - 1
 
+    @Synchronized
     fun resize(newColumns: Int, newRows: Int) {
         val width = newColumns.coerceIn(20, 300)
         val height = newRows.coerceIn(5, 120)
@@ -132,9 +135,11 @@ internal class TerminalScreen(
     }
 
     /** Exposes the active DECSCUSR mode for deterministic tests and the renderer. */
+    @Synchronized
     fun cursorShapeCode(): Int = cursorShape
 
     /** True only while DEC cursor visibility and blink phase both allow drawing. */
+    @Synchronized
     fun isCursorDrawn(): Boolean = cursorVisible && cursorBlinkOn
 
     /**
@@ -143,9 +148,11 @@ internal class TerminalScreen(
      * contribute their two UTF-16 code units exactly as Compose text layout expects.
      */
     /** Zero-based terminal cell coordinates, including transcript rows in the primary buffer. */
+    @Synchronized
     fun cursorGridPosition(): Pair<Int, Int> =
         column to (if (alternateBuffer) row else scrollback.size + row)
 
+    @Synchronized
     fun cursorTextOffset(): Int {
         var offset = 0
         if (!alternateBuffer) {
@@ -196,6 +203,7 @@ internal class TerminalScreen(
         return offset
     }
 
+    @Synchronized
     fun setCursorBlinkPhase(visible: Boolean) {
         val blinkingMode = cursorShape == 0 || cursorShape == 1 ||
             cursorShape == 3 || cursorShape == 5
@@ -205,12 +213,14 @@ internal class TerminalScreen(
     }
 
     /** Advance only blinking DECSCUSR modes; steady cursor modes never disappear. */
+    @Synchronized
     fun advanceCursorBlinkPhase(): Boolean {
         val previous = cursorBlinkOn
         cursorBlinkOn = if (cursorShape in setOf(0, 1, 3, 5)) !cursorBlinkOn else true
         return previous != cursorBlinkOn
     }
 
+    @Synchronized
     fun append(chunk: String) {
         chunk.forEach { ch ->
             // Preserve UTF-16 surrogate pairs even when the PTY splits a
@@ -262,6 +272,7 @@ internal class TerminalScreen(
         }
     }
 
+    @Synchronized
     fun render(): String {
         val lines = ArrayList<String>(scrollback.size + rows)
         if (!alternateBuffer) lines.addAll(scrollback.map { line -> buildString {
@@ -284,6 +295,7 @@ internal class TerminalScreen(
         return lines.joinToString("\n")
     }
 
+    @Synchronized
     fun renderAnnotated(): AnnotatedString {
         val builder = AnnotatedString.Builder()
         if (!alternateBuffer) scrollback.forEachIndexed { lineIndex, line ->
