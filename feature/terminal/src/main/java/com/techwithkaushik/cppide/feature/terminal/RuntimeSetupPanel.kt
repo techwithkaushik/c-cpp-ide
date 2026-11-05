@@ -1,5 +1,7 @@
 package com.techwithkaushik.cppide.feature.terminal
 
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.net.Uri

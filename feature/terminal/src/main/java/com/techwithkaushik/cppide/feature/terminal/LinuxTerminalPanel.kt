@@ -411,7 +411,7 @@ fun LinuxTerminalPanel(
                     onExit = { code ->
                         DeveloperLog.info(context, "SSH", "SSH session exited with code=$code")
                         handler.post { LinuxTerminalSessions.closeTab(tab.id) }
-                    } }
+                    }
                 )
                 password = ""
                 TerminalConnectionConfig.sshPassword = ""
@@ -491,7 +491,7 @@ fun LinuxTerminalPanel(
                     onExit = { code ->
                         DeveloperLog.info(context, "Ubuntu", "Local shell exited with code=$code")
                         handler.post { LinuxTerminalSessions.closeTab(tab.id) }
-                    } }
+                    }
                 )
             }.onFailure { failure ->
                 DeveloperLog.error(context, "Ubuntu", "Local Ubuntu terminal session failed to start", failure)
