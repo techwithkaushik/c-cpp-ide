@@ -69,20 +69,12 @@ internal class CcppToolchainInspector(context: Context) {
             ?: return unavailable("The runtime has no executable shell entry point.", projectName)
 
         val toolNames = listOf("clang", "clang++", "clangd", "clang-format", "clang-tidy", "lldb")
-        val roles = mapOf(
-            "clang" to LanguageToolingCatalog.Role.Compiler,
-            "clang++" to LanguageToolingCatalog.Role.Compiler,
-            "clangd" to LanguageToolingCatalog.Role.LanguageServer,
-            "clang-format" to LanguageToolingCatalog.Role.Formatter,
-            "clang-tidy" to LanguageToolingCatalog.Role.Linter,
-            "lldb" to LanguageToolingCatalog.Role.Debugger
-        )
         val statuses = toolNames.map { name ->
             val configured = pathPreferences.getExecutable("c-cpp", name)
             val resolved = if (configured != null) resolveGuestPath(configured) else null
             val candidate = when {
                 configured != null -> resolved
-                else -> inventory.find(name)?.executable
+                else -> inventory.find(name)?.executable?.let(::toGuestPath)
             }
             when {
                 configured != null && candidate == null -> CppToolStatus(
@@ -119,6 +111,13 @@ internal class CcppToolchainInspector(context: Context) {
     fun savePath(executable: String, path: String?) {
         require(executable in setOf("clang", "clang++", "clangd", "clang-format", "clang-tidy", "lldb"))
         pathPreferences.setExecutable("c-cpp", executable, path)
+    }
+
+    private fun toGuestPath(hostPath: String): String? {
+        val root = appContext.filesDir.canonicalFile
+        val file = File(hostPath).canonicalFile
+        if (!file.toPath().startsWith(root.toPath())) return null
+        return "/" + file.relativeTo(root).invariantSeparatorsPath
     }
 
     private fun resolveGuestPath(configured: String): String? {
