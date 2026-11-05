@@ -132,7 +132,14 @@ private object LinuxTerminalSessions {
     var onLastSessionExited: (() -> Unit)? = null
     private var nextId = 1
 
-    fun select(id: Int) { if (tabs.any { it.id == id }) selectedId = id }
+    fun select(id: Int) {
+        val tab = tabs.firstOrNull { it.id == id } ?: return
+        selectedId = id
+        // Keep inactive tabs' VT models current, but defer expensive annotated
+        // text construction until the tab is actually visible.
+        tab.output.value = tab.screen.renderAnnotated()
+        tab.outputRevision.value++
+    }
 
     fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, resize: (Int, Int) -> Unit = { _, _ -> }, initialOutput: String = "", maxScrollbackLines: Int = 5_000): LinuxTerminalTab {
         val screen = TerminalScreen(maxScrollbackLines = maxScrollbackLines)
@@ -179,8 +186,10 @@ private object LinuxTerminalSessions {
             val batch = pendingOutput.remove(tab.id)?.toString().orEmpty()
             if (batch.isNotEmpty() && tabs.any { it.id == tab.id } && !tab.ended.get()) {
                 tab.screen.append(batch)
-                tab.output.value = tab.screen.renderAnnotated()
-                tab.outputRevision.value++
+                if (selectedId == tab.id) {
+                    tab.output.value = tab.screen.renderAnnotated()
+                    tab.outputRevision.value++
+                }
             }
         }, OUTPUT_FRAME_INTERVAL_MS)
     }
