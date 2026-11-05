@@ -1,8 +1,7 @@
 package com.techwithkaushik.cppide
 
 import android.content.Context
-import com.techwithkaushik.cppide.integration.termuxruntime.AndroidRuntimeLauncher
-import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
+import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.toolchain.CppBuildPreferences
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -17,7 +16,7 @@ import java.util.concurrent.TimeUnit
  */
 internal class EmbeddedCppBuildRunner(context: Context) {
     private val appContext = context.applicationContext
-    private val runtime = EmbeddedTermuxRuntime(appContext.filesDir)
+    private val runtime = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
     private val inspector = CcppToolchainInspector(appContext)
     private val toolPaths = ToolPathPreferences(appContext)
     private val storage = ProjectStorage(appContext)
@@ -65,7 +64,8 @@ internal class EmbeddedCppBuildRunner(context: Context) {
             "cc", "cpp", "cxx", "c++" -> CppBuildPreferences.SourceLanguage.CPP
             else -> return failure(source.absolutePath, "Only C and C++ source files can be built.")
         }
-        if (!runtime.hasBootstrapLayout()) return failure(source.absolutePath, "Embedded runtime is not installed.")
+        runtime.ensureDirectories()
+        if (!runtime.ready()) return failure(source.absolutePath, "Ubuntu rootfs or PRoot is not installed.")
 
         val compilerName = if (language == CppBuildPreferences.SourceLanguage.C) "clang" else "clang++"
         val report = runCatching { inspector.inspect(projectName) }.getOrElse {
@@ -93,9 +93,13 @@ internal class EmbeddedCppBuildRunner(context: Context) {
             includeDirectories = preferences.getString("include_paths", "") ?: "",
             definitions = preferences.getString("defines", "") ?: ""
         )
-        val compiler = toolPaths.getExecutable("c-cpp", compilerName)?.takeIf { it.isNotBlank() } ?: compilerName
+        val compiler = toolPaths.getExecutable("c-cpp", compilerName)?.takeIf { it.isNotBlank() }
+            ?: compilerStatus.path
+            ?: "/usr/bin/$compilerName"
+        val sourceGuestPath = "/workspace/" + source.relativeTo(workspace).invariantSeparatorsPath
+        val executableGuestPath = "/workspace/.cppide-build/" + executable.name
         val compileArguments = try {
-            buildPreferences.compileArguments(language) + listOf(source.absolutePath, "-o", executable.absolutePath)
+            buildPreferences.compileArguments(language) + listOf(sourceGuestPath, "-o", executableGuestPath)
         } catch (error: IllegalArgumentException) {
             return failure(source.absolutePath, error.message ?: "Invalid C/C++ build settings.")
         }
@@ -112,7 +116,7 @@ internal class EmbeddedCppBuildRunner(context: Context) {
             return Result(source.absolutePath, executable.absolutePath, compile.exitCode, null, compile.output, "", error = "Compiler reported success but produced no executable.")
         }
 
-        val run = execute(listOf(executable.absolutePath) + programArguments, workspace, timeoutSeconds)
+        val run = execute(listOf(executableGuestPath) + programArguments, workspace, timeoutSeconds)
         return Result(source.absolutePath, executable.absolutePath, compile.exitCode, run.exitCode, compile.output, run.output, run.timedOut, run.error)
     }
 
@@ -124,19 +128,36 @@ internal class EmbeddedCppBuildRunner(context: Context) {
     )
 
     private fun execute(arguments: List<String>, workingDirectory: File, timeoutSeconds: Long): CommandResult {
-        if (!runtime.layout.shell.isFile || !runtime.layout.shell.canRead()) {
-            return CommandResult(null, "", error = "Embedded shell is missing.")
-        }
-        val shellCommand = "exec " + arguments.joinToString(" ") { shellQuote(it) }
+        if (!runtime.ready()) return CommandResult(null, "", error = "Ubuntu runtime or PRoot is missing.")
         val process = try {
             ProcessBuilder(
-                AndroidRuntimeLauncher.command(runtime.layout.shell, "-c", shellCommand).toList()
+                runtime.proot.absolutePath,
+                "-0", "-v", "0",
+                "-r", runtime.ubuntuRoot.absolutePath,
+                "-w", "/workspace",
+                "-b", "${workingDirectory.absolutePath}:/workspace",
+                "-b", "/dev:/dev",
+                "-b", "/proc:/proc",
+                "-b", "/sys:/sys",
+                *arguments.toTypedArray()
             ).directory(workingDirectory).apply {
                 environment().clear()
-                environment().putAll(runtime.layout.environment())
+                environment()["HOME"] = "/root"
+                environment()["USER"] = "root"
+                environment()["LOGNAME"] = "root"
+                environment()["SHELL"] = "/bin/bash"
+                environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                environment()["TMPDIR"] = runtime.usrTmp.absolutePath
+                environment()["TMP"] = runtime.usrTmp.absolutePath
+                environment()["PROOT_TMP_DIR"] = runtime.usrTmp.absolutePath
+                environment()["PROOT_NO_SECCOMP"] = "1"
+                environment()["PROOT_LOADER"] = runtime.prootLoader.absolutePath
+                environment()["TERM"] = "xterm-256color"
+                environment()["LANG"] = "C.UTF-8"
+                redirectErrorStream(true)
             }.start()
         } catch (error: Exception) {
-            return CommandResult(null, "", error = error.message ?: "Unable to start embedded runtime command.")
+            return CommandResult(null, "", error = error.message ?: "Unable to start Ubuntu PRoot command.")
         }
 
         val output = StringBuilder()
@@ -174,8 +195,6 @@ internal class EmbeddedCppBuildRunner(context: Context) {
 
     private fun failure(path: String, message: String) =
         Result(path, "", null, null, "", "", error = message)
-
-    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 
     private companion object {
         const val MAX_OUTPUT_CHARS = 256 * 1024
