@@ -1045,11 +1045,18 @@ public final class TerminalView extends View {
     }
 
     public int getCursorX(float x) {
-        return (int) (x / mRenderer.mFontWidth);
+        // Floor instead of truncating towards zero so touches just outside the
+        // left edge remain outside the first terminal cell.
+        return (int) Math.floor(x / mRenderer.mFontWidth);
     }
 
     public int getCursorY(float y) {
-        return (int) (((y - 40) / mRenderer.mFontLineSpacing) + mTopRow);
+        // Keep hit-testing in sync with TerminalRenderer's first-row baseline.
+        // A fixed 40px offset breaks selection as soon as font size or display
+        // density changes.
+        return (int) Math.floor(
+            ((y - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing) + mTopRow
+        );
     }
 
     public int getPointX(int cx) {
