@@ -49,12 +49,15 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
                     "echo '=== dpkg consistency ==='; /usr/bin/dpkg --audit; " +
                     "echo '=== apt package database ==='; /usr/bin/apt-get check; " +
                     "echo '=== PRoot hard-link compatibility ==='; " +
-                    "probe_file=\$(mktemp /tmp/cppide-link-test.XXXXXX); " +
-                    "probe_link=\${probe_file}.link; " +
-                    "trap 'unlink \"\$probe_link\" 2>/dev/null || true; unlink \"\$probe_file\" 2>/dev/null || true' EXIT; " +
-                    "printf x > \"\$probe_file\"; " +
-                    "ln \"\$probe_file\" \"\$probe_link\"; " +
-                    "test -L \"\$probe_link\"; " +
+                    // Use /root rather than /tmp: minimal rootfs archives can have
+                    // a non-standard /tmp mode, which is unrelated to PRoot link support.
+                    "probe_file=/root/.cppide-link-test.\\$\\$; " +
+                    "probe_link=\\${probe_file}.link; " +
+                    "printf x > \"\\$probe_file\" || { echo 'link-test: cannot create probe file in /root'; exit 31; }; " +
+                    "if ! ln \"\\$probe_file\" \"\\$probe_link\"; then echo 'link-test: ln could not create a link (PRoot --link2symlink)'; exit 32; fi; " +
+                    "if ! test -e \"\\$probe_link\"; then echo 'link-test: created link is not accessible'; exit 33; fi; " +
+                    "if [ \"\\$(cat \"\\$probe_link\")\" != x ]; then echo 'link-test: linked file content does not match'; exit 34; fi; " +
+                    "unlink \"\\$probe_link\" 2>/dev/null || true; unlink \"\\$probe_file\" 2>/dev/null || true; " +
                     "printf 'link2symlink=ok\\n'; " +
                     "printf 'CPPIDE_UBUNTU_RUNTIME_OK\\n'"
             ).directory(paths.ubuntuRoot).apply {
