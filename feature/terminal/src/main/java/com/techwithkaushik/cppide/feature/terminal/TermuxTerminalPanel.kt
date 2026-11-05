@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.produceState
@@ -44,6 +45,7 @@ import com.techwithkaushik.cppide.integration.termuxruntime.BootstrapSmokeTest
 import com.techwithkaushik.cppide.integration.termuxruntime.EmbeddedTermuxRuntime
 import com.techwithkaushik.cppide.integration.termuxruntime.RuntimeLayout
 import com.techwithkaushik.cppide.integration.termuxruntime.AndroidRuntimeLauncher
+import com.termux.terminal.KeyHandler
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
@@ -266,13 +268,19 @@ fun TermuxTerminalPanel(
                 }) { Text("New terminal") }
             }
         } else {
+            val terminalViewRef = remember(activeTab.id) { mutableStateOf<TerminalView?>(null) }
             DisposableEffect(activeTab.id, activeTab.client) {
                 onDispose {
                     // Detach only. Do NOT finish the process when the panel is
                     // hidden or the user switches to Editor/another panel.
                     activeTab.client.attach(null)
+                    terminalViewRef.value = null
                 }
             }
+            TerminalExtraKeys(
+                client = activeTab.client,
+                terminalView = terminalViewRef.value
+            )
             AndroidView(
                 modifier = Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0D1117)),
                 factory = { viewContext ->
@@ -283,6 +291,7 @@ fun TermuxTerminalPanel(
                         setTerminalViewClient(terminalViewClient)
                         terminalViewClient.attachView(this)
                         activeTab.client.attach(this)
+                        terminalViewRef.value = this
                         attachSession(activeTab.session)
                         isFocusable = true
                         isFocusableInTouchMode = true
@@ -300,6 +309,7 @@ fun TermuxTerminalPanel(
                 },
                 update = { view ->
                     activeTab.client.attach(view)
+                    terminalViewRef.value = view
                     if (view.mTermSession !== activeTab.session) view.attachSession(activeTab.session)
                     view.setTextSize(terminalFontSizePx)
                 }
@@ -308,6 +318,56 @@ fun TermuxTerminalPanel(
     }
 }
 
+
+
+@Composable
+private fun TerminalExtraKeys(
+    client: IdeTermuxSessionClient,
+    terminalView: TerminalView?
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        TerminalExtraKey("CTRL", client.readControlKey()) { client.toggleControl() }
+        TerminalExtraKey("ALT", client.readAltKey()) { client.toggleAlt() }
+        TerminalExtraKey("SHIFT", client.readShiftKey()) { client.toggleShift() }
+        TerminalExtraKey("FN", client.readFnKey()) { client.toggleFn() }
+        TerminalExtraKey("ESC") { terminalView?.mTermSession?.write("\u001b") }
+        TerminalExtraKey("TAB") { terminalView?.mTermSession?.write("\t") }
+        TerminalExtraKey("↑") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_UP, client.keyModifiers()) }
+        TerminalExtraKey("↓") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_DOWN, client.keyModifiers()) }
+        TerminalExtraKey("←") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_LEFT, client.keyModifiers()) }
+        TerminalExtraKey("→") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_DPAD_RIGHT, client.keyModifiers()) }
+        TerminalExtraKey("HOME") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_MOVE_HOME, client.keyModifiers()) }
+        TerminalExtraKey("END") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_MOVE_END, client.keyModifiers()) }
+        TerminalExtraKey("PGUP") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_PAGE_UP, client.keyModifiers()) }
+        TerminalExtraKey("PGDN") { terminalView?.handleKeyCode(KeyEvent.KEYCODE_PAGE_DOWN, client.keyModifiers()) }
+    }
+}
+
+@Composable
+private fun TerminalExtraKey(
+    label: String,
+    selected: Boolean = false,
+    onClick: () -> Unit
+) {
+    Text(
+        text = label,
+        color = if (selected) Color(0xFF071426) else Color(0xFFCFD9E6),
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .background(
+                if (selected) Color(0xFF83B7FF) else Color(0xFF202B38),
+                RoundedCornerShape(6.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
+    )
+}
 
 /**
  * Caches only a successfully verified prefix for the lifetime of this process.
@@ -436,6 +496,23 @@ private class IdeTermuxSessionClient(
     private val context: Context
 ) : TerminalSessionClient {
     @Volatile private var terminalView: TerminalView? = null
+    @Volatile private var controlPressed = false
+    @Volatile private var altPressed = false
+    @Volatile private var shiftPressed = false
+    @Volatile private var fnPressed = false
+
+    fun toggleControl() { controlPressed = !controlPressed }
+    fun toggleAlt() { altPressed = !altPressed }
+    fun toggleShift() { shiftPressed = !shiftPressed }
+    fun toggleFn() { fnPressed = !fnPressed }
+
+    fun keyModifiers(): Int {
+        var modifiers = 0
+        if (controlPressed) modifiers = modifiers or KeyHandler.KEYMOD_CTRL
+        if (altPressed) modifiers = modifiers or KeyHandler.KEYMOD_ALT
+        if (shiftPressed) modifiers = modifiers or KeyHandler.KEYMOD_SHIFT
+        return modifiers
+    }
 
     fun attach(view: TerminalView?) {
         val previous = terminalView
@@ -539,10 +616,10 @@ private class IdeTermuxViewClient(
     override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean = false
     override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean = false
     override fun onLongPress(event: MotionEvent): Boolean = false
-    override fun readControlKey(): Boolean = false
-    override fun readAltKey(): Boolean = false
-    override fun readShiftKey(): Boolean = false
-    override fun readFnKey(): Boolean = false
+    override fun readControlKey(): Boolean = controlPressed
+    override fun readAltKey(): Boolean = altPressed
+    override fun readShiftKey(): Boolean = shiftPressed
+    override fun readFnKey(): Boolean = fnPressed
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
     override fun onEmulatorSet() {
         terminalView?.let { view ->
