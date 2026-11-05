@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide
 
 import com.techwithkaushik.cppide.feature.terminal.TermuxLinuxTerminalPanel
+import com.techwithkaushik.cppide.feature.terminal.IdeMasterShellUi
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
@@ -1454,8 +1455,27 @@ private fun WorkspaceScreen(
     onPanel: (ToolPanel) -> Unit,
     onOpenSettings: () -> Unit
 ) {
-    Box(Modifier.fillMaxSize()) {
-    Scaffold(
+    IdeMasterShellUi(
+        modifier = Modifier.fillMaxSize(),
+        bottomPanelVisible = showToolPanel,
+        onCloseBottomPanel = onCloseToolPanel,
+        sidebarContent = {
+            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("OPEN EDITORS", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                openFiles.forEach { file ->
+                    Text(
+                        file,
+                        Modifier.fillMaxWidth().clickable { onSelectFile(file) }.padding(vertical = 5.dp, horizontal = 4.dp),
+                        color = if (file == activeFile) IdeAccent else IdeMuted,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        },
+        workspaceContent = {
+                Scaffold(
         containerColor = IdeBackground,
         topBar = {
             TopAppBar(
@@ -1578,49 +1598,19 @@ private fun WorkspaceScreen(
             }
         }
     }
-    if (showToolPanel) {
-        var sheetFraction by rememberSaveable { mutableStateOf(0.72f) }
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val density = LocalDensity.current
-            val maxHeightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
-            val minFraction = (with(density) { 280.dp.toPx() } / maxHeightPx).coerceAtMost(0.95f)
-            Box(
-                Modifier.fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.42f))
-                    .clickable(onClick = onCloseToolPanel)
+        },
+        terminalDock = {
+            ToolPanelContent(
+                selected = selectedPanel,
+                projectName = projectName,
+                activeFile = activeFile,
+                code = code,
+                onSelect = onPanel,
+                onClose = onCloseToolPanel,
+                onOpenSettings = onOpenSettings
             )
-            Column(
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .fillMaxHeight(if (selectedPanel == ToolPanel.Terminal) 1f else sheetFraction.coerceIn(minFraction, 1f))
-                    .background(Color(0xFF10151C), RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-            ) {
-                Box(
-                    Modifier.fillMaxWidth().height(28.dp).pointerInput(maxHeightPx) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { change, dragAmount ->
-                                change.consume()
-                                sheetFraction = (sheetFraction - dragAmount / maxHeightPx).coerceIn(minFraction, 1f)
-                            }
-                        )
-                    },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(Modifier.width(36.dp).height(4.dp).background(Color(0xFF718096), RoundedCornerShape(2.dp)))
-                }
-                ToolPanelContent(
-                    selected = selectedPanel,
-                    projectName = projectName,
-                    activeFile = activeFile,
-                    code = code,
-                    onSelect = onPanel,
-                    onClose = onCloseToolPanel,
-                    onOpenSettings = onOpenSettings
-                )
-            }
         }
-    }
-    }
+    )
 }
 
 @Composable
