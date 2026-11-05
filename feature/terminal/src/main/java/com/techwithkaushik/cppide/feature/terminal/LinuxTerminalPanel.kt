@@ -444,20 +444,27 @@ fun LinuxTerminalPanel(
             // Change the actual glyph/cell layout size. A graphics-only scale leaves
             // the text layout and horizontal scroll extent at the old width.
             val displayFontSize = (terminalFontSize * terminalVisualScale).coerceIn(7f, 56f)
+            // Visual cell width follows pinch zoom for cursor placement and scrolling.
             val cursorCellWidth = terminalTextMeasurer.measure(
                 AnnotatedString("M"),
                 style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = displayFontSize.sp)
             ).size.width.toFloat().coerceAtLeast(1f)
+            // PTY geometry is deliberately independent from pinch zoom. Only the
+            // unscaled configured font and actual viewport dimensions determine rows/columns.
+            val ptyCellWidth = terminalTextMeasurer.measure(
+                AnnotatedString("M"),
+                style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = terminalFontSize.sp)
+            ).size.width.toFloat().coerceAtLeast(1f)
             var terminalViewportSize by remember(active.id) { mutableStateOf(IntSize.Zero) }
             val density = androidx.compose.ui.platform.LocalDensity.current
-            LaunchedEffect(active.id, terminalViewportSize, displayFontSize) {
+            LaunchedEffect(active.id, terminalViewportSize, terminalFontSize) {
                 if (terminalViewportSize.width <= 0 || terminalViewportSize.height <= 0) return@LaunchedEffect
                 // BottomSheet drag/expand changes the actual PTY grid. Debounce the
                 // stream of intermediate pixel sizes so the shell is not resized
                 // dozens of times during one gesture.
                 delay(90)
-                val lineHeightPx = with(density) { (displayFontSize * 1.28f).sp.toPx() }
-                val columns = (terminalViewportSize.width / cursorCellWidth).toInt().coerceIn(20, 300)
+                val lineHeightPx = with(density) { (terminalFontSize * 1.28f).sp.toPx() }
+                val columns = (terminalViewportSize.width / ptyCellWidth).toInt().coerceIn(20, 300)
                 val rows = (terminalViewportSize.height / lineHeightPx.coerceAtLeast(1f)).toInt().coerceIn(5, 120)
                 if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
                     active.screen.resize(columns, rows)
