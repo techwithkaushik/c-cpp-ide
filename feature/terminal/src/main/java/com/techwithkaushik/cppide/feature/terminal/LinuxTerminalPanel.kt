@@ -204,11 +204,12 @@ fun LinuxTerminalPanel(
 
     DisposableEffect(terminalPreferences) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-            when (key) {
-                IdeDesignTokens.Preference.TERMINAL_FONT_SIZE -> terminalFontSize = prefs?.getInt(key, 13)?.coerceIn(10, 28) ?: 13
-                "terminal_scrollback_lines" -> scrollbackLines = prefs?.getInt(key, 5_000)?.coerceIn(1_000, 10_000) ?: 5_000
-                IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD -> autoShowKeyboard = prefs?.getBoolean(key, true) ?: true
-                IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK -> cursorBlink = prefs?.getBoolean(key, true) ?: true
+            val changedKey = key ?: return@OnSharedPreferenceChangeListener
+            when (changedKey) {
+                IdeDesignTokens.Preference.TERMINAL_FONT_SIZE -> terminalFontSize = prefs?.getInt(changedKey, 13)?.coerceIn(10, 28) ?: 13
+                "terminal_scrollback_lines" -> scrollbackLines = prefs?.getInt(changedKey, 5_000)?.coerceIn(1_000, 10_000) ?: 5_000
+                IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD -> autoShowKeyboard = prefs?.getBoolean(changedKey, true) ?: true
+                IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK -> cursorBlink = prefs?.getBoolean(changedKey, true) ?: true
             }
         }
         terminalPreferences.registerOnSharedPreferenceChangeListener(listener)
