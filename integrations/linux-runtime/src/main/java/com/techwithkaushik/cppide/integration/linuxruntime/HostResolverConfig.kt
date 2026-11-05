@@ -11,6 +11,17 @@ internal object HostResolverConfig {
     private val ipv4Pattern = Regex("""(?:[0-9]{1,3}\.){3}[0-9]{1,3}""")
     private val ipv6Pattern = Regex("""[0-9a-fA-F:]+""")
 
+    internal fun parseDnsServers(propertyDump: String): List<String> {
+        val servers = linkedSetOf<String>()
+        propertyPattern.findAll(propertyDump).forEach { match ->
+            val value = match.groupValues[1].trim()
+            val valid = (ipv4Pattern.matches(value) || ipv6Pattern.matches(value) && value.contains(':')) &&
+                value.split('.').filter { it.isNotEmpty() }.all { it.toIntOrNull() in 0..255 }
+            if (valid) servers += value
+        }
+        return servers.toList()
+    }
+
     fun prepare(hostTemp: File): File {
         if (!hostTemp.exists() && !hostTemp.mkdirs()) {
             throw IllegalStateException("Cannot create host temporary directory for DNS configuration.")
@@ -25,13 +36,7 @@ internal object HostResolverConfig {
                 .inputStream.bufferedReader().use { it.readText() }
         }.getOrDefault("")
 
-        val servers = linkedSetOf<String>()
-        propertyPattern.findAll(propertyDump).forEach { match ->
-            val value = match.groupValues[1].trim()
-            val valid = (ipv4Pattern.matches(value) || ipv6Pattern.matches(value) && value.contains(':')) &&
-                value.split('.').filter { it.isNotEmpty() }.all { it.toIntOrNull() in 0..255 }
-            if (valid) servers += value
-        }
+        val servers = parseDnsServers(propertyDump).toCollection(linkedSetOf())
 
         // Android's DNS properties may be empty on some vendor ROMs. Public
         // resolvers are only a fallback; prefer the device's network DNS above.
