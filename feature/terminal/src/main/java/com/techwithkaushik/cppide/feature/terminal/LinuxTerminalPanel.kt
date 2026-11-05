@@ -121,9 +121,9 @@ private data class LinuxTerminalTab(
 
 private object LinuxTerminalSessions {
     // PTY readers can produce hundreds of small chunks per second (apt/dpkg is
-    // particularly chatty). Coalesce them before touching Compose state or
-    // rebuilding the annotated scrollback. All screen/state mutations remain
-    // confined to the main thread.
+    // particularly chatty). Coalesce them before rebuilding the annotated
+    // scrollback. TerminalScreen mutations run on renderExecutor; Compose state
+    // mutations are posted back to the main looper.
     private val outputHandler = Handler(Looper.getMainLooper())
     // Keep PTY coalescing timers off the main looper. If Compose is busy laying
     // out a large terminal snapshot, incoming output must still be drained.
@@ -209,8 +209,12 @@ private object LinuxTerminalSessions {
     }
 
     fun markExited(tab: LinuxTerminalTab, code: Int, message: String) {
-        if (!tabs.any { it.id == tab.id } || !tab.ended.compareAndSet(false, true)) return
-        tab.exited.value = code
+        // PTY reader callbacks are background-thread callbacks. Never inspect
+        // Compose's snapshot-backed tab list or mutate tab state from here.
+        if (!activeTabIds.contains(tab.id) || !tab.ended.compareAndSet(false, true)) return
+        outputHandler.post {
+            if (activeTabIds.contains(tab.id)) tab.exited.value = code
+        }
         append(tab, message)
     }
 
