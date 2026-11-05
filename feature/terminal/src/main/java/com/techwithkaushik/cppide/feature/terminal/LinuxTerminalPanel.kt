@@ -402,6 +402,7 @@ fun LinuxTerminalPanel(
             busy = false
             result.onSuccess { session ->
                 val title = "SSH ${sshHost.username}@${sshHost.host}"
+                DeveloperLog.info(context, "SSH", "Connected to configured SSH endpoint")
                 val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, resize = session::resize, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> LinuxTerminalSessions.append(tab, chunk) },
@@ -419,7 +420,10 @@ fun LinuxTerminalPanel(
                 if (e is HostKeyConfirmationRequired) {
                     fingerprintConfirmation = e.fingerprint
                     expectedFingerprint = e.fingerprint
-                } else error = terminalUserMessage(e.message, "Could not connect to the SSH server.")
+                } else {
+                    DeveloperLog.warn(context, "SSH", "SSH connection failed", e)
+                    error = terminalUserMessage(e.message, "Could not connect to the SSH server.")
+                }
             }
         }
     }
@@ -471,6 +475,7 @@ fun LinuxTerminalPanel(
             }
             busy = false
             result.onSuccess { session ->
+                DeveloperLog.info(context, "Ubuntu", "Local Ubuntu terminal session started")
                 val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, resize = session::resize, initialOutput = "", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
                     onChunk = { chunk -> LinuxTerminalSessions.append(tab, chunk) },
@@ -479,6 +484,7 @@ fun LinuxTerminalPanel(
                     } }
                 )
             }.onFailure { failure ->
+                DeveloperLog.error(context, "Ubuntu", "Local Ubuntu terminal session failed to start", failure)
                 error = terminalUserMessage(failure.message, "Ubuntu could not start. Please check the Ubuntu setup and try again.")
             }
         }
