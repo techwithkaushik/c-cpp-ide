@@ -4,6 +4,7 @@ import java.io.File
 import java.io.IOException
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
@@ -117,6 +118,37 @@ class RootfsInstallerTest {
         assertEquals(first, group.readText())
     }
 
+
+    @Test fun preservesWorldWritableTmpPermissionsForAptSandbox() {
+        val files = temporaryFolder.newFolder("tmp-permissions")
+        val archive = File(temporaryFolder.root, "tmp-permissions.tar.gz")
+        GzipCompressorOutputStream(FileOutputStream(archive)).use { gzip ->
+            TarArchiveOutputStream(gzip).use { tar ->
+                val tmp = TarArchiveEntry("tmp/", TarArchiveEntry.LF_DIR).apply { mode = 0x1ff }
+                tar.putArchiveEntry(tmp)
+                tar.closeArchiveEntry()
+                val osRelease = "NAME=Ubuntu\nID=ubuntu\n".toByteArray()
+                val release = TarArchiveEntry("etc/os-release").apply { size = osRelease.size.toLong() }
+                tar.putArchiveEntry(release)
+                tar.write(osRelease)
+                tar.closeArchiveEntry()
+                val shell = "shell".toByteArray()
+                val bin = TarArchiveEntry("bin/", TarArchiveEntry.LF_DIR).apply { mode = 0x1ed }
+                tar.putArchiveEntry(bin)
+                tar.closeArchiveEntry()
+                val sh = TarArchiveEntry("bin/sh").apply { size = shell.size.toLong(); mode = 0x1ed }
+                tar.putArchiveEntry(sh)
+                tar.write(shell)
+                tar.closeArchiveEntry()
+            }
+        }
+
+        RootfsInstaller(LinuxRuntimePaths(files)).install(archive)
+
+        val permissions = Files.getPosixFilePermissions(File(files, "rootfs/tmp").toPath())
+        assertTrue("apt sandbox needs /tmp to be writable by other users", permissions.contains(PosixFilePermission.OTHERS_WRITE))
+        assertTrue("apt sandbox needs /tmp to be searchable by other users", permissions.contains(PosixFilePermission.OTHERS_EXECUTE))
+    }
 
     @Test fun acceptsCompatibleRootfsCreatedByEarlierInstallerVersion() {
         val files = temporaryFolder.newFolder("legacy-runtime")
