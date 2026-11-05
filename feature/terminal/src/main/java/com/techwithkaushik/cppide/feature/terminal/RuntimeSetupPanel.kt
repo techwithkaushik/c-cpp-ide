@@ -1,11 +1,6 @@
 package com.techwithkaushik.cppide.feature.terminal
 
-import com.techwithkaushik.cppide.core.logging.DeveloperLog
-
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.net.Uri
-import android.widget.Toast
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,11 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,88 +29,121 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
-import com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader
+import com.techwithkaushik.cppide.integration.linuxruntime.RootfsArchitectureInspector
 import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
+import com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.IOException
 
 @Composable
-fun RuntimeSetupPanel(
-    onRuntimeReady: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun RuntimeSetupPanel(onRuntimeReady: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
     val paths = remember(context) { LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir) }
     val scope = rememberCoroutineScope()
-    var rootfsUri by remember { mutableStateOf<Uri?>(null) }
-    var rootfsSha by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Checking Ubuntu runtime…") }
+    var status by remember { mutableStateOf("Choose an Ubuntu installation method.") }
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedName by remember { mutableStateOf("") }
+    var report by remember { mutableStateOf<RootfsArchitectureInspector.Report?>(null) }
+    var showOverride by remember { mutableStateOf(false) }
 
     fun displayName(uri: Uri): String = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
-    }.getOrNull() ?: (uri.lastPathSegment ?: "selected-file")
+    }.getOrNull() ?: (uri.lastPathSegment ?: "ubuntu-rootfs.tar")
 
-    suspend fun copySelected(uri: Uri, label: String): File = withContext(Dispatchers.IO) {
-        val name = displayName(uri).replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val file = File(context.cacheDir, "$label-${System.currentTimeMillis()}-$name")
-        val input = context.contentResolver.openInputStream(uri) ?: throw IOException("Android could not open selected file.")
-        input.use { source ->
-            file.outputStream().buffered().use { target ->
-                val buffer = ByteArray(64 * 1024)
-                var total = 0L
-                while (true) {
-                    val n = source.read(buffer)
-                    if (n < 0) break
-                    total += n
-                    if (total > MAX_IMPORT_BYTES) throw IOException("Selected file exceeds the 4 GiB import limit.")
-                    target.write(buffer, 0, n)
-                }
+    suspend fun validateRuntime() {
+        val validation = withContext(Dispatchers.IO) {
+            runCatching {
+                ProotDownloader(paths).downloadAndInstall()
+                if (!paths.hasRootfs()) throw IOException("Ubuntu rootfs is missing or incomplete.")
+                val smoke = LinuxRuntimeSmokeTest(paths).run()
+                if (!smoke.success) throw IOException(smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." })
             }
         }
-        file
+        validation.fold(
+            onSuccess = { status = "Ubuntu runtime is ready."; onRuntimeReady() },
+            onFailure = { error ->
+                DeveloperLog.error("UbuntuSetup", "Runtime validation failed", error)
+                status = runtimeFailureMessage(error.message, "Ubuntu could not start. Please try again.")
+            }
+        )
     }
 
-    val rootfsPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { rootfsUri = it }
-    LaunchedEffect(context) {
-        status = withContext(Dispatchers.IO) {
-            DeveloperLog.info(context, "UbuntuSetup", "Initial runtime validation started; ${paths.rootfsDiagnostic()}")
-            val prootCheck = runCatching {
-                // Materializes APK native-library links and validates the ELF ABI.
-                ProotDownloader(paths).downloadAndInstall()
-            }
-            when {
-                !paths.hasRootfs() -> {
-                    val diagnostic = paths.rootfsDiagnostic()
-                    DeveloperLog.warn(context, "UbuntuSetup", "Rootfs validation rejected the installed distro; $diagnostic")
-                    "Ubuntu rootfs is not installed or incomplete."
-                }
-                prootCheck.isFailure -> {
-                    DeveloperLog.error(context, "UbuntuSetup", "Bundled PRoot validation failed", prootCheck.exceptionOrNull())
-                    runtimeFailureMessage(prootCheck.exceptionOrNull()?.message, "Ubuntu is installed, but its terminal component could not be prepared.")
-                }
-                else -> {
-                    val smoke = LinuxRuntimeSmokeTest(paths).run()
-                    if (smoke.success) {
-                        DeveloperLog.info(context, "UbuntuSetup", "Initial Ubuntu shell smoke test passed")
-                        "Ubuntu shell smoke test passed."
-                    } else {
-                        DeveloperLog.error(context, "UbuntuSetup", "Initial Ubuntu shell smoke test failed: ${smoke.error ?: smoke.output}")
-                        runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            selectedUri = uri
+            selectedName = displayName(uri)
+            report = null
+            showOverride = false
+            busy = true
+            status = "Inspecting selected rootfs architecture…"
+            scope.launch {
+                try {
+                    val inspected = withContext(Dispatchers.IO) {
+                        RootfsArchitectureInspector.inspect({
+                            context.contentResolver.openInputStream(uri)
+                                ?: throw IOException("Android could not reopen the selected archive.")
+                        }, selectedName)
                     }
-                }
+                    report = inspected
+                    val expected = paths.ubuntuArchitecture.lowercase()
+                    val compatible = (expected in listOf("arm64", "aarch64") && inspected.architecture == "arm64") ||
+                        (expected in listOf("arm", "armhf", "armv7", "armv7l") && inspected.architecture == "armhf")
+                    if (compatible) status = "Architecture verified (${inspected.architecture}). Ready to install."
+                    else { status = "Architecture mismatch: app=$expected, archive=${inspected.architecture}."; showOverride = true }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    DeveloperLog.error("UbuntuSetup", "Rootfs architecture inspection failed", error)
+                    selectedUri = null
+                    selectedName = ""
+                    status = runtimeFailureMessage(error.message, "Could not inspect this archive.")
+                } finally { busy = false }
             }
         }
+    }
+
+    fun installLocal(allowMismatch: Boolean) {
+        val uri = selectedUri ?: return
+        val inspected = report ?: return
+        val expected = paths.ubuntuArchitecture.lowercase()
+        val compatible = (expected in listOf("arm64", "aarch64") && inspected.architecture == "arm64") ||
+            (expected in listOf("arm", "armhf", "armv7", "armv7l") && inspected.architecture == "armhf")
+        if (!compatible && !allowMismatch) { showOverride = true; return }
+        showOverride = false
+        busy = true
+        status = "Installing local Ubuntu rootfs…"
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    RootfsInstaller(paths).install({
+                        context.contentResolver.openInputStream(uri)
+                            ?: throw IOException("Android could not reopen the selected archive.")
+                    }, selectedName)
+                }
+                validateRuntime()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                DeveloperLog.error("UbuntuSetup", "Local rootfs installation failed", error)
+                status = runtimeFailureMessage(error.message, "Ubuntu rootfs installation failed.")
+            } finally { busy = false }
+        }
+    }
+
+    LaunchedEffect(context) {
+        val present = withContext(Dispatchers.IO) { paths.hasRootfs() }
+        status = if (present) "Ubuntu rootfs found. Validating shell…" else "Ubuntu rootfs is not installed."
+        if (present) validateRuntime()
     }
 
     Column(
@@ -124,176 +153,56 @@ fun RuntimeSetupPanel(
         Text("Ubuntu Linux runtime", color = Color(0xFF8CC8FF), fontSize = 18.sp)
         Button(enabled = !busy, onClick = {
             busy = true
-            status = "Downloading Ubuntu system files…"
+            status = "Downloading Ubuntu Base 24.04.5…"
             scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    try {
-                        DeveloperLog.info(context, "UbuntuSetup", "Starting Ubuntu Base download")
-                        val installed = UbuntuBaseDownloader(paths).downloadAndInstall()
-                        DeveloperLog.info(context, "UbuntuSetup", "Ubuntu Base installed successfully")
-                        "Ubuntu system files have been installed. The terminal component is the next step."
-                    } catch (e: Exception) {
-                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu Base download failed", e)
-                        runtimeFailureMessage(e.message, "Ubuntu could not be downloaded. Please check your internet connection and try again.")
-                    }
-                }
-                status = result
-                busy = false
-                if (paths.ready()) {
-                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
-                    if (smoke.success) {
-                        status = "Ubuntu shell smoke test passed."
-                        onRuntimeReady()
-                    } else {
-                        DeveloperLog.error(context, "UbuntuSetup", "Downloaded Ubuntu Base failed shell smoke test: ${smoke.error ?: smoke.output}")
-                        status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
-                    }
-                }
+                try {
+                    withContext(Dispatchers.IO) { UbuntuBaseDownloader(paths).downloadAndInstall() }
+                    validateRuntime()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    DeveloperLog.error("UbuntuSetup", "Online Ubuntu download/install failed", error)
+                    status = runtimeFailureMessage(error.message, "Ubuntu download failed. Check your connection and try again.")
+                } finally { busy = false }
             }
-        }) { Text("Download official Ubuntu Base 24.04.5") }
-        Button(enabled = !busy, onClick = {
-            busy = true
-            status = "Checking terminal component…"
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    try {
-                        DeveloperLog.info(context, "UbuntuSetup", "Validating bundled terminal runtime")
-                        val installed = ProotDownloader(paths).downloadAndInstall()
-                        "The terminal component is ready."
-                    } catch (e: Exception) {
-                        DeveloperLog.error(context, "UbuntuSetup", "Bundled terminal runtime validation failed", e)
-                        runtimeFailureMessage(e.message, "The terminal component could not be prepared. Please update or reinstall the app.")
-                    }
-                }
-                status = result
-                busy = false
-                if (paths.ready()) {
-                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
-                    if (smoke.success) {
-                        status = "Ubuntu shell smoke test passed."
-                        onRuntimeReady()
-                    } else {
-                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu shell smoke test failed after PRoot validation: ${smoke.error ?: smoke.output}")
-                        status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
-                    }
-                }
-            }
-        }) { Text("Check terminal component") }
-        Button(enabled = !busy, onClick = { rootfsPicker.launch(arrayOf("application/gzip", "application/x-xz", "application/x-tar", "application/octet-stream", "*/*")) }) {
-            Text(if (rootfsUri == null) "1 · Select Ubuntu rootfs archive" else "Change Ubuntu rootfs")
-        }
-        Text(rootfsUri?.let(::displayName) ?: "No Ubuntu rootfs selected", color = Color(0xFF9AA7B5), fontSize = 11.sp)
-        OutlinedTextField(
-            value = rootfsSha,
-            onValueChange = { rootfsSha = it.trim() },
-            label = { Text("Rootfs SHA-256 (optional for local import)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Button(enabled = !busy && rootfsUri != null, onClick = {
-            val uri = rootfsUri ?: return@Button
-            busy = true
-            status = "Validating and installing Ubuntu rootfs…"
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    var staged: File? = null
-                    try {
-                        staged = copySelected(uri, "ubuntu-rootfs")
-                        val name = displayName(uri).lowercase()
-                        val namedArchive = File(staged.parentFile, "rootfs-" + when {
-                            name.endsWith(".tar.xz") -> "import.tar.xz"
-                            name.endsWith(".tar.gz") || name.endsWith(".tgz") -> "import.tar.gz"
-                            else -> "import.tar"
-                        })
-                        staged.copyTo(namedArchive, overwrite = true)
-                        DeveloperLog.info(context, "UbuntuSetup", "Installing selected Ubuntu root filesystem archive: name=${namedArchive.name}, bytes=${namedArchive.length()}")
-                        val installResult = RootfsInstaller(paths).install(namedArchive, rootfsSha.ifBlank { null })
-                        DeveloperLog.info(context, "UbuntuSetup", "Rootfs extraction completed: entries=${installResult.entries}, expandedBytes=${installResult.expandedBytes}; ${paths.rootfsDiagnostic()}")
-                        namedArchive.delete()
-                        if (paths.hasProot()) {
-                            val smoke = LinuxRuntimeSmokeTest(paths).run()
-                            if (!smoke.success) {
-                                DeveloperLog.error(context, "UbuntuSetup", "Installed rootfs failed shell smoke test: ${smoke.error ?: smoke.output}")
-                                throw IOException("Ubuntu shell smoke test failed.")
-                            }
-                            DeveloperLog.info(context, "UbuntuSetup", "Imported Ubuntu rootfs passed shell smoke test")
-                            "Ubuntu rootfs installed and shell smoke test passed."
-                        } else {
-                            "Ubuntu system files are installed. Set up the terminal component to start Ubuntu."
-                        }
-                    } catch (e: Exception) {
-                        DeveloperLog.error(context, "UbuntuSetup", "Ubuntu root filesystem installation failed; ${paths.rootfsDiagnostic()}", e)
-                        runtimeFailureMessage(e.message, "Ubuntu could not be installed. Please check the archive and available storage.")
-                    } finally { staged?.delete() }
-                }
-                status = result
-                busy = false
-                if (paths.ready()) {
-                    val smoke = withContext(Dispatchers.IO) { LinuxRuntimeSmokeTest(paths).run() }
-                    if (smoke.success) {
-                        status = "Ubuntu shell smoke test passed."
-                        onRuntimeReady()
-                    } else {
-                        DeveloperLog.error(context, "UbuntuSetup", "Post-install Ubuntu shell smoke test failed: ${smoke.error ?: smoke.output}")
-                        status = runtimeFailureMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
-                    }
-                }
-            }
-        }) { Text("Install Ubuntu rootfs") }
+        }) { Text("Download Online") }
 
-        if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                status,
-                color = if (paths.ready()) Color(0xFF7DDBB0) else Color(0xFF9AA7B5),
-                fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
-            )
-            OutlinedButton(onClick = {
-                val clipboard = context.getSystemService(ClipboardManager::class.java)
-                clipboard?.setPrimaryClip(ClipData.newPlainText("CPPIDE status", status))
-                Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
-            }) {
-                Text("Copy message", fontSize = 11.sp)
-            }
+        OutlinedButton(enabled = !busy, onClick = {
+            picker.launch(arrayOf("application/x-tar", "application/gzip", "application/x-xz", "application/octet-stream", "*/*"))
+        }) { Text("Select Local File") }
+
+        if (selectedName.isNotBlank()) Text("Selected: $selectedName", color = Color(0xFF9AA7B5), fontSize = 12.sp)
+        report?.let { inspected ->
+            Text("Detected: ${inspected.architecture} · ARM64 ${inspected.arm64Executables} · ARMHF ${inspected.armhfExecutables} · Other ${inspected.otherExecutables}",
+                color = Color(0xFF9AA7B5), fontSize = 12.sp)
+            Button(enabled = !busy && !showOverride, onClick = { installLocal(false) }) { Text("Install Local Rootfs") }
         }
+        if (busy) CircularProgressIndicator(color = Color(0xFF8CC8FF))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(status, color = Color(0xFF9AA7B5), fontSize = 12.sp, modifier = Modifier.weight(1f))
+        }
+    }
+
+    if (showOverride && report != null) {
+        val inspected = report!!
+        AlertDialog(
+            onDismissRequest = { showOverride = false },
+            title = { Text("Architecture mismatch") },
+            text = { Text("The app expects ${paths.ubuntuArchitecture}, but this archive contains ${inspected.architecture} executables. Installing it may prevent Ubuntu from starting. Continue anyway?") },
+            confirmButton = { TextButton(onClick = { installLocal(true) }) { Text("Install anyway") } },
+            dismissButton = { TextButton(onClick = { showOverride = false }) { Text("Cancel") } }
+        )
     }
 }
 
-private const val MAX_IMPORT_BYTES = 4L * 1024 * 1024 * 1024
-
-
-/** Converts low-level runtime diagnostics into clear actions for the app user. */
 private fun runtimeFailureMessage(details: String?, fallback: String): String {
     val message = details.orEmpty().lowercase()
     return when {
-        message.contains("sha-256 value") || message.contains("invalid sha") ->
-            "The SHA-256 value is invalid. Enter a 64-character checksum or leave it empty."
-        message.contains("checksum") || message.contains("sha-256") || message.contains("digest") ->
-            "The Ubuntu download could not be verified. Please download it again."
-        message.contains("no space") || message.contains("enospc") || message.contains("not enough space") ->
-            "There is not enough free storage. Free up some space and try again."
-        message.contains("unknownhost") || message.contains("unable to resolve") ||
-            message.contains("connection") || message.contains("timed out") || message.contains("http 4") ||
-            message.contains("http 5") ->
-            "Could not connect to the download server. Check your internet connection and try again."
-        message.contains("unsupported archive") || message.contains("invalid archive") ||
-            message.contains("truncated archive") || message.contains("archive exceeds") ->
-            "This Ubuntu archive is damaged or unsupported. Select a valid .tar, .tar.gz, or .tar.xz archive."
-        message.contains("rootfs") && (message.contains("missing") || message.contains("incomplete")) ->
-            "Ubuntu files are missing or incomplete. Install the Ubuntu environment again."
-        message.contains("proot") && (message.contains("permission denied") || message.contains("eacces") ||
-            message.contains("missing") || message.contains("loader")) ->
-            "The terminal component could not start. Please update or reinstall the app."
-        message.contains("timed out") || message.contains("timeout") ->
-            "Ubuntu is taking too long to start. Please try again."
-        message.contains("apt-get check") || message.contains("dpkg") ->
-            "Ubuntu's package database needs repair. Open the terminal and run: sudo apt --fix-broken install"
-        message.contains("permission denied") || message.contains("eacces") ->
-            "Ubuntu could not access a required file. Reinstall the Ubuntu environment and try again."
+        "no space" in message || "enospc" in message -> "Not enough storage. Free space and try again."
+        "unknownhost" in message || "connection" in message || "timed out" in message -> "Download connection failed. Check your internet connection."
+        "checksum" in message || "sha-256" in message -> "Archive verification failed. Download or select the archive again."
+        "unsupported archive" in message || "invalid archive" in message -> "Unsupported archive. Select a .tar, .tar.gz, or .tar.xz file."
+        "permission denied" in message || "eacces" in message -> "Ubuntu could not access a required file. Reinstall the runtime."
         else -> fallback
     }
 }
