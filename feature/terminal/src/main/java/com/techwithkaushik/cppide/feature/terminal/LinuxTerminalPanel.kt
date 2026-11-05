@@ -383,7 +383,7 @@ fun LinuxTerminalPanel(
         val sshHost = try {
             SshHost(host.trim(), port.toIntOrNull() ?: 22, username.trim(), password = password.ifBlank { null }, privateKey = privateKeyBytes, privateKeyPassphrase = privateKeyPassphrase.ifBlank { null }, expectedSha256Fingerprint = expected ?: sshHostKeyPrefs.getString("${host.trim()}:${port.toIntOrNull() ?: 22}", null))
         } catch (e: Exception) {
-            error = e.message ?: "Invalid SSH settings."
+            error = terminalUserMessage(e.message, "Please check your SSH connection settings.")
             return
         }
         // Persist only non-secret connection coordinates; passwords and private keys stay in memory.
@@ -419,7 +419,7 @@ fun LinuxTerminalPanel(
                 if (e is HostKeyConfirmationRequired) {
                     fingerprintConfirmation = e.fingerprint
                     expectedFingerprint = e.fingerprint
-                } else error = e.message ?: e.javaClass.simpleName
+                } else error = terminalUserMessage(e.message, "Could not connect to the SSH server.")
             }
         }
     }
@@ -445,7 +445,7 @@ fun LinuxTerminalPanel(
                                 ProotDownloader(paths).downloadAndInstall()
                                 val smoke = LinuxRuntimeSmokeTest(paths).run()
                                 if (!smoke.success) {
-                                    "Ubuntu shell validation failed: ${smoke.error ?: smoke.output}"
+                                    terminalUserMessage(smoke.error ?: smoke.output, "Ubuntu could not start. Please try again.")
                                 } else {
                                     "Ubuntu runtime ready."
                                 }
@@ -479,7 +479,7 @@ fun LinuxTerminalPanel(
                     } }
                 )
             }.onFailure { failure ->
-                error = failure.message ?: "Could not validate or start Ubuntu shell."
+                error = terminalUserMessage(failure.message, "Ubuntu could not start. Please check the Ubuntu setup and try again.")
             }
         }
     }
@@ -772,7 +772,7 @@ fun LinuxTerminalPanel(
                                     } else active.send(added)
                                 }
                             }
-                            } catch (e: Exception) { error = e.message ?: "Terminal input failed." }
+                            } catch (e: Exception) { error = terminalUserMessage(e.message, "Could not send input to the terminal. Please try again.") }
                         }
                         command = updated
                     },
@@ -844,7 +844,7 @@ fun LinuxTerminalPanel(
                         when (key) {
                             "CTRL" -> ctrlMode = !ctrlMode
                             "ALT" -> altMode = !altMode
-                            else -> runCatching { active.send(sequence) }.onFailure { error = it.message ?: "Terminal input failed." }
+                            else -> runCatching { active.send(sequence) }.onFailure { error = terminalUserMessage(it.message, "Could not send input to the terminal. Please try again.") }
                         }
                         terminalInputFocusRequester.requestFocus()
                     }) {
@@ -894,15 +894,15 @@ fun LinuxTerminalPanel(
                         }
                         TextButton(onClick = {
                             runCatching { clipboardManager.setText(active.output.value) }
-                                .onFailure { error = it.message ?: "Could not copy terminal output." }
+                                .onFailure { error = terminalUserMessage(it.message, "Could not copy terminal output.") }
                         }) { Text("Copy all", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
                             val pasted = clipboardManager.getText()?.text.orEmpty()
-                            if (pasted.isNotEmpty()) runCatching { active.send(active.screen.pasteSequence(pasted)) }.onFailure { error = it.message ?: "Could not paste into terminal." }
+                            if (pasted.isNotEmpty()) runCatching { active.send(active.screen.pasteSequence(pasted)) }.onFailure { error = terminalUserMessage(it.message, "Could not paste into the terminal.") }
                             terminalInputFocusRequester.requestFocus()
                         }) { Text("Paste", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
-                            runCatching { active.send("\u000c") }.onFailure { error = it.message ?: "Could not clear terminal." }
+                            runCatching { active.send("\u000c") }.onFailure { error = terminalUserMessage(it.message, "Could not clear the terminal.") }
                         }) { Text("Clear", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
                             terminalInputFocusRequester.requestFocus()
@@ -1083,3 +1083,33 @@ fun LinuxTerminalPanel(
     }
 }
 
+
+
+/** Keeps implementation details out of normal terminal UI error banners. */
+private fun terminalUserMessage(details: String?, fallback: String): String {
+    val message = details.orEmpty().lowercase()
+    return when {
+        message.contains("host key changed") ->
+            "The SSH server identity has changed. Do not connect until you have verified the new server fingerprint."
+        message.contains("confirm the ssh server host key") ->
+            "Verify the SSH server fingerprint before connecting."
+        message.contains("unknownhost") || message.contains("unable to resolve") ||
+            message.contains("connection refused") || message.contains("no route to host") ||
+            message.contains("network is unreachable") || message.contains("timed out") ->
+            "Could not reach the SSH server. Check the host, port, and internet connection."
+        message.contains("authentication") || message.contains("auth fail") ||
+            message.contains("permission denied") || message.contains("publickey") ->
+            "SSH login was rejected. Check your username, password, or private key."
+        message.contains("invalid ssh") || message.contains("invalid port") ->
+            "The SSH settings are invalid. Check the server address and port."
+        message.contains("rootfs") && (message.contains("missing") || message.contains("incomplete")) ->
+            "Ubuntu is not installed completely. Open Runtime Setup and install Ubuntu."
+        message.contains("proot") || message.contains("loader") || message.contains("eacces") ->
+            "The terminal component could not start. Please update or reinstall the app."
+        message.contains("apt-get check") || message.contains("dpkg") ->
+            "Ubuntu's package database needs repair. Run: sudo apt --fix-broken install"
+        message.contains("no space") || message.contains("enospc") ->
+            "There is not enough free storage. Free up some space and try again."
+        else -> fallback
+    }
+}
