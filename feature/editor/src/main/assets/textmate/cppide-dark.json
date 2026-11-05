@@ -1,0 +1,15 @@
+{
+  "name": "cppide-dark",
+  "settings": [
+    {"settings": {"background": "#0F1218", "foreground": "#D4D4D4", "lineHighlight": "#1B2532", "selection": "#264F78"}},
+    {"scope": "comment", "settings": {"foreground": "#6A9955", "fontStyle": "italic"}},
+    {"scope": "keyword, keyword.control, storage", "settings": {"foreground": "#C586C0"}},
+    {"scope": "storage.type, support.type", "settings": {"foreground": "#4EC9B0"}},
+    {"scope": "string", "settings": {"foreground": "#CE9178"}},
+    {"scope": "constant.numeric, constant.language", "settings": {"foreground": "#B5CEA8"}},
+    {"scope": "entity.name.function", "settings": {"foreground": "#DCDCAA"}},
+    {"scope": "entity.name.namespace", "settings": {"foreground": "#4EC9B0"}},
+    {"scope": "meta.preprocessor", "settings": {"foreground": "#C586C0"}},
+    {"scope": "constant.character.escape", "settings": {"foreground": "#D7BA7D"}}
+  ]
+}
