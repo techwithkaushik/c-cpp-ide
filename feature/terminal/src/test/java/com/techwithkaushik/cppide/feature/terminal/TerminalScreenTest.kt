@@ -466,7 +466,7 @@ class TerminalScreenTest {
 
     @Test fun carriageReturnAndEraseLineRedrawProgressWithoutAddingRows() {
         val screen = TerminalScreen(columns = 40, rows = 5)
-        screen.append("Reading package lists... 19%\\r\\u001B[2KReading package lists... 79%")
+        screen.append("Reading package lists... 19%\r\u001B[2KReading package lists... 79%")
         val rendered = screen.render()
         assertTrue(rendered.contains("Reading package lists... 79%"))
         assertFalse(rendered.contains("19%"))
