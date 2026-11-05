@@ -5,7 +5,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** Builds a resolver file from Android's active DNS properties. */
-internal object HostResolverConfig {
+object HostResolverConfig {
     private val propertyPattern = Regex("""\[net\.dns[1-4]\]: \[(.*?)\]""")
     private val ipv4Pattern = Regex("""(?:[0-9]{1,3}\.){3}[0-9]{1,3}""")
     private val ipv6Pattern = Regex("""[0-9a-fA-F:]+""")
