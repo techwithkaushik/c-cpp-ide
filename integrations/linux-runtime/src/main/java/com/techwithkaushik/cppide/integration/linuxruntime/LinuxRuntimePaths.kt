@@ -34,9 +34,37 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
             if (!it.exists() && !it.mkdirs()) throw IllegalStateException("Cannot create runtime directory: $it")
             if (!it.isDirectory) throw IllegalStateException("Runtime path is not a directory: $it")
         }
+        normalizeGuestTemporaryDirectories()
         val nativeDir = nativeLibraryDir ?: return
         linkNativeBinary(proot, File(nativeDir, "libproot.so"))
         linkNativeBinary(prootLoader, File(nativeDir, "libproot-loader.so"))
+    }
+
+    /**
+     * Older app releases extracted directories with the host's default 0755 mode.
+     * Ubuntu's apt sandbox runs as _apt and needs /tmp and /var/tmp to be writable
+     * by non-root users. Repair these two guest paths in-place for existing installs.
+     */
+    private fun normalizeGuestTemporaryDirectories() {
+        val root = runCatching { ubuntuRoot.canonicalFile }.getOrNull() ?: return
+        listOf(File(ubuntuRoot, "tmp"), File(ubuntuRoot, "var/tmp")).forEach { directory ->
+            if (!directory.isDirectory) return@forEach
+            val canonical = runCatching { directory.canonicalFile }.getOrNull() ?: return@forEach
+            if (!canonical.path.startsWith(root.path + File.separator) || !canonical.isDirectory) return@forEach
+            val readable = canonical.setReadable(true, false)
+            val writable = canonical.setWritable(true, false)
+            val executable = canonical.setExecutable(true, false)
+            if (!readable || !writable || !executable) {
+                throw IllegalStateException("Cannot prepare Ubuntu temporary directory permissions.")
+            }
+            // Android supports chmod's sticky bit; reflection keeps local JVM tests
+            // independent of android.jar while retaining standard /tmp semantics on-device.
+            runCatching {
+                val os = Class.forName("android.system.Os")
+                os.getMethod("chmod", String::class.java, Int::class.javaPrimitiveType)
+                    .invoke(null, canonical.absolutePath, 0x1ff or 0x200)
+            }
+        }
     }
 
     private fun linkNativeBinary(alias: File, target: File) {
