@@ -95,6 +95,7 @@ import java.util.Locale
 import java.io.OutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN")
@@ -122,6 +123,9 @@ private object LinuxTerminalSessions {
     // rebuilding the annotated scrollback. All screen/state mutations remain
     // confined to the main thread.
     private val outputHandler = Handler(Looper.getMainLooper())
+    private val renderExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "terminal-render").apply { isDaemon = true }
+    }
     private val pendingOutput = HashMap<Int, StringBuilder>()
     private val scheduledFlushes = HashSet<Int>()
     private const val OUTPUT_FRAME_INTERVAL_MS = 32L
@@ -135,10 +139,30 @@ private object LinuxTerminalSessions {
     fun select(id: Int) {
         val tab = tabs.firstOrNull { it.id == id } ?: return
         selectedId = id
-        // Keep inactive tabs' VT models current, but defer expensive annotated
-        // text construction until the tab is actually visible.
-        tab.output.value = tab.screen.renderAnnotated()
-        tab.outputRevision.value++
+        // Snapshot construction is intentionally off the UI thread. The single
+        // worker preserves byte order with pending PTY output and resize events.
+        renderExecutor.execute {
+            val rendered = tab.screen.renderAnnotated()
+            outputHandler.post {
+                if (selectedId == tab.id && tabs.any { it.id == tab.id }) {
+                    tab.output.value = rendered
+                    tab.outputRevision.value++
+                }
+            }
+        }
+    }
+
+    fun resize(tab: LinuxTerminalTab, columns: Int, rows: Int) {
+        renderExecutor.execute {
+            tab.screen.resize(columns, rows)
+            val rendered = tab.screen.renderAnnotated()
+            outputHandler.post {
+                if (selectedId == tab.id && tabs.any { it.id == tab.id }) {
+                    tab.output.value = rendered
+                    tab.outputRevision.value++
+                }
+            }
+        }
     }
 
     fun add(title: String, session: AutoCloseable, input: OutputStream, interrupt: () -> Unit, resize: (Int, Int) -> Unit = { _, _ -> }, initialOutput: String = "", maxScrollbackLines: Int = 5_000): LinuxTerminalTab {
@@ -184,11 +208,18 @@ private object LinuxTerminalSessions {
         outputHandler.postDelayed({
             scheduledFlushes.remove(tab.id)
             val batch = pendingOutput.remove(tab.id)?.toString().orEmpty()
-            if (batch.isNotEmpty() && tabs.any { it.id == tab.id } && !tab.ended.get()) {
-                tab.screen.append(batch)
-                if (selectedId == tab.id) {
-                    tab.output.value = tab.screen.renderAnnotated()
-                    tab.outputRevision.value++
+            if (batch.isNotEmpty() && tabs.any { it.id == tab.id }) {
+                renderExecutor.execute {
+                    tab.screen.append(batch)
+                    if (selectedId == tab.id) {
+                        val rendered = tab.screen.renderAnnotated()
+                        outputHandler.post {
+                            if (selectedId == tab.id && tabs.any { it.id == tab.id }) {
+                                tab.output.value = rendered
+                                tab.outputRevision.value++
+                            }
+                        }
+                    }
                 }
             }
         }, OUTPUT_FRAME_INTERVAL_MS)
@@ -515,12 +546,10 @@ fun LinuxTerminalPanel(
                 val columns = (terminalViewportSize.width / ptyCellWidth).toInt().coerceIn(20, 300)
                 val rows = (terminalViewportSize.height / lineHeightPx.coerceAtLeast(1f)).toInt().coerceIn(5, 120)
                 if (columns != active.lastPtyColumns || rows != active.lastPtyRows) {
-                    active.screen.resize(columns, rows)
                     active.resize(columns, rows)
+                    LinuxTerminalSessions.resize(active, columns, rows)
                     active.lastPtyColumns = columns
                     active.lastPtyRows = rows
-                    active.output.value = active.screen.renderAnnotated()
-                    active.outputRevision.value++
                 }
             }
             LaunchedEffect(active.id, active.outputRevision.value) {
@@ -543,6 +572,10 @@ fun LinuxTerminalPanel(
                 Box(
                     Modifier.weight(1f).fillMaxWidth()
                         .background(Color.Black)
+                        // Scroll the viewport container rather than the selectable
+                        // Text node; this keeps one-finger history scrolling reliable
+                        // while text selection and horizontal panning remain available.
+                        .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
                         .onSizeChanged { terminalViewportSize = it }
                         .pointerInput(active.id) {
                             // The whole terminal viewport is an input surface, including
@@ -582,7 +615,6 @@ fun LinuxTerminalPanel(
                             onTextLayout = { cursorTextLayout.value = it },
                             modifier = Modifier
                                 .horizontalScroll(outputHorizontalScrollState)
-                                .verticalScroll(outputScrollState, flingBehavior = ScrollableDefaults.flingBehavior())
                                 .fillMaxWidth()
                         )
                     }
