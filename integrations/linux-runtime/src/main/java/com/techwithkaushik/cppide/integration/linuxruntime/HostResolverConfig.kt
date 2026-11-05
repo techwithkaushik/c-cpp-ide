@@ -7,7 +7,7 @@ import java.io.File
  * automatically inherit Android's per-network DNS resolver inside Ubuntu.
  */
 internal object HostResolverConfig {
-    private val propertyPattern = Regex("""\[net\.dns[1-4]\]: \[([^]]+)]""")
+    private val propertyPattern = Regex("""\[net\.dns[1-4]\]: \[(.*?)\]""")
     private val ipv4Pattern = Regex("""(?:[0-9]{1,3}\.){3}[0-9]{1,3}""")
     private val ipv6Pattern = Regex("""[0-9a-fA-F:]+""")
 
@@ -15,9 +15,10 @@ internal object HostResolverConfig {
         val servers = linkedSetOf<String>()
         propertyPattern.findAll(propertyDump).forEach { match ->
             val value = match.groupValues[1].trim()
-            val valid = (ipv4Pattern.matches(value) || ipv6Pattern.matches(value) && value.contains(':')) &&
-                value.split('.').filter { it.isNotEmpty() }.all { it.toIntOrNull() in 0..255 }
-            if (valid) servers += value
+            val isIpv4 = ipv4Pattern.matches(value) &&
+                value.split('.').all { octet -> octet.toIntOrNull() in 0..255 }
+            val isIpv6 = ipv6Pattern.matches(value) && value.contains(':')
+            if (isIpv4 || isIpv6) servers += value
         }
         return servers.toList()
     }
