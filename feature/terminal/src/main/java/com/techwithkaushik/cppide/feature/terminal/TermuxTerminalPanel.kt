@@ -133,10 +133,44 @@ fun TermuxTerminalPanel(
     val terminalPreferences = remember(appContext) {
         appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE)
     }
-    val terminalFontSizeSp = terminalPreferences.getInt(
-        IdeDesignTokens.Preference.TERMINAL_FONT_SIZE,
-        IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
-    )
+    var terminalFontSizeSp by remember(appContext) {
+        mutableIntStateOf(
+            terminalPreferences.getInt(
+                IdeDesignTokens.Preference.TERMINAL_FONT_SIZE,
+                IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
+            )
+        )
+    }
+    var autoShowKeyboard by remember(appContext) {
+        mutableStateOf(terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true))
+    }
+    var cursorBlinkEnabled by remember(appContext) {
+        mutableStateOf(terminalPreferences.getBoolean(IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK, true))
+    }
+    DisposableEffect(terminalPreferences) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+            when (key) {
+                IdeDesignTokens.Preference.TERMINAL_FONT_SIZE -> {
+                    terminalFontSizeSp = sharedPreferences?.getInt(
+                        IdeDesignTokens.Preference.TERMINAL_FONT_SIZE,
+                        IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
+                    ) ?: IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE
+                }
+                IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD -> {
+                    autoShowKeyboard = sharedPreferences?.getBoolean(
+                        IdeDesignTokens.Preference.TERMINAL_AUTO_KEYBOARD, true
+                    ) ?: true
+                }
+                IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK -> {
+                    cursorBlinkEnabled = sharedPreferences?.getBoolean(
+                        IdeDesignTokens.Preference.TERMINAL_CURSOR_BLINK, true
+                    ) ?: true
+                }
+            }
+        }
+        terminalPreferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { terminalPreferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     // TerminalRenderer draws with Android Canvas/Paint, whose text size is in
     // physical pixels. Settings store SP, so convert once before configuring
     // the native View; otherwise text becomes noticeably too small on high-DPI
@@ -291,6 +325,7 @@ fun TermuxTerminalPanel(
                         setTerminalViewClient(terminalViewClient)
                         terminalViewClient.attachView(this)
                         activeTab.client.attach(this)
+                        activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                         terminalViewRef.value = this
                         attachSession(activeTab.session)
                         isFocusable = true
@@ -309,6 +344,7 @@ fun TermuxTerminalPanel(
                 },
                 update = { view ->
                     activeTab.client.attach(view)
+                    activeTab.client.setCursorBlinkEnabled(cursorBlinkEnabled)
                     terminalViewRef.value = view
                     if (view.mTermSession !== activeTab.session) view.attachSession(activeTab.session)
                     view.setTextSize(terminalFontSizePx)
@@ -516,6 +552,16 @@ private class IdeTermuxSessionClient(
         return modifiers
     }
 
+    @Volatile private var cursorBlinkEnabled = true
+
+    fun setCursorBlinkEnabled(enabled: Boolean) {
+        cursorBlinkEnabled = enabled
+        terminalView?.let { view ->
+            view.setTerminalCursorBlinkerRate(if (enabled) DEFAULT_CURSOR_BLINK_RATE_MS else 0)
+            view.setTerminalCursorBlinkerState(enabled, true)
+        }
+    }
+
     fun attach(view: TerminalView?) {
         val previous = terminalView
         if (previous !== view) {
@@ -524,7 +570,8 @@ private class IdeTermuxSessionClient(
             previous?.setTerminalCursorBlinkerState(false, false)
         }
         terminalView = view
-        view?.setTerminalCursorBlinkerRate(DEFAULT_CURSOR_BLINK_RATE_MS)
+        view?.setTerminalCursorBlinkerRate(if (cursorBlinkEnabled) DEFAULT_CURSOR_BLINK_RATE_MS else 0)
+        view?.setTerminalCursorBlinkerState(cursorBlinkEnabled, true)
     }
 
     override fun onTextChanged(changedSession: TerminalSession) {
@@ -567,7 +614,7 @@ private class IdeTermuxSessionClient(
 
     override fun onTerminalCursorStateChange(state: Boolean) {
         terminalView?.post {
-            terminalView?.setTerminalCursorBlinkerState(state, true)
+            terminalView?.setTerminalCursorBlinkerState(state && cursorBlinkEnabled, true)
         }
     }
     override fun setTerminalShellPid(session: TerminalSession, pid: Int) = Unit
@@ -625,8 +672,8 @@ private class IdeTermuxViewClient(
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
     override fun onEmulatorSet() {
         terminalView?.let { view ->
-            view.setTerminalCursorBlinkerRate(DEFAULT_CURSOR_BLINK_RATE_MS)
-            view.setTerminalCursorBlinkerState(true, true)
+            view.setTerminalCursorBlinkerRate(if (cursorBlinkEnabled) DEFAULT_CURSOR_BLINK_RATE_MS else 0)
+            view.setTerminalCursorBlinkerState(cursorBlinkEnabled, true)
         }
     }
     override fun logError(tag: String, message: String): Unit { android.util.Log.e(tag, message) }
