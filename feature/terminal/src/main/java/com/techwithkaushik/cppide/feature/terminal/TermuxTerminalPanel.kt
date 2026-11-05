@@ -175,6 +175,7 @@ fun TermuxTerminalPanel(
     // physical pixels. Settings store SP, so convert once before configuring
     // the native View; otherwise text becomes noticeably too small on high-DPI
     // devices and row/column metrics are calculated from the wrong size.
+    val autoKeyboardOnOpen = autoShowKeyboard
     val terminalFontSizePx = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP,
         terminalFontSizeSp.toFloat(),
@@ -331,7 +332,7 @@ fun TermuxTerminalPanel(
                         isFocusableInTouchMode = true
                         post {
                             requestFocus()
-                            if (autoShowKeyboard) {
+                            if (autoKeyboardOnOpen) {
                                 postDelayed({
                                     (viewContext.getSystemService(Context.INPUT_METHOD_SERVICE) as?
                                         android.view.inputmethod.InputMethodManager)
