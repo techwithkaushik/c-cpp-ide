@@ -301,7 +301,7 @@ fun TermuxTerminalPanel(
                 update = { view ->
                     activeTab.client.attach(view)
                     if (view.mTermSession !== activeTab.session) view.attachSession(activeTab.session)
-                    view.setTextSize(terminalFontSize)
+                    view.setTextSize(terminalFontSizePx)
                 }
             )
         }
