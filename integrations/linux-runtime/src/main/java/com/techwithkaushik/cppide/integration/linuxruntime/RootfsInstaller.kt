@@ -34,6 +34,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
         if (!stage.mkdirs()) throw IOException("Cannot create extraction directory.")
         var count = 0
         var expanded = 0L
+        val directoryModes = mutableListOf<Pair<File, Int>>()
         try {
             val raw = BufferedInputStream(FileInputStream(archive))
             val lower = archive.name.lowercase(Locale.ROOT)
@@ -56,10 +57,9 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                             removeEntrySymlink(target)
                             if (!target.exists() && !target.mkdirs()) throw IOException("Cannot create directory: ${entry.name}")
                             if (!target.isDirectory) throw IOException("Directory conflicts with non-directory: ${entry.name}")
-                            // Preserve guest directory permissions. In particular, /tmp
-                            // must remain world-writable so apt's _apt sandbox can create
-                            // temporary files after extraction.
-                            applyMode(target, entry.mode)
+                            // Apply directory modes after extraction: a read-only
+                            // directory entry must not block later child entries.
+                            directoryModes += target to entry.mode
                         }
                         entry.isLink -> {
                             val linked = safeTarget(stage, entry.linkName)
@@ -96,8 +96,11 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                     }
                 }
             }
+            // Preserve guest modes after all children have been extracted. /tmp
+            // must remain world-writable for apt's _apt sandbox.
+            directoryModes.forEach { (directory, mode) -> applyMode(directory, mode) }
 
-            // Activate the unmodified extracted tree at the one canonical distro path.
+            // Activate the extracted tree at the one canonical distro path.
             val old = File(paths.staging, "distro-previous")
             if (old.exists() && !old.deleteRecursively()) throw IOException("Cannot remove previous extraction backup.")
             if (paths.ubuntuRoot.exists() && !paths.ubuntuRoot.renameTo(old)) {
