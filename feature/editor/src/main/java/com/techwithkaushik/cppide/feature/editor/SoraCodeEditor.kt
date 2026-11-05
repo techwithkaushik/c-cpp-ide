@@ -19,6 +19,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import org.eclipse.tm4e.core.registry.IThemeSource
+import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
@@ -31,6 +32,7 @@ import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 private object CppTextMateSupport {
     private var initialized = false
     private var activeTheme = ""
+    private val scopeByEditor = WeakHashMap<CodeEditor, String>()
 
     @Synchronized
     private fun ensureInitialized(context: android.content.Context) {
@@ -70,6 +72,7 @@ private object CppTextMateSupport {
             else -> null
         }
         if (scope == null) {
+            scopeByEditor.remove(editor)
             if (editor.editorLanguage !is EmptyLanguage) {
                 editor.setEditorLanguage(EmptyLanguage())
             }
@@ -93,10 +96,15 @@ private object CppTextMateSupport {
 
         val currentLanguage = editor.editorLanguage
         if (currentLanguage is TextMateLanguage) {
-            currentLanguage.updateLanguage(scope)
+            if (scopeByEditor[editor] != scope) currentLanguage.updateLanguage(scope)
         } else {
             editor.setEditorLanguage(TextMateLanguage.create(scope, false))
         }
+        scopeByEditor[editor] = scope
+    }
+
+    fun detach(editor: CodeEditor) {
+        scopeByEditor.remove(editor)
     }
 }
 
@@ -290,6 +298,7 @@ fun SoraCodeEditor(
         },
         onRelease = { editor ->
             controller?.detach(editor)
+            CppTextMateSupport.detach(editor)
             editor.release()
         }
     )
