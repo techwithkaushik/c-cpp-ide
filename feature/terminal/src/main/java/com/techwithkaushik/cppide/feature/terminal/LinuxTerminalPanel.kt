@@ -96,6 +96,7 @@ import java.io.OutputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.Executors
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 private val DEFAULT_TERMINAL_EXTRA_KEYS = setOf("ESC", "TAB", "CTRL", "ALT", "HOME", "UP", "END", "PGUP", "LEFT", "DOWN", "RIGHT", "PGDN")
@@ -126,8 +127,10 @@ private object LinuxTerminalSessions {
     private val renderExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "terminal-render").apply { isDaemon = true }
     }
+    private val outputLock = Any()
     private val pendingOutput = HashMap<Int, StringBuilder>()
     private val scheduledFlushes = HashSet<Int>()
+    private val activeTabIds = ConcurrentHashMap.newKeySet<Int>()
     private const val OUTPUT_FRAME_INTERVAL_MS = 32L
 
     val tabs = mutableStateListOf<LinuxTerminalTab>()
@@ -189,6 +192,7 @@ private object LinuxTerminalSessions {
             ended = ended
         )
         tabs.add(tab)
+        activeTabIds.add(tab.id)
         selectedId = tab.id
         return tab
     }
@@ -200,38 +204,46 @@ private object LinuxTerminalSessions {
     }
 
     fun append(tab: LinuxTerminalTab, text: String) {
-        if (text.isEmpty() || tabs.none { it.id == tab.id }) return
-        val pending = pendingOutput.getOrPut(tab.id) { StringBuilder() }
-        pending.append(text)
-        if (!scheduledFlushes.add(tab.id)) return
-
-        outputHandler.postDelayed({
-            scheduledFlushes.remove(tab.id)
-            val batch = pendingOutput.remove(tab.id)?.toString().orEmpty()
-            if (batch.isNotEmpty() && tabs.any { it.id == tab.id }) {
-                val renderForVisibleTab = selectedId == tab.id
-                renderExecutor.execute {
-                    tab.screen.append(batch)
-                    if (renderForVisibleTab) {
-                        val rendered = tab.screen.renderAnnotated()
-                        outputHandler.post {
-                            if (selectedId == tab.id && tabs.any { it.id == tab.id }) {
-                                tab.output.value = rendered
-                                tab.outputRevision.value++
+        if (text.isEmpty() || !activeTabIds.contains(tab.id)) return
+        // Reader threads enqueue directly; do not post one main-thread message
+        // per PTY read. This prevents a flood of tiny apt/dpkg chunks from
+        // starving gestures, input and Compose frames.
+        synchronized(outputLock) {
+            pendingOutput.getOrPut(tab.id) { StringBuilder() }.append(text)
+            if (!scheduledFlushes.add(tab.id)) return
+            outputHandler.postDelayed({
+                val batch = synchronized(outputLock) {
+                    scheduledFlushes.remove(tab.id)
+                    pendingOutput.remove(tab.id)?.toString().orEmpty()
+                }
+                if (batch.isNotEmpty() && activeTabIds.contains(tab.id)) {
+                    val renderForVisibleTab = selectedId == tab.id
+                    renderExecutor.execute {
+                        tab.screen.append(batch)
+                        if (renderForVisibleTab) {
+                            val rendered = tab.screen.renderAnnotated()
+                            outputHandler.post {
+                                if (selectedId == tab.id && activeTabIds.contains(tab.id)) {
+                                    tab.output.value = rendered
+                                    tab.outputRevision.value++
+                                }
                             }
                         }
                     }
                 }
-            }
-        }, OUTPUT_FRAME_INTERVAL_MS)
+            }, OUTPUT_FRAME_INTERVAL_MS)
+        }
     }
 
     fun finish(tab: LinuxTerminalTab) {
         val index = tabs.indexOfFirst { it.id == tab.id }
         if (index < 0) return
         tabs.removeAt(index)
-        pendingOutput.remove(tab.id)
-        scheduledFlushes.remove(tab.id)
+        activeTabIds.remove(tab.id)
+        synchronized(outputLock) {
+            pendingOutput.remove(tab.id)
+            scheduledFlushes.remove(tab.id)
+        }
         runCatching { tab.session.close() }
         if (tabs.isEmpty()) {
             selectedId = 0
@@ -354,7 +366,7 @@ fun LinuxTerminalPanel(
                 val title = "SSH ${sshHost.username}@${sshHost.host}"
                 val tab = LinuxTerminalSessions.add(title, session, session.input, interrupt = { runCatching { session.input.write(byteArrayOf(3)); session.input.flush() } }, resize = session::resize, initialOutput = "Connected to ${sshHost.host}:\n", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
-                    onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
+                    onChunk = { chunk -> LinuxTerminalSessions.append(tab, chunk) },
                     onExit = { code -> handler.post {
                         LinuxTerminalSessions.closeTab(tab.id)
                     } }
