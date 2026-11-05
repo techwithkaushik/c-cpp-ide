@@ -43,6 +43,17 @@ class LanguageToolingCatalogTest {
     }
 
     @Test
+    fun resolvesClangdLanguageIdsSeparatelyForCAndCpp() {
+        assertEquals("c", LanguageToolingCatalog.languageIdFor("src/main.c"))
+        assertEquals("cpp", LanguageToolingCatalog.languageIdFor("src/main.cpp"))
+        assertEquals("cpp", LanguageToolingCatalog.languageIdFor("include/api.hpp"))
+        assertEquals("cpp", LanguageToolingCatalog.languageIdFor("include/api.h"))
+        assertNull(LanguageToolingCatalog.languageIdFor("Makefile"))
+        assertNull(LanguageToolingCatalog.languageIdFor("CMakeLists.txt"))
+        assertNull(LanguageToolingCatalog.languageIdFor("README.md"))
+    }
+
+    @Test
     fun exposesToolRolesForSourceLanguage() {
         val python = LanguageToolingCatalog.detect("main.py")
         assertNotNull(python)
