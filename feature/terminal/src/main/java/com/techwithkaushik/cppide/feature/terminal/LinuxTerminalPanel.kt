@@ -435,7 +435,7 @@ fun LinuxTerminalPanel(
             result.onSuccess { session ->
                 val tab = LinuxTerminalSessions.add("Ubuntu " + (LinuxTerminalSessions.tabs.size + 1), session, session.input, interrupt = { session.interrupt() }, resize = session::resize, initialOutput = "", maxScrollbackLines = scrollbackLines)
                 session.readOutput(
-                    onChunk = { chunk -> handler.post { LinuxTerminalSessions.append(tab, chunk) } },
+                    onChunk = { chunk -> LinuxTerminalSessions.append(tab, chunk) },
                     onExit = { code -> handler.post {
                         LinuxTerminalSessions.closeTab(tab.id)
                     } }
