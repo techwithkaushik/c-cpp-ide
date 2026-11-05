@@ -92,6 +92,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -1537,6 +1539,9 @@ private fun WorkspaceScreen(
             ) {
                 ToolPanelContent(
                     selected = selectedPanel,
+                    projectName = projectName,
+                    activeFile = activeFile,
+                    code = code,
                     onSelect = onPanel,
                     onClose = onCloseToolPanel,
                     onOpenSettings = onOpenSettings
@@ -1806,7 +1811,22 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
 }
 
 @Composable
-private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit, onClose: () -> Unit, onOpenSettings: () -> Unit) {
+private fun ToolPanelContent(
+    selected: ToolPanel,
+    projectName: String,
+    activeFile: String,
+    code: String,
+    onSelect: (ToolPanel) -> Unit,
+    onClose: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    val context = LocalContext.current.applicationContext
+    val buildScope = rememberCoroutineScope()
+    val buildRunner = remember(context) { EmbeddedCppBuildRunner(context) }
+    var building by remember(projectName, activeFile) { mutableStateOf(false) }
+    var buildResult by remember(projectName, activeFile) { mutableStateOf<EmbeddedCppBuildRunner.Result?>(null) }
+    var buildError by remember(projectName, activeFile) { mutableStateOf<String?>(null) }
+
     // The terminal view can hold focus and consume Android Back as Escape.
     // Give the open tool panel an explicit Back handler so it always dismisses.
     BackHandler(onBack = onClose)
@@ -1852,11 +1872,85 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
                 )
             }
             ToolPanel.Build -> {
-                ToolStatusCard("BUILD STATUS", "Waiting for runtime", "Build tools are resolved from the active file and workspace.", "Language toolchain · Not active", IdeAccent)
-                Text("Build steps", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                PanelInfoRow("1", "Resolve project configuration", "Waiting for build integration")
-                PanelInfoRow("2", "Resolve and run the active language", "Toolchain is selected from the file type")
-                PanelInfoRow("3", "Link executable", "Not started")
+                val extension = activeFile.substringAfterLast('.', "").lowercase()
+                val supportedSource = extension in setOf("c", "cc", "cpp", "cxx", "c++")
+                ToolStatusCard(
+                    "C / C++ BUILD",
+                    when {
+                        building -> "Building and running…"
+                        buildResult?.runSucceeded == true -> "Build and run succeeded"
+                        buildResult?.compileSucceeded == true -> "Compiled; program returned a non-zero exit code"
+                        buildResult?.timedOut == true -> "Command timed out"
+                        buildResult?.error != null -> "Build failed"
+                        buildResult != null -> "Compilation failed"
+                        else -> "Ready to build"
+                    },
+                    "Uses the embedded Termux clang/clang++ toolchain and saved C/C++ Language Settings.",
+                    if (supportedSource) "$projectName / $activeFile" else "Open a .c, .cc, .cpp or .cxx source file",
+                    if (buildResult?.runSucceeded == true) IdeGreen else IdeAccent
+                )
+                Button(
+                    enabled = supportedSource && !building,
+                    onClick = {
+                        building = true
+                        buildResult = null
+                        buildError = null
+                        buildScope.launch {
+                            try {
+                                buildResult = withContext(Dispatchers.IO) {
+                                    ProjectStorage(context).writeFile(projectName, activeFile, code)
+                                    buildRunner.buildAndRun(projectName, activeFile)
+                                }
+                            } catch (error: Exception) {
+                                buildError = error.message ?: error.javaClass.simpleName
+                            } finally {
+                                building = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (building) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else IdeIcon("play", Color.White, 16.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (building) "Building…" else "Build & Run")
+                }
+                buildError?.let { ToolStatusCard("BUILD ERROR", "Unable to build", it, "Check runtime and workspace", Color(0xFFE5B978)) }
+                buildResult?.let { result ->
+                    Text("COMPILER OUTPUT", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    if (result.compilerOutput.isNotBlank()) {
+                        Text(
+                            result.compilerOutput,
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp).verticalScroll(rememberScrollState())
+                                .background(Color(0xFF0B0F14), RoundedCornerShape(8.dp)).padding(8.dp),
+                            color = Color(0xFFD5DCE5),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                    } else {
+                        Text("No compiler messages.", color = IdeMuted, fontSize = 11.sp)
+                    }
+                    result.error?.let { Text(it, color = Color(0xFFE5B978), fontSize = 11.sp) }
+                    if (result.compileSucceeded) {
+                        Text("PROGRAM OUTPUT", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            result.programOutput.ifBlank { "(no output)" },
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState())
+                                .background(Color(0xFF0B0F14), RoundedCornerShape(8.dp)).padding(8.dp),
+                            color = Color(0xFFD5DCE5),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Text(
+                        "Compiler exit: ${result.compileExitCode ?: "—"} · Program exit: ${result.runExitCode ?: "—"}",
+                        color = IdeMuted,
+                        fontSize = 10.sp
+                    )
+                }
+                if (!supportedSource) {
+                    Text("Build & Run currently supports C and C++ source files. Header files and project build scripts are not executable targets.", color = IdeMuted, fontSize = 11.sp)
+                }
             }
             ToolPanel.Problems -> {
                 ToolStatusCard("DIAGNOSTICS", "No diagnostics", "No compiler or clangd results are available yet.", "0 errors  ·  0 warnings  ·  UI preview", IdeGreen)
@@ -1871,8 +1965,8 @@ private fun ToolPanelContent(selected: ToolPanel, onSelect: (ToolPanel) -> Unit,
                 }
             }
         }
-        if (selected != ToolPanel.Terminal) {
-            Text("Runtime/compiler integration is still being connected", color = Color(0xFFE5B978), fontSize = 10.sp)
+        if (selected == ToolPanel.Problems) {
+            Text("Compiler diagnostics are shown in Build output for now; clangd diagnostics are the next integration stage.", color = Color(0xFFE5B978), fontSize = 10.sp)
         }
     }
 }
