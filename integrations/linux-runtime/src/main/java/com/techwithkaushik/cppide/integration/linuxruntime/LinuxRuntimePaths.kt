@@ -61,7 +61,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
             // independent of android.jar while retaining standard /tmp semantics on-device.
             runCatching {
                 val os = Class.forName("android.system.Os")
-                os.getMethod("chmod", String::class.java, Int::class.javaPrimitiveType)
+                os.getMethod("chmod", String::class.java, Int::class.javaPrimitiveType!!)
                     .invoke(null, canonical.absolutePath, 0x1ff or 0x200)
             }
         }
