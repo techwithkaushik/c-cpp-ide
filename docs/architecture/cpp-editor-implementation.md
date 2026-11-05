@@ -48,6 +48,15 @@ C/C++ settings must be independent from global editor appearance settings:
 
 Resolution order: explicit workspace configuration, then user language settings, then detected runtime defaults. Do not apply C++ settings to C translation units.
 
+## Current implementation status
+
+- [x] C/C++ package roles are cataloged separately for Ubuntu, Debian and Arch Linux.
+- [x] C and C++ resolve to distinct clangd document language identifiers (`c` and `cpp`).
+- [x] Sora TextMate support is added with local C and C++ grammars, matching indentation configuration and four editor themes.
+- [ ] Runtime package installation, executable probing and compiler path resolution are not yet connected to the embedded rootfs.
+- [ ] clangd process launch, JSON-RPC transport, editor diagnostics/completion and workspace lifecycle are not yet connected.
+- [ ] Build/Run, format-on-save and C/C++ settings persistence still require integration and tests.
+
 ## Required validation before calling C/C++ support complete
 
 1. Install clang and clangd in each supported distro through the integrated terminal; verify versions from the same runtime used by Build/Run.
