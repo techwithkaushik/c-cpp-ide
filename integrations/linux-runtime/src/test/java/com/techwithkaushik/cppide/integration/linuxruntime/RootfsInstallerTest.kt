@@ -75,7 +75,7 @@ class RootfsInstallerTest {
         val installer = RootfsInstaller(LinuxRuntimePaths(filesAlias))
         installer.install(archive)
 
-        val root = File(files, "rootfs")
+        val root = File(files, "ubuntu")
         assertTrue(Files.isSymbolicLink(File(root, "bin").toPath()))
         assertEquals("usr/bin", Files.readSymbolicLink(File(root, "bin").toPath()).toString())
         assertEquals("original-target", File(root, "usr/lib/arm-linux-gnueabihf/libtinfo.so.6.4").readText())
@@ -163,7 +163,7 @@ class RootfsInstallerTest {
 
         RootfsInstaller(LinuxRuntimePaths(files)).install(archive)
 
-        val permissions = Files.getPosixFilePermissions(File(files, "rootfs/tmp").toPath())
+        val permissions = Files.getPosixFilePermissions(File(files, "ubuntu/tmp").toPath())
         assertTrue("apt sandbox needs /tmp to be writable by other users", permissions.contains(PosixFilePermission.OTHERS_WRITE))
         assertTrue("apt sandbox needs /tmp to be searchable by other users", permissions.contains(PosixFilePermission.OTHERS_EXECUTE))
     }
@@ -178,6 +178,7 @@ class RootfsInstallerTest {
         File(files, "runtime.properties").writeText("installerVersion=4\nroot=${root.absolutePath}\nentries=2\n")
 
         val paths = LinuxRuntimePaths(files)
+        paths.ensureDirectories()
         assertTrue("Earlier compatible installer marker should remain valid", paths.hasRootfs())
         assertTrue(paths.rootfsDiagnostic().contains("installerVersion=4"))
     }
@@ -191,6 +192,8 @@ class RootfsInstallerTest {
         File(root, "bin/sh").writeText("shell-placeholder")
         File(files, "runtime.properties").writeText("installerVersion=99\n")
 
-        assertFalse(LinuxRuntimePaths(files).hasRootfs())
+        val paths = LinuxRuntimePaths(files)
+        paths.ensureDirectories()
+        assertFalse(paths.hasRootfs())
     }
 }
