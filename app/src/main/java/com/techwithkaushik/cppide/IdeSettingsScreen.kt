@@ -67,6 +67,7 @@ internal fun IdeSettingsScreen(
     var category by rememberSaveable { mutableStateOf("Interface") }
     var terminalFontSize by remember { mutableStateOf(prefs.getInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).toFloat()) }
     var autoKeyboard by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true)) }
+    var cursorBlink by remember { mutableStateOf(prefs.getBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, true)) }
     var resetMessage by rememberSaveable { mutableStateOf("") }
     val categories = listOf("Interface", "Editor", "Terminal", "Runtime & Bootstrap", "Languages", "Build & Run", "Keyboard", "About")
 
@@ -97,7 +98,7 @@ internal fun IdeSettingsScreen(
                 when (category) {
                     "Interface" -> { onUiFontScaleChange(1.0f); prefs.edit().putFloat(SettingsPreference.UI_FONT_SCALE, 1.0f).apply() }
                     "Editor" -> { onEditorFontSizeChange(14f); onEditorWordWrapChange(false); onEditorThemeChange("Dark+ (VS Code)"); prefs.edit().putFloat(SettingsPreference.EDITOR_FONT_SIZE, 14f).putBoolean(SettingsPreference.EDITOR_WORD_WRAP, false).putString(SettingsPreference.EDITOR_THEME, "Dark+ (VS Code)").apply() }
-                    "Terminal" -> { terminalFontSize = 13f; autoKeyboard = true; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, 13).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).apply() }
+                    "Terminal" -> { terminalFontSize = IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE.toFloat(); autoKeyboard = true; cursorBlink = true; prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, true).putBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, true).apply() }
                     else -> resetMessage = "This section has no saved preferences to reset yet."
                 }
                 if (category == "Interface" || category == "Editor" || category == "Terminal") resetMessage = category + " reset."
@@ -138,14 +139,17 @@ internal fun IdeSettingsScreen(
                         SettingsCard("Editor engine", "Implementation", "Sora code editor")
                     }
                     "Terminal" -> {
-                        SettingsHeading("TERMINAL", "Font and keyboard.")
+                        SettingsHeading("TERMINAL", "Changes apply to the running terminal immediately.")
                         SettingsCard("Terminal font size", "Current size", "${terminalFontSize.toInt()} sp")
                         Slider(value = terminalFontSize, onValueChange = {
                             terminalFontSize = it
                             prefs.edit().putInt(SettingsPreference.TERMINAL_FONT_SIZE, it.toInt()).apply()
                         }, valueRange = 10f..22f, steps = 11)
-                        SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when the terminal opens", autoKeyboard) {
+                        SettingsSwitch("Open keyboard automatically", "Show the soft keyboard when a terminal session opens", autoKeyboard) {
                             autoKeyboard = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_AUTO_KEYBOARD, it).apply()
+                        }
+                        SettingsSwitch("Blink terminal cursor", "Animate the cursor while the terminal is active", cursorBlink) {
+                            cursorBlink = it; prefs.edit().putBoolean(SettingsPreference.TERMINAL_CURSOR_BLINK, it).apply()
                         }
                         SettingsCard("Main terminal", "Runtime status", "The terminal requires an installed ABI-matched bootstrap and a passing shell execution test.")
                         Button(
