@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -49,7 +51,7 @@ import java.util.UUID
 
 private data class TermuxLinuxTab(val id: Int, val session: TerminalSession)
 
-private object TermuxLinuxTabs {
+internal object TermuxLinuxTabs {
     val tabs = mutableStateListOf<TermuxLinuxTab>()
     var selectedId by mutableStateOf(0)
     private val ids = AtomicInteger(1)
@@ -59,6 +61,14 @@ private object TermuxLinuxTabs {
         tabs.add(TermuxLinuxTab(id, session))
         selectedId = id
         return id
+    }
+
+    fun onSessionFinished(session: TerminalSession) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            val tab = tabs.firstOrNull { it.session === session } ?: return@post
+            tabs.remove(tab)
+            if (selectedId == tab.id) selectedId = tabs.lastOrNull()?.id ?: 0
+        }
     }
 
     fun close(id: Int) {
@@ -185,9 +195,14 @@ fun TermuxLinuxTerminalPanel(
                     DeveloperLog.event("TermuxTerminal", "runtime_validation_started", mapOf("operationId" to operationId))
                     paths.ensureDirectories()
                     check(paths.hasRootfs()) { "Ubuntu rootfs is not installed or incomplete. Open Runtime & Bootstrap settings." }
-                    ProotDownloader(paths).downloadAndInstall()
-                    val smoke = LinuxRuntimeSmokeTest(paths).run()
-                    check(smoke.success) { smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." } }
+                    if (!paths.ready()) {
+                        ProotDownloader(paths).downloadAndInstall()
+                        val smoke = LinuxRuntimeSmokeTest(paths).run()
+                        check(smoke.success) {
+                            smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." }
+                        }
+                        check(paths.ready()) { "Ubuntu runtime did not become ready after validation." }
+                    }
                 }
             }
             val validationDurationMs = (System.nanoTime() - validationStartedAt) / 1_000_000
@@ -201,7 +216,7 @@ fun TermuxLinuxTerminalPanel(
                 val sessionStartedAt = System.nanoTime()
                 DeveloperLog.event("TermuxTerminal", "terminal_session_create_started", mapOf("operationId" to operationId))
                 withContext(Dispatchers.Main.immediate) {
-                    runCatching { UbuntuTermuxSession.create(context, paths) }
+                    runCatching { UbuntuTermuxSession.create(context, paths, onFinished = TermuxLinuxTabs::onSessionFinished) }
                 }.also { sessionResult ->
                     DeveloperLog.event("TermuxTerminal", "terminal_session_create_completed", mapOf(
                         "operationId" to operationId,
@@ -255,10 +270,18 @@ fun TermuxLinuxTerminalPanel(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             TermuxLinuxTabs.tabs.forEach { tab ->
-                OutlinedButton(onClick = { TermuxLinuxTabs.selectedId = tab.id }) {
-                    Text(if (tab.id == TermuxLinuxTabs.selectedId) "● Ubuntu ${tab.id}" else "Ubuntu ${tab.id}", fontSize = 11.sp)
+                OutlinedButton(
+                    onClick = { TermuxLinuxTabs.selectedId = tab.id },
+                    modifier = Modifier.height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        if (tab.id == TermuxLinuxTabs.selectedId) "● ${tab.id}" else "${tab.id}",
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp
+                    )
                 }
-                Text("×", color = Color(0xFFFF8A80), modifier = Modifier.clickable { TermuxLinuxTabs.close(tab.id) }.padding(8.dp))
+                Text("×", color = Color(0xFFFF8A80), modifier = Modifier.clickable { TermuxLinuxTabs.close(tab.id) }.padding(horizontal = 3.dp, vertical = 4.dp), fontSize = 12.sp)
             }
             Button(enabled = !busy, onClick = ::startUbuntu) { Text("+") }
         }
