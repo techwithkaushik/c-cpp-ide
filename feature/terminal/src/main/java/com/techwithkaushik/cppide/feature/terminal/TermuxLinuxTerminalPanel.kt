@@ -2,10 +2,14 @@ package com.techwithkaushik.cppide.feature.terminal
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -32,10 +37,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import com.termux.terminal.TerminalSession
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
@@ -49,7 +56,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
 
-internal data class TermuxLinuxTab(val id: Int, val session: TerminalSession)
+internal data class TermuxLinuxTab(val id: Int, val session: TerminalSession, val title: String)
 
 internal object TermuxLinuxTabs {
     val tabs = mutableStateListOf<TermuxLinuxTab>()
@@ -58,25 +65,39 @@ internal object TermuxLinuxTabs {
 
     fun add(session: TerminalSession): Int {
         val id = ids.getAndIncrement()
-        tabs.add(TermuxLinuxTab(id, session))
+        tabs.add(TermuxLinuxTab(id, session, "Terminal ${tabs.size + 1}"))
         selectedId = id
         return id
     }
 
+    fun rename(id: Int, title: String) {
+        val index = tabs.indexOfFirst { it.id == id }
+        if (index >= 0) tabs[index] = tabs[index].copy(title = title.trim().ifBlank { tabs[index].title })
+    }
+
+    private fun removeFinished(session: TerminalSession): Boolean {
+        val index = tabs.indexOfFirst { it.session === session }
+        if (index < 0) return false
+        val tab = tabs[index]
+        tabs.removeAt(index)
+        if (selectedId == tab.id) selectedId = tabs.getOrNull(index - 1)?.id ?: tabs.firstOrNull()?.id ?: 0
+        return tabs.isEmpty()
+    }
+
     fun onSessionFinished(session: TerminalSession, onAllSessionsFinished: () -> Unit = {}) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
-            val tab = tabs.firstOrNull { it.session === session } ?: return@post
-            tabs.remove(tab)
-            if (selectedId == tab.id) selectedId = tabs.lastOrNull()?.id ?: 0
-            if (tabs.isEmpty()) onAllSessionsFinished()
+            if (removeFinished(session)) onAllSessionsFinished()
         }
     }
 
-    fun close(id: Int) {
-        val tab = tabs.firstOrNull { it.id == id } ?: return
-        tabs.remove(tab)
+    fun close(id: Int, onAllSessionsFinished: () -> Unit = {}) {
+        val index = tabs.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val tab = tabs[index]
+        tabs.removeAt(index)
+        if (selectedId == id) selectedId = tabs.getOrNull(index - 1)?.id ?: tabs.firstOrNull()?.id ?: 0
         runCatching { tab.session.finishIfRunning() }
-        if (selectedId == id) selectedId = tabs.lastOrNull()?.id ?: 0
+        if (tabs.isEmpty()) onAllSessionsFinished()
     }
 }
 
@@ -94,6 +115,8 @@ fun TermuxLinuxTerminalPanel(
     var error by remember { mutableStateOf<String?>(null) }
     var pendingArchitectureWarning by remember { mutableStateOf<Pair<Uri, String>?>(null) }
     var localInstallStatus by remember { mutableStateOf<String?>(null) }
+    var tabActionId by remember { mutableStateOf<Int?>(null) }
+    var renameValue by remember { mutableStateOf("") }
     val preferences = remember(context) { context.getSharedPreferences("developer_options", 0) }
     val fontSize = remember(context) {
         context.getSharedPreferences("ide_preferences", 0).getInt("terminal_font_size", 14).coerceIn(10, 28)
@@ -251,6 +274,36 @@ fun TermuxLinuxTerminalPanel(
         if (TermuxLinuxTabs.tabs.isEmpty()) startUbuntu()
     }
 
+    val tabForAction = TermuxLinuxTabs.tabs.firstOrNull { it.id == tabActionId }
+    if (tabForAction != null) {
+        AlertDialog(
+            onDismissRequest = { tabActionId = null },
+            title = { Text("Terminal tab") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Rename this terminal or close its session.")
+                    TextField(value = renameValue, onValueChange = { renameValue = it }, singleLine = true, label = { Text("Tab name") })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    TermuxLinuxTabs.rename(tabForAction.id, renameValue)
+                    tabActionId = null
+                }) { Text("Rename") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        val id = tabForAction.id
+                        tabActionId = null
+                        TermuxLinuxTabs.close(id, onCloseTerminal)
+                    }) { Text("Close tab") }
+                    TextButton(onClick = { tabActionId = null }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
     pendingArchitectureWarning?.let { (uri, warning) ->
         AlertDialog(
             onDismissRequest = { pendingArchitectureWarning = null },
@@ -266,6 +319,35 @@ fun TermuxLinuxTerminalPanel(
     }
 
     Column(modifier.fillMaxSize().background(Color(0xFF0B0F14))) {
+        Row(
+            Modifier.fillMaxWidth().height(38.dp).background(Color(0xFF111820))
+                .horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            TermuxLinuxTabs.tabs.forEach { tab ->
+                val selected = tab.id == TermuxLinuxTabs.selectedId
+                Column(
+                    Modifier.pointerInput(tab.id) {
+                        detectTapGestures(
+                            onTap = { TermuxLinuxTabs.selectedId = tab.id },
+                            onLongPress = { renameValue = tab.title; tabActionId = tab.id }
+                        )
+                    }.background(if (selected) Color(0xFF263442) else Color.Transparent)
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        tab.title,
+                        color = if (selected) Color(0xFFE6EDF3) else Color(0xFF9AA7B4),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.width(3.dp))
+            }
+            Text("+", Modifier.clickable { startUbuntu() }.padding(horizontal = 12.dp, vertical = 4.dp), color = Color(0xFF7CC7FF), fontSize = 22.sp)
+        }
+
         val active = TermuxLinuxTabs.tabs.firstOrNull { it.id == TermuxLinuxTabs.selectedId }
         if (active != null) {
             TermuxTerminalView(
