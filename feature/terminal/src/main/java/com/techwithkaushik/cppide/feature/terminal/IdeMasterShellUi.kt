@@ -78,7 +78,7 @@ fun IdeMasterShellUi(
                                     change.consume()
                                     val heightPx = with(density) { availableHeight.toPx() }
                                         .coerceAtLeast(1f)
-                                    dockFraction = (dockFraction - dragAmount / heightPx)
+                                    dockFraction = (dockFraction - dragAmount.y / heightPx)
                                         .coerceIn(minDockFraction, 0.98f)
                                 }
                             },
