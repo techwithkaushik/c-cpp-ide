@@ -143,7 +143,7 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: gradle --no-daemon --build-cache :integrations:linux-runtime:testDebugUnitTest :feature:terminal:testDebugUnitTest
+        run: gradle --no-daemon --build-cache --warning-mode all :integrations:linux-runtime:testDebugUnitTest :feature:terminal:testDebugUnitTest
 
       - name: Build arm32 release APK with Gradle signing
         env:

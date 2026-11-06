@@ -26,9 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
+import android.content.ClipData
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,7 +130,7 @@ internal fun DeveloperOptionsPanel() {
         dismissButton = {
             Row {
                 TextButton(onClick = { refreshLogs() }) { Text("Refresh") }
-                TextButton(enabled = logText.isNotBlank(), onClick = { scope.launch { clipboard.setText(AnnotatedString(logText)) } }) { Text("Copy") }
+                TextButton(enabled = logText.isNotBlank(), onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Developer logs", logText))) } }) { Text("Copy") }
             }
         }
     )

@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.feature.terminal
 
+import android.content.ClipData
 import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
@@ -58,6 +59,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
@@ -911,13 +913,15 @@ fun LinuxTerminalPanel(
                         }
                         TextButton(onClick = {
                             scope.launch {
-                                runCatching { clipboardManager.setText(active.output.value) }
+                                runCatching { clipboardManager.setClipEntry(ClipEntry(ClipData.newPlainText("Terminal output", active.output.value))) }
                                     .onFailure { error = terminalUserMessage(it.message, "Could not copy terminal output.") }
                             }
                         }) { Text("Copy all", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
                             scope.launch {
-                                val pasted = runCatching { clipboardManager.getText()?.text.orEmpty() }
+                                val pasted = runCatching { clipboardManager.getClipEntry()?.clipData?.let { clipData ->
+                                    if (clipData.itemCount > 0) clipData.getItemAt(0)?.coerceToText(context)?.toString().orEmpty() else ""
+                                }.orEmpty() }
                                     .onFailure { error = terminalUserMessage(it.message, "Could not read the clipboard.") }
                                     .getOrDefault("")
                                 if (pasted.isNotEmpty()) {
