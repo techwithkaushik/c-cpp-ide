@@ -58,7 +58,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import androidx.compose.ui.graphics.Color
@@ -332,7 +332,7 @@ fun LinuxTerminalPanel(
     val terminalInputFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboardManager = LocalClipboard.current
     val sshHostKeyPrefs = remember(context) { context.getSharedPreferences("trusted_ssh_host_keys", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val handler = remember { Handler(Looper.getMainLooper()) }
@@ -910,13 +910,22 @@ fun LinuxTerminalPanel(
                             }) { Text(label, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
                         }
                         TextButton(onClick = {
-                            runCatching { clipboardManager.setText(active.output.value) }
-                                .onFailure { error = terminalUserMessage(it.message, "Could not copy terminal output.") }
+                            scope.launch {
+                                runCatching { clipboardManager.setText(active.output.value) }
+                                    .onFailure { error = terminalUserMessage(it.message, "Could not copy terminal output.") }
+                            }
                         }) { Text("Copy all", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
-                            val pasted = clipboardManager.getText()?.text.orEmpty()
-                            if (pasted.isNotEmpty()) runCatching { active.send(active.screen.pasteSequence(pasted)) }.onFailure { error = terminalUserMessage(it.message, "Could not paste into the terminal.") }
-                            terminalInputFocusRequester.requestFocus()
+                            scope.launch {
+                                val pasted = runCatching { clipboardManager.getText()?.text.orEmpty() }
+                                    .onFailure { error = terminalUserMessage(it.message, "Could not read the clipboard.") }
+                                    .getOrDefault("")
+                                if (pasted.isNotEmpty()) {
+                                    runCatching { active.send(active.screen.pasteSequence(pasted)) }
+                                        .onFailure { error = terminalUserMessage(it.message, "Could not paste into the terminal.") }
+                                }
+                                terminalInputFocusRequester.requestFocus()
+                            }
                         }) { Text("Paste", fontSize = 11.sp) }
                         TextButton(enabled = active.exited.value == null, onClick = {
                             runCatching { active.send("\u000c") }.onFailure { error = terminalUserMessage(it.message, "Could not clear the terminal.") }

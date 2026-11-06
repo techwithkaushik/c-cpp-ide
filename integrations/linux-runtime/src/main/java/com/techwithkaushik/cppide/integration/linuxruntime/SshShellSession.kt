@@ -73,7 +73,7 @@ class SshShellSession private constructor(private val session: Session, private 
             jsch.hostKeyRepository = repository
             host.privateKey?.let { jsch.addIdentity("ide-key", it, null, host.privateKeyPassphrase?.toByteArray(Charsets.UTF_8)) }
             val session = jsch.getSession(host.username, host.host, host.port)
-            host.password?.let(session::setPassword)
+            host.password?.toByteArray(StandardCharsets.UTF_8)?.let(session::setPassword)
             session.setConfig(Properties().apply {
                 setProperty("StrictHostKeyChecking", "yes")
                 setProperty("PreferredAuthentications", if (host.privateKey != null) "publickey,password,keyboard-interactive" else "password,keyboard-interactive")

@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -46,7 +47,7 @@ class RootfsInstaller(private val paths: LinuxRuntimePaths) {
                 val buffer = ByteArray(32 * 1024)
                 while (true) {
                     if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException("Rootfs extraction cancelled.")
-                    val entry = tar.nextTarEntry ?: break
+                    val entry = tar.nextEntry as? TarArchiveEntry ?: break
                     count++
                     if (count > MAX_ENTRIES) throw IOException("Archive contains too many entries.")
                     val target = safeTarget(stage, entry.name)
