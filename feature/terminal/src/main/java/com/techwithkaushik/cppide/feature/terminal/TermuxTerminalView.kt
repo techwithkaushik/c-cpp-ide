@@ -86,7 +86,6 @@ private object TerminalViewInvalidationRegistry {
         }
         view.post {
             if (view.mTermSession === session) {
-                view.notifySessionChanged()
                 view.invalidate()
             }
         }
@@ -100,7 +99,6 @@ private object TerminalViewInvalidationRegistry {
             } else {
                 view.post {
                     if (view.mTermSession === session) {
-                        view.notifySessionChanged()
                         view.invalidate()
                     }
                 }
@@ -225,7 +223,9 @@ internal fun createTermuxSessionClient(context: Context, onSessionFinished: (Ter
         if (text != null) { val bytes = text.toString().toByteArray(Charsets.UTF_8); session.write(bytes, 0, bytes.size) }
     }
     override fun onBell(session: TerminalSession) = Unit
-    override fun onColorsChanged(session: TerminalSession) = Unit
+    override fun onColorsChanged(session: TerminalSession) {
+        TerminalViewInvalidationRegistry.invalidate(session)
+    }
     override fun onTerminalCursorStateChange(state: Boolean) {
         TerminalViewInvalidationRegistry.invalidateAll()
     }
