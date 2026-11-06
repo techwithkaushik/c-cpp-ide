@@ -30,6 +30,28 @@ jobs:
           # Gradle derives versionCode from the complete branch history.
           fetch-depth: 0
 
+      - name: Package current branch source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot_dir="$RUNNER_TEMP/code-studio-source"
+          mkdir -p "$snapshot_dir"
+          git archive HEAD | tar -x -C "$snapshot_dir"
+          {
+            echo "branch=$GITHUB_REF_NAME"
+            echo "commit=$GITHUB_SHA"
+            echo "repository=$GITHUB_REPOSITORY"
+          } > "$snapshot_dir/BUILD_SOURCE_INFO.txt"
+          tar -czf "$RUNNER_TEMP/code-studio-source.tar.gz" -C "$snapshot_dir" .
+
+      - name: Upload current branch source
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-studio-source-${{ github.ref_name }}-${{ github.sha }}
+          path: ${{ runner.temp }}/code-studio-source.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Restore repository signing keystore
         id: keystore
         uses: timheuer/base64-to-file@v2.0
