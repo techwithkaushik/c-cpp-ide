@@ -12,7 +12,7 @@ import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.onSizeChanged
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.viewinterop.AndroidView
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -163,12 +163,16 @@ private class TerminalZoomController(
 ) {
     private var configuredFontSizeSp = initialFontSizeSp
     private var fontSizeSp = initialFontSizeSp.coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+    // Keep fractional size between scale callbacks; rounding each callback
+    // independently discards small pinch movements and makes zoom feel sticky.
+    private var fontSizeFloat = fontSizeSp.toFloat()
     private var lastScale = 1f
 
     fun updateConfiguredFontSize(newFontSizeSp: Int) {
         if (newFontSizeSp == configuredFontSizeSp) return
         configuredFontSizeSp = newFontSizeSp
         fontSizeSp = newFontSizeSp.coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+        fontSizeFloat = fontSizeSp.toFloat()
         lastScale = 1f
         view.setTextSize(fontSizeSp)
         resizeListener.updateFontSize(fontSizeSp)
@@ -180,7 +184,8 @@ private class TerminalZoomController(
         val targetScale = cumulativeScale.coerceIn(MIN_SCALE, MAX_SCALE)
         val ratio = targetScale / lastScale
         if (abs(ratio - 1f) >= SCALE_EPSILON) {
-            val nextSize = (fontSizeSp * ratio).roundToInt().coerceIn(MIN_FONT_SP, MAX_FONT_SP)
+            fontSizeFloat = (fontSizeFloat * ratio).coerceIn(MIN_FONT_SP.toFloat(), MAX_FONT_SP.toFloat())
+            val nextSize = fontSizeFloat.roundToInt().coerceIn(MIN_FONT_SP, MAX_FONT_SP)
             if (nextSize != fontSizeSp) {
                 fontSizeSp = nextSize
                 view.setTextSize(fontSizeSp)

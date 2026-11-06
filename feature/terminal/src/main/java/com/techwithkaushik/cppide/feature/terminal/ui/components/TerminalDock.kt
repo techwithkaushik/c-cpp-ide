@@ -57,7 +57,7 @@ fun TerminalDock(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(5.dp)
+                    .height(18.dp)
                     .background(VsCodeTerminal)
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
@@ -67,7 +67,13 @@ fun TerminalDock(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Box(Modifier.width(36.dp).height(2.dp).background(VsCodeBorder))
+                Box(
+                    Modifier
+                        .padding(top = 3.dp)
+                        .width(36.dp)
+                        .height(3.dp)
+                        .background(VsCodeBorder)
+                )
             }
         }
 
