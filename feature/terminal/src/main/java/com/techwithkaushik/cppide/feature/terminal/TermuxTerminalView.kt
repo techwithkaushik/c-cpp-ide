@@ -193,7 +193,16 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
                 isFocusable = true
                 isFocusableInTouchMode = true
                 requestFocus()
-                post { resizeListener.onLayoutChange(this, left, top, right, bottom, left, top, right, bottom) }
+                // AndroidView can be attached before its parent has completed the
+                // first measure pass. Re-read the final bounds on the next frame so
+                // the PTY grid is correct before the user drags the dock.
+                postOnAnimation {
+                    if (isAttachedToWindow && width > 0 && height > 0) {
+                        requestLayout()
+                        resizeListener.resize(this)
+                        invalidate()
+                    }
+                }
             }
         },
         update = { view ->
@@ -207,6 +216,12 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
                 // The listener is held by the Compose owner rather than an integer View tag:
                 // setTag(key, value) requires an app resource ID and is unsafe with arbitrary IDs.
                 controllers.resizeListener?.resize(view)
+                view.postOnAnimation {
+                    if (view.isAttachedToWindow && view.width > 0 && view.height > 0) {
+                        controllers.resizeListener?.resize(view)
+                        view.invalidate()
+                    }
+                }
             }
             if (view.mTermSession !== session) {
                 view.mTermSession?.let { TerminalViewInvalidationRegistry.detach(it, view) }
