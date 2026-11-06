@@ -151,6 +151,7 @@ private class TerminalZoomController(
                 view.setTextSize(fontSizeSp)
                 resizeListener.updateFontSize(fontSizeSp)
                 view.requestLayout()
+                view.invalidate()
                 resizeListener.resize(view)
             }
         }
@@ -174,6 +175,10 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
         modifier = modifier,
         factory = { context ->
             TerminalView(context, null).apply {
+                layoutParams = android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                )
                 setTextSize(fontSizeSp)
                 setTypeface(Typeface.MONOSPACE)
                 setPadding(0, 0, 0, 0)
@@ -193,6 +198,16 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
         },
         update = { view ->
             controllers.zoomController?.updateConfiguredFontSize(fontSizeSp)
+            if (view.width > 0 && view.height > 0) {
+                view.measure(
+                    View.MeasureSpec.makeMeasureSpec(view.width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(view.height, View.MeasureSpec.EXACTLY)
+                )
+                view.layout(view.left, view.top, view.right, view.bottom)
+                // The listener is held by the Compose owner rather than an integer View tag:
+                // setTag(key, value) requires an app resource ID and is unsafe with arbitrary IDs.
+                controllers.resizeListener?.resize(view)
+            }
             if (view.mTermSession !== session) {
                 view.mTermSession?.let { TerminalViewInvalidationRegistry.detach(it, view) }
                 view.attachSession(session)
