@@ -1,25 +1,18 @@
 package com.techwithkaushik.cppide.feature.terminal
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,17 +23,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalDensity
 
 val VsCodeBg = Color(0xFF1E1E1E)
 val VsCodeSidebarBg = Color(0xFF252526)
 val VsCodeTerminalBg = Color(0xFF181818)
+private val VsCodeAccent = Color(0xFF007ACC)
 
 /**
- * Stable VS Code-style workspace frame. The caller owns editor and runtime state;
- * the shell only controls layout and keeps the dock composed while collapsed.
+ * VS Code-style workspace with a directly draggable terminal partition.
+ * The dock is resized in-place (without a BottomSheet or height animation) so
+ * AndroidView receives each intermediate width/height during the drag.
  */
 @Composable
 fun IdeMasterShellUi(
@@ -50,51 +46,85 @@ fun IdeMasterShellUi(
     workspaceContent: @Composable () -> Unit,
     terminalDock: @Composable () -> Unit,
 ) {
-    var dockFraction by remember { mutableStateOf(0.42f) }
+    var dockFraction by remember { mutableStateOf(0.38f) }
     val density = LocalDensity.current
-    BoxWithConstraints(modifier.fillMaxSize().background(VsCodeBg)) {
-    val availableHeight = maxHeight
-    val dockHeight by animateDpAsState(
-        targetValue = if (bottomPanelVisible) availableHeight * dockFraction else 0.dp,
-        animationSpec = tween(durationMillis = 220),
-        label = "ide-terminal-dock-height",
-    )
 
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f).fillMaxWidth().background(VsCodeBg)) {
-            workspaceContent()
+    BoxWithConstraints(modifier.fillMaxSize().background(VsCodeBg)) {
+        val availableHeight = maxHeight
+        val minDockFraction = with(density) {
+            (100.dp.toPx() / availableHeight.toPx().coerceAtLeast(1f)).coerceAtMost(0.98f)
         }
-        Column(
-            Modifier.fillMaxWidth().height(dockHeight)
-                .background(VsCodeTerminalBg, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
-        ) {
+        val dockHeight = (availableHeight * dockFraction).coerceIn(100.dp, availableHeight)
+
+        Column(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.weight(1f).fillMaxWidth().background(VsCodeBg)
+            ) {
+                workspaceContent()
+            }
+
             if (bottomPanelVisible) {
-                Box(
-                    Modifier.fillMaxWidth().height(12.dp)
-                        .pointerInput(availableHeight) {
-                            detectVerticalDragGestures { change, dragAmount ->
-                                change.consume()
-                                val maxPx = with(density) { availableHeight.toPx() }.coerceAtLeast(1f)
-                                dockFraction = (dockFraction - dragAmount / maxPx).coerceIn(0.22f, 0.72f)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
+                Column(
+                    Modifier.fillMaxWidth()
+                        .height(dockHeight)
+                        .background(VsCodeTerminalBg)
                 ) {
-                    Box(Modifier.width(42.dp).height(4.dp).background(Color(0xFF666666), RoundedCornerShape(2.dp)))
-                }
-                Row(
-                    Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("TERMINAL", color = Color(0xFFCCCCCC), fontSize = 10.sp)
-                    Text("×", Modifier.clickable(onClick = onCloseBottomPanel).padding(horizontal = 8.dp), color = Color(0xFFCCCCCC), fontSize = 16.sp)
-                }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    terminalDock()
+                    // A narrow drag rail is deliberately outside the AndroidView.
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .height(9.dp)
+                            .pointerInput(availableHeight, minDockFraction) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    val heightPx = with(density) { availableHeight.toPx() }
+                                        .coerceAtLeast(1f)
+                                    dockFraction = (dockFraction - dragAmount / heightPx)
+                                        .coerceIn(minDockFraction, 0.98f)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            Modifier.width(36.dp).height(3.dp)
+                                .background(Color(0xFF555555), RoundedCornerShape(2.dp))
+                        )
+                    }
+
+                    Row(
+                        Modifier.fillMaxWidth().height(30.dp)
+                            .background(VsCodeTerminalBg)
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        Column(
+                            Modifier.height(30.dp),
+                            verticalArrangement = Arrangement.Bottom
+                        ) {
+                            Text(
+                                "TERMINAL",
+                                color = Color(0xFFE7E7E7),
+                                fontSize = 11.sp,
+                                lineHeight = 13.sp,
+                                modifier = Modifier.padding(bottom = 5.dp)
+                            )
+                            Box(Modifier.fillMaxWidth().height(2.dp).background(VsCodeAccent))
+                        }
+                        Box(Modifier.weight(1f))
+                        Text(
+                            "×",
+                            Modifier.clickable(onClick = onCloseBottomPanel)
+                                .padding(horizontal = 5.dp),
+                            color = Color(0xFFCCCCCC),
+                            fontSize = 16.sp
+                        )
+                    }
+
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        terminalDock()
+                    }
                 }
             }
         }
-    }
     }
 }
