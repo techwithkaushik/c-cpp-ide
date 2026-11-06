@@ -46,11 +46,11 @@ fun IdeMasterShellUi(
     activeEditorBufferId: String? = null,
     onSelectEditorBuffer: (EditorBuffer) -> Unit = {},
 ) {
-    var dockHeight by remember(maxHeight) { mutableStateOf(maxHeight / 3f) }
     val density = LocalDensity.current
 
     BoxWithConstraints(modifier.fillMaxSize().background(VsCodeBackground)) {
-        val maxDock = maxHeight * 0.92f
+        var dockHeight by remember(maxHeight) { mutableStateOf(maxHeight / 3f) }
+        val maxDock = (maxHeight - 40.dp).coerceAtLeast(0.dp)
         val minDock = 0.dp
         val boundedMaxDock = maxDock.coerceAtLeast(minDock)
         val actualDockHeight = dockHeight.coerceIn(minDock, boundedMaxDock)
@@ -75,7 +75,7 @@ fun IdeMasterShellUi(
                     dockHeight = (dockHeight - deltaDp).coerceIn(minDock, boundedMaxDock)
                 },
                 content = terminalDock,
-                modifier = Modifier.fillMaxWidth().height(30.dp + if (dockVisible) actualDockHeight else 0.dp)
+                modifier = Modifier.fillMaxWidth().height(30.dp + if (dockVisible) 10.dp + actualDockHeight else 0.dp)
             )
             statusBarContent()
         }
