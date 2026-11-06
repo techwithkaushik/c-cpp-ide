@@ -399,7 +399,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                             IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg) }
                         }
-                        HorizontalDivider(color = IdeSurfaceRaised)
+                        HorizontalHorizontalDivider(color = IdeSurfaceRaised)
                         Row(Modifier.fillMaxSize()) {
                             Column(
                                 Modifier.width(116.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs),
