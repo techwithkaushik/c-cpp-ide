@@ -12,6 +12,7 @@ import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.onSizeChanged
 import androidx.compose.ui.viewinterop.AndroidView
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -24,45 +25,68 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.abs
 
-/** Measures terminal cells after layout and synchronizes the PTY only when its grid changes. */
+/** Measures the actual laid-out viewport and keeps the shell PTY grid in sync. */
 private class PtyResizeListener(
     private val session: TerminalSession,
     density: Float,
     fontSizeSp: Int,
 ) : View.OnLayoutChangeListener {
     private val density = density
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE; textSize = fontSizeSp * density }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Typeface.MONOSPACE
+        textSize = fontSizeSp * density
+    }
     private var lastColumns = 0
     private var lastRows = 0
 
     fun updateFontSize(fontSizeSp: Int) {
         val size = fontSizeSp * density
-        if (abs(paint.textSize - size) > 0.01f) { paint.textSize = size; lastColumns = 0; lastRows = 0 }
+        if (abs(paint.textSize - size) > 0.01f) {
+            paint.textSize = size
+            lastColumns = 0
+            lastRows = 0
+        }
     }
 
-    override fun onLayoutChange(view: View, left: Int, top: Int, right: Int, bottom: Int, oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int) {
-        val width = right - left - view.paddingLeft - view.paddingRight
-        val height = bottom - top - view.paddingTop - view.paddingBottom
+    override fun onLayoutChange(
+        view: View,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        oldLeft: Int,
+        oldTop: Int,
+        oldRight: Int,
+        oldBottom: Int
+    ) {
+        // Use measured dimensions, not parent-relative right/left coordinates.
+        resize(view.width, view.height, view)
+    }
+
+    fun resize(view: View) {
+        resize(view.width, view.height, view)
+    }
+
+    fun resize(widthPx: Int, heightPx: Int, view: View? = null) {
+        val width = widthPx - (view?.paddingLeft ?: 0) - (view?.paddingRight ?: 0)
+        val height = heightPx - (view?.paddingTop ?: 0) - (view?.paddingBottom ?: 0)
         if (width <= 0 || height <= 0) return
+
         val cellWidth = paint.measureText("W").coerceAtLeast(1f)
         val metrics = paint.fontMetrics
         val cellHeight = (metrics.descent - metrics.ascent).coerceAtLeast(1f)
         val columns = floor(width / cellWidth).toInt().coerceAtLeast(1)
         val rows = floor(height / cellHeight).toInt().coerceAtLeast(1)
         if (columns == lastColumns && rows == lastRows) return
+
         lastColumns = columns
         lastRows = rows
+        // updateSize resizes the terminal emulator and sends the new window size
+        // to the PTY (SIGWINCH), so shell output reflows to the visible viewport.
         session.updateSize(columns, rows)
-        view.requestLayout()
-        view.postInvalidate()
-    }
-
-    fun resize(view: View) {
-        onLayoutChange(view, view.left, view.top, view.right, view.bottom,
-            view.left, view.top, view.right, view.bottom)
+        view?.postInvalidateOnAnimation()
     }
 }
-
 /**
  * Tracks the view currently rendering each session. Session callbacks may arrive on
  * PTY reader threads, so all view work is posted to the view's UI queue.
@@ -113,10 +137,21 @@ private object TerminalViewInvalidationRegistry {
 private class TerminalViewControllerHolder {
     var resizeListener: PtyResizeListener? = null
     var zoomController: TerminalZoomController? = null
+    var terminalView: TerminalView? = null
+    var measuredWidthPx: Int = 0
+    var measuredHeightPx: Int = 0
+
+    fun updateMeasuredSize(widthPx: Int, heightPx: Int) {
+        measuredWidthPx = widthPx
+        measuredHeightPx = heightPx
+        resizeListener?.resize(widthPx, heightPx, terminalView)
+        terminalView?.postInvalidateOnAnimation()
+    }
 
     fun clear() {
         resizeListener = null
         zoomController = null
+        terminalView = null
     }
 }
 
@@ -172,7 +207,12 @@ private class TerminalZoomController(
 internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = Modifier, fontSizeSp: Int = 14, onSessionFinished: (TerminalSession) -> Unit = {}) {
     val controllers = remember(session) { TerminalViewControllerHolder() }
     AndroidView(
-        modifier = modifier,
+        modifier = modifier.onSizeChanged { size ->
+            // Compose can resize the AndroidView during a dock drag without a
+            // recomposition of the terminal session itself. Forward every real
+            // viewport size change directly to the PTY resize controller.
+            controllers.updateMeasuredSize(size.width, size.height)
+        },
         factory = { context ->
             TerminalView(context, null).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(
@@ -186,6 +226,7 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
                 val zoomController = TerminalZoomController(this, resizeListener, fontSizeSp)
                 controllers.resizeListener = resizeListener
                 controllers.zoomController = zoomController
+                controllers.terminalView = this
                 setTerminalViewClient(createTerminalViewClient(context, this, zoomController))
                 addOnLayoutChangeListener(resizeListener)
                 attachSession(session)
@@ -198,23 +239,21 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
                 // the PTY grid is correct before the user drags the dock.
                 postOnAnimation {
                     if (isAttachedToWindow && width > 0 && height > 0) {
-                        requestLayout()
                         resizeListener.resize(this)
                         invalidate()
                     }
+                }
+                if (controllers.measuredWidthPx > 0 && controllers.measuredHeightPx > 0) {
+                    resizeListener.resize(controllers.measuredWidthPx, controllers.measuredHeightPx, this)
                 }
             }
         },
         update = { view ->
             controllers.zoomController?.updateConfiguredFontSize(fontSizeSp)
+            // Do not re-measure/re-layout the AndroidView with cached bounds here.
+            // Compose owns its constraints; its onSizeChanged callback and this
+            // View's layout listener both feed the latest dimensions to the PTY.
             if (view.width > 0 && view.height > 0) {
-                view.measure(
-                    View.MeasureSpec.makeMeasureSpec(view.width, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(view.height, View.MeasureSpec.EXACTLY)
-                )
-                view.layout(view.left, view.top, view.right, view.bottom)
-                // The listener is held by the Compose owner rather than an integer View tag:
-                // setTag(key, value) requires an app resource ID and is unsafe with arbitrary IDs.
                 controllers.resizeListener?.resize(view)
                 view.postOnAnimation {
                     if (view.isAttachedToWindow && view.width > 0 && view.height > 0) {
