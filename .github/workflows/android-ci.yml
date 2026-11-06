@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Gradle derives versionCode from the complete branch history.
           fetch-depth: 0
@@ -45,7 +45,7 @@ jobs:
           tar -czf "$RUNNER_TEMP/code-studio-source.tar.gz" -C "$snapshot_dir" .
 
       - name: Upload current branch source
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: code-studio-source-${{ github.ref_name == 'feature/ubuntu-runtime-ssh' && 'feature-ubuntu-runtime-ssh' || github.ref_name }}-${{ github.sha }}
           path: ${{ runner.temp }}/code-studio-source.tar.gz
@@ -76,13 +76,13 @@ jobs:
           echo "Gradle signing secrets are configured."
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Gradle with dependency and build cache
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
 
@@ -150,7 +150,7 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: gradle --no-daemon --build-cache :app:assembleArm32Release
+        run: gradle --no-daemon --build-cache --warning-mode all :app:assembleArm32Release
 
       - name: Verify APK signature and ensure Linux runtime is app-private
         shell: bash
@@ -180,7 +180,7 @@ jobs:
           echo "Signed arm32 APK verified; Ubuntu rootfs remains a separately installed app-private runtime."
 
       - name: Upload arm32 APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: code-studio-release-apk-arm32
           path: app/build/outputs/apk/arm32/release/*.apk

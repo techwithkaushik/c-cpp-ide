@@ -5,7 +5,6 @@
     <application
         android:name=".CppIdeApplication"
         android:allowBackup="false"
-        android:extractNativeLibs="true"
         android:label="Code Studio"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
