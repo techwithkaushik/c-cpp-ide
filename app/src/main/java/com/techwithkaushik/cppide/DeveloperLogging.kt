@@ -26,7 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -45,7 +45,7 @@ import java.util.Locale
 internal fun DeveloperOptionsPanel() {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     var enabled by remember { mutableStateOf(DeveloperLog.isEnabled(context)) }
     var exporting by remember { mutableStateOf(false) }
     var showLogs by remember { mutableStateOf(false) }
@@ -129,7 +129,7 @@ internal fun DeveloperOptionsPanel() {
         dismissButton = {
             Row {
                 TextButton(onClick = { refreshLogs() }) { Text("Refresh") }
-                TextButton(enabled = logText.isNotBlank(), onClick = { clipboard.setText(AnnotatedString(logText)) }) { Text("Copy") }
+                TextButton(enabled = logText.isNotBlank(), onClick = { scope.launch { clipboard.setText(AnnotatedString(logText)) } }) { Text("Copy") }
             }
         }
     )

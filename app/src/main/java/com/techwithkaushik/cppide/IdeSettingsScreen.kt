@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -137,7 +137,7 @@ internal fun IdeSettingsScreen(
                 else OutlinedButton(onClick = { category = item }) { Text(item, fontSize = 11.sp) }
             }
         }
-        Divider(color = IdeDesignTokens.Color.Divider)
+        HorizontalDivider(color = IdeDesignTokens.Color.Divider)
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(category, color = SettingsAccent, modifier = Modifier.weight(1f))
             if (category != "Runtime & Bootstrap" && category != "Developer Options") TextButton(onClick = {

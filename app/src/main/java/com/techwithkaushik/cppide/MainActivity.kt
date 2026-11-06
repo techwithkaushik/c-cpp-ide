@@ -9,7 +9,6 @@ import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 
 import android.os.Bundle
-import android.view.WindowManager
 import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -59,7 +59,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -223,16 +223,6 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
-    // The tool panel is a bottom-anchored overlay. It must receive the
-    // reduced window height when the IME opens so its terminal toolbar docks
-    // directly above the keyboard instead of staying at its old screen position.
-    // ADJUST_RESIZE lets the bottom-anchored sheet follow the IME bounds.
-    SideEffect {
-        hostActivity?.window?.setSoftInputMode(
-            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
-        )
-    }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
     var showExplorer by rememberSaveable { mutableStateOf(false) }
     var activeActivity by rememberSaveable { mutableStateOf("Explorer") }
@@ -409,7 +399,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                             IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg) }
                         }
-                        Divider(color = IdeSurfaceRaised)
+                        HorizontalDivider(color = IdeSurfaceRaised)
                         Row(Modifier.fillMaxSize()) {
                             Column(
                                 Modifier.width(116.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs),
@@ -1456,7 +1446,7 @@ private fun WorkspaceScreen(
     onOpenSettings: () -> Unit
 ) {
     IdeMasterShellUi(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().imePadding(),
         bottomPanelVisible = showToolPanel,
         onCloseBottomPanel = onCloseToolPanel,
         selectedPanel = selectedPanel.name.uppercase(),
