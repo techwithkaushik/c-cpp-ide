@@ -49,7 +49,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
 
-private data class TermuxLinuxTab(val id: Int, val session: TerminalSession)
+internal data class TermuxLinuxTab(val id: Int, val session: TerminalSession)
 
 internal object TermuxLinuxTabs {
     val tabs = mutableStateListOf<TermuxLinuxTab>()
