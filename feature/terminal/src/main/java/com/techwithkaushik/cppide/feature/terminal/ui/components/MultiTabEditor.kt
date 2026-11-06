@@ -29,26 +29,28 @@ fun MultiTabEditor(
     modifier: Modifier = Modifier
 ) {
     Column(modifier.fillMaxSize().background(VsCodeBackground)) {
-        Row(
-            Modifier.height(35.dp).background(VsCodeSidebar).horizontalScroll(rememberScrollState())
-        ) {
+        if (buffers.isNotEmpty()) {
+            Row(
+                Modifier.height(30.dp).background(VsCodeSidebar).horizontalScroll(rememberScrollState())
+            ) {
             buffers.forEach { buffer ->
                 val active = buffer.id == activeBufferId
                 Column(
-                    Modifier.height(35.dp)
-                        .widthIn(min = 104.dp)
+                    Modifier.height(30.dp)
+                        .widthIn(min = 92.dp)
                         .background(if (active) VsCodeBackground else VsCodeSidebar)
                         .clickable { onSelectBuffer(buffer) }
                 ) {
                     Box(Modifier.height(1.dp).background(if (active) VsCodeAccent else VsCodeBorder))
                     Text(
                         buffer.fileName + if (buffer.dirty) " •" else "",
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
                         color = if (active) VsCodeText else VsCodeMutedText,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         maxLines = 1
                     )
                 }
+            }
             }
         }
         Box(Modifier.fillMaxSize()) {

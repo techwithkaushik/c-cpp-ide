@@ -1470,7 +1470,7 @@ private fun WorkspaceScreen(
         containerColor = IdeBackground,
         topBar = {
             TopAppBar(
-                modifier = Modifier.height(52.dp),
+                modifier = Modifier.height(42.dp),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         FileTypeIcon(activeFile, 21.dp)
@@ -1504,29 +1504,13 @@ private fun WorkspaceScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeSurface)
             )
         },
-        bottomBar = {
-            Column(Modifier.fillMaxWidth().background(IdeSurface)) {
-                Row(
-                    Modifier.fillMaxWidth().height(20.dp).background(Color(0xFF007ACC)).padding(horizontal = 7.dp, vertical = 1.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(if (fullScreen) "⛶" else "⌘", Modifier.clickable(onClick = onToggleFullScreen), color = Color.White, fontSize = 11.sp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("main", color = Color.White, fontSize = 10.sp)
-                    Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
-                    Text(if (dirtyFiles.contains(activeFile)) "● Unsaved" else "✓ ${projectName}", color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.weight(1f))
-                    Text(when (activeFile.substringAfterLast(".", "").lowercase()) { "cpp", "cc", "cxx", "hpp", "h" -> "C++"; "c" -> "C"; "py" -> "Python"; "js", "mjs" -> "JavaScript"; "ts", "tsx" -> "TypeScript"; "html", "htm" -> "HTML"; "css" -> "CSS"; "json" -> "JSON"; "md" -> "Markdown"; "sh", "bash" -> "Shell"; "rs" -> "Rust"; else -> "Plain Text" } + "  •  UTF-8", color = Color.White, fontSize = 10.sp)
-                }
-            }
-        }
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).background(IdeBackground)
         ) {
             // Compact AndroidIDE-style open-file strip: never let a tab consume the full row width.
             Row(
-                Modifier.fillMaxWidth().height(36.dp).background(Color(0xFF151A22)),
+                Modifier.fillMaxWidth().height(30.dp).background(Color(0xFF151A22)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
@@ -1562,6 +1546,20 @@ private fun WorkspaceScreen(
             }
         }
     }
+        },
+        statusBarContent = {
+            Row(
+                Modifier.fillMaxWidth().height(20.dp).background(Color(0xFF007ACC)).padding(horizontal = 7.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(if (fullScreen) "⛶" else "⌘", Modifier.clickable(onClick = onToggleFullScreen), color = Color.White, fontSize = 11.sp)
+                Spacer(Modifier.width(6.dp))
+                Text("main", color = Color.White, fontSize = 10.sp)
+                Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
+                Text(if (dirtyFiles.contains(activeFile)) "● Unsaved" else "✓ ${projectName}", color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.weight(1f))
+                Text(when (activeFile.substringAfterLast(".", "").lowercase()) { "cpp", "cc", "cxx", "hpp", "h" -> "C++"; "c" -> "C"; "py" -> "Python"; "js", "mjs" -> "JavaScript"; "ts", "tsx" -> "TypeScript"; "html", "htm" -> "HTML"; "css" -> "CSS"; "json" -> "JSON"; "md" -> "Markdown"; "sh", "bash" -> "Shell"; "rs" -> "Rust"; else -> "Plain Text" } + "  •  UTF-8", color = Color.White, fontSize = 10.sp)
+            }
         },
         terminalDock = {
             ToolPanelContent(

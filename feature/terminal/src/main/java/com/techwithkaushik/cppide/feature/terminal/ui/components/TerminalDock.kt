@@ -24,6 +24,7 @@ import com.techwithkaushik.cppide.feature.terminal.ui.theme.*
 @Composable
 fun TerminalDock(
     selectedPanel: String,
+    expanded: Boolean,
     onSelectPanel: (String) -> Unit,
     onClose: () -> Unit,
     onHeightDelta: (Float) -> Unit,
@@ -31,18 +32,20 @@ fun TerminalDock(
     modifier: Modifier = Modifier
 ) {
     Column(modifier.fillMaxWidth().fillMaxSize().background(VsCodeTerminal)) {
-        Box(
-            Modifier.fillMaxWidth().height(6.dp).background(VsCodeTerminal)
-                .pointerInput(Unit) {
-                    detectDragGestures { change, drag ->
-                        change.consume()
-                        onHeightDelta(drag.y)
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) { Box(Modifier.width(36.dp).height(2.dp).background(VsCodeBorder)) }
+        if (expanded) {
+            Box(
+                Modifier.fillMaxWidth().height(6.dp).background(VsCodeTerminal)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, drag ->
+                            change.consume()
+                            onHeightDelta(drag.y)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) { Box(Modifier.width(36.dp).height(2.dp).background(VsCodeBorder)) }
+        }
         Row(
-            Modifier.fillMaxWidth().height(32.dp).background(VsCodeTerminal).padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().height(32.dp).background(VsCodeTerminal).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -54,8 +57,8 @@ fun TerminalDock(
                 }
             }
             Box(Modifier.weight(1f))
-            Text("×", Modifier.clickable(onClick = onClose), color = VsCodeText, fontSize = 16.sp)
+            if (expanded) Text("×", Modifier.clickable(onClick = onClose), color = VsCodeText, fontSize = 16.sp)
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+        if (expanded) Box(Modifier.weight(1f).fillMaxWidth()) { content() }
     }
 }
