@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.techwithkaushik.cppide.feature.terminal.ui.components.ActivityBar
 import com.techwithkaushik.cppide.feature.terminal.ui.components.ActivityDestination
+import com.techwithkaushik.cppide.feature.terminal.ui.components.EditorBuffer
+import com.techwithkaushik.cppide.feature.terminal.ui.components.MultiTabEditor
 import com.techwithkaushik.cppide.feature.terminal.ui.components.OutlineNode
 import com.techwithkaushik.cppide.feature.terminal.ui.components.SidebarPanel
 import com.techwithkaushik.cppide.feature.terminal.ui.components.TerminalDock
@@ -26,8 +28,8 @@ import com.techwithkaushik.cppide.feature.terminal.ui.components.WorkspaceNode
 import com.techwithkaushik.cppide.feature.terminal.ui.theme.VsCodeBackground
 
 /**
- * Root IDE shell. Navigation is explicit: the sidebar is only changed by an
- * ActivityBar button press; no edge-swipe or modal drawer gesture is installed.
+ * Root IDE shell. The workspace/editor, navigation rail, contextual sidebar and
+ * resizable terminal are independent layout sections with explicit boundaries.
  */
 @Composable
 fun IdeMasterShellUi(
@@ -43,6 +45,9 @@ fun IdeMasterShellUi(
     ubuntuEnvironment: UbuntuEnvironmentState = UbuntuEnvironmentState(),
     onWorkspaceNodeClick: (WorkspaceNode) -> Unit = {},
     onOutlineNodeClick: (OutlineNode) -> Unit = {},
+    editorBuffers: List<EditorBuffer> = emptyList(),
+    activeEditorBufferId: String? = null,
+    onSelectEditorBuffer: (EditorBuffer) -> Unit = {},
 ) {
     var dockHeight by remember { mutableStateOf(280.dp) }
     var selectedDestination by remember { mutableStateOf(ActivityDestination.EXPLORER) }
@@ -52,7 +57,9 @@ fun IdeMasterShellUi(
     BoxWithConstraints(modifier.fillMaxSize().background(VsCodeBackground)) {
         val maxDock = maxHeight * 0.92f
         val minDock = 112.dp.coerceAtMost(maxHeight)
-        val actualDockHeight = dockHeight.coerceIn(minDock, maxDock.coerceAtLeast(minDock))
+        val boundedMaxDock = maxDock.coerceAtLeast(minDock)
+        val actualDockHeight = dockHeight.coerceIn(minDock, boundedMaxDock)
+
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 ActivityBar(
@@ -81,7 +88,12 @@ fun IdeMasterShellUi(
                     onOutlineNodeClick = onOutlineNodeClick
                 )
                 Box(Modifier.weight(1f).fillMaxSize().background(VsCodeBackground)) {
-                    workspaceContent()
+                    MultiTabEditor(
+                        buffers = editorBuffers,
+                        activeBufferId = activeEditorBufferId,
+                        onSelectBuffer = onSelectEditorBuffer,
+                        editorContent = { workspaceContent() }
+                    )
                 }
             }
             if (bottomPanelVisible) {
@@ -89,9 +101,9 @@ fun IdeMasterShellUi(
                     selectedPanel = selectedPanel,
                     onSelectPanel = onSelectPanel,
                     onClose = onCloseBottomPanel,
-                    onHeightDelta = { delta ->
-                        dockHeight = (dockHeight - with(density) { delta.toDp() })
-                            .coerceIn(minDock, maxDock.coerceAtLeast(minDock))
+                    onHeightDelta = { deltaPx ->
+                        val deltaDp = with(density) { deltaPx.toDp() }
+                        dockHeight = (dockHeight - deltaDp).coerceIn(minDock, boundedMaxDock)
                     },
                     content = terminalDock,
                     modifier = Modifier.fillMaxWidth().height(actualDockHeight)

@@ -1,6 +1,6 @@
 package com.techwithkaushik.cppide.feature.terminal.ui.components
 
-import androidx.compose.animation.animateDpAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,11 +38,14 @@ fun SidebarPanel(
     onOutlineNodeClick: (OutlineNode) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val width = animateDpAsState(if (expanded) 260.dp else 0.dp, label = "sidebar-width")
+    val animatedWidth = animateDpAsState(
+        targetValue = if (expanded) 260.dp else 0.dp,
+        label = "sidebar-width"
+    )
     Column(
-        modifier.width(width.value).fillMaxHeight().background(VsCodeSidebar)
+        modifier.width(animatedWidth.value).fillMaxHeight().background(VsCodeSidebar)
     ) {
-        if (width.value > 0.dp) {
+        if (animatedWidth.value > 0.dp) {
             Text(title.uppercase(), Modifier.fillMaxWidth().padding(12.dp), color = VsCodeText, fontSize = 11.sp)
             when (title) {
                 "Ubuntu" -> {
