@@ -98,7 +98,7 @@ fun TerminalDock(
                         selectedPanel.equals(label, ignoreCase = true)
                     Column(
                         Modifier
-                            .height(36.dp)
+                            .height(30.dp)
                             .clickable { onSelectPanel(value) }
                             .padding(horizontal = 6.dp),
                         verticalArrangement = Arrangement.Center,

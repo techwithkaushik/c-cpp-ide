@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -320,8 +319,8 @@ fun TermuxLinuxTerminalPanel(
 
     Column(modifier.fillMaxSize().background(Color(0xFF0B0F14))) {
         Row(
-            Modifier.fillMaxWidth().height(38.dp).background(Color(0xFF111820))
-                .horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
+            Modifier.fillMaxWidth().height(28.dp).background(Color(0xFF111820))
+                .horizontalScroll(rememberScrollState()).padding(horizontal = 0.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
             TermuxLinuxTabs.tabs.forEach { tab ->
@@ -333,19 +332,19 @@ fun TermuxLinuxTerminalPanel(
                             onLongPress = { renameValue = tab.title; tabActionId = tab.id }
                         )
                     }.background(if (selected) Color(0xFF263442) else Color.Transparent)
-                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                        .padding(horizontal = 3.dp, vertical = 4.dp)
                 ) {
                     Text(
                         tab.title,
                         color = if (selected) Color(0xFFE6EDF3) else Color(0xFF9AA7B4),
-                        fontSize = 12.sp,
+                        fontSize = 7.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(Modifier.width(3.dp))
+                Spacer(Modifier.width(1.dp))
             }
-            Text("+", Modifier.clickable { startUbuntu() }.padding(horizontal = 12.dp, vertical = 4.dp), color = Color(0xFF7CC7FF), fontSize = 22.sp)
+            Text("+", Modifier.clickable { startUbuntu() }.padding(horizontal = 5.dp, vertical = 2.dp), color = Color(0xFF7CC7FF), fontSize = 22.sp)
         }
 
         val active = TermuxLinuxTabs.tabs.firstOrNull { it.id == TermuxLinuxTabs.selectedId }
