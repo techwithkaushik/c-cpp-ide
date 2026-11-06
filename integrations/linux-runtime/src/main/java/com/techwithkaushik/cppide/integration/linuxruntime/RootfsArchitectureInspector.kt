@@ -1,6 +1,5 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
@@ -23,7 +22,7 @@ object RootfsArchitectureInspector {
         val decoded = decoder(raw, archiveName)
         TarArchiveInputStream(decoded).use { tar ->
             while (true) {
-                val entry = tar.nextEntry as? TarArchiveEntry ?: break
+                val entry = tar.nextEntry ?: break
                 if (!entry.isFile) continue
                 val header = ByteArray(20)
                 var read = 0
