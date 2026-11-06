@@ -16,7 +16,7 @@ concurrency:
 
 env:
   JAVA_VERSION: "17"
-  GRADLE_VERSION: "8.13"
+  GRADLE_VERSION: "9.8.2"
 
 jobs:
   release:
