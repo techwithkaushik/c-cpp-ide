@@ -57,7 +57,7 @@ fun TerminalDock(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(18.dp)
+                    .height(10.dp)
                     .background(VsCodeTerminal)
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
@@ -69,7 +69,7 @@ fun TerminalDock(
             ) {
                 Box(
                     Modifier
-                        .padding(top = 3.dp)
+                        .padding(top = 2.dp)
                         .width(36.dp)
                         .height(3.dp)
                         .background(VsCodeBorder)
@@ -82,7 +82,7 @@ fun TerminalDock(
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(36.dp)
+                .height(30.dp)
                 .background(VsCodeTerminal),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -100,7 +100,7 @@ fun TerminalDock(
                         Modifier
                             .height(36.dp)
                             .clickable { onSelectPanel(value) }
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 6.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -111,13 +111,13 @@ fun TerminalDock(
                             Text(
                                 glyph,
                                 color = if (selected) VsCodeAccent else VsCodeMutedText,
-                                fontSize = 17.sp
+                                fontSize = 14.sp
                             )
                             Text(
                                 label,
                                 color = if (selected) VsCodeText else VsCodeMutedText,
-                                fontSize = 11.sp,
-                                letterSpacing = 0.35.sp
+                                fontSize = 9.sp,
+                                letterSpacing = 0.2.sp
                             )
                         }
                         Box(
@@ -134,9 +134,9 @@ fun TerminalDock(
                 if (expanded) "⌄" else "⌃",
                 Modifier
                     .clickable(onClick = onClose)
-                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
                 color = VsCodeMutedText,
-                fontSize = 18.sp
+                fontSize = 16.sp
             )
         }
 

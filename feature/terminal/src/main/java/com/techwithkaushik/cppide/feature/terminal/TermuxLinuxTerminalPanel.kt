@@ -63,11 +63,12 @@ internal object TermuxLinuxTabs {
         return id
     }
 
-    fun onSessionFinished(session: TerminalSession) {
+    fun onSessionFinished(session: TerminalSession, onAllSessionsFinished: () -> Unit = {}) {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             val tab = tabs.firstOrNull { it.session === session } ?: return@post
             tabs.remove(tab)
             if (selectedId == tab.id) selectedId = tabs.lastOrNull()?.id ?: 0
+            if (tabs.isEmpty()) onAllSessionsFinished()
         }
     }
 
@@ -216,7 +217,7 @@ fun TermuxLinuxTerminalPanel(
                 val sessionStartedAt = System.nanoTime()
                 DeveloperLog.event("TermuxTerminal", "terminal_session_create_started", mapOf("operationId" to operationId))
                 withContext(Dispatchers.Main.immediate) {
-                    runCatching { UbuntuTermuxSession.create(context, paths, onFinished = TermuxLinuxTabs::onSessionFinished) }
+                    runCatching { UbuntuTermuxSession.create(context, paths, onFinished = { finished -> TermuxLinuxTabs.onSessionFinished(finished, onCloseTerminal) }) }
                 }.also { sessionResult ->
                     DeveloperLog.event("TermuxTerminal", "terminal_session_create_completed", mapOf(
                         "operationId" to operationId,

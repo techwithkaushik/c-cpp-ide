@@ -177,15 +177,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             when {
                 !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
                 prootCheck.isFailure -> "Bundled Android PRoot validation failed: ${prootCheck.exceptionOrNull()?.message ?: "unknown error"}"
-                else -> {
-                    val smoke = LinuxRuntimeSmokeTest(paths).run()
-                    if (smoke.success) "Ubuntu runtime ready."
-                    else "Ubuntu shell validation failed: ${smoke.error ?: smoke.output}"
-                }
+                else -> "Ubuntu runtime binaries ready; shell smoke test deferred until terminal start."
             }
         }
-        if (result == "Ubuntu runtime ready.") {
-            DeveloperLog.info(appContext, "Ubuntu", "Startup runtime validation succeeded")
+        if (result == "Ubuntu runtime binaries ready; shell smoke test deferred until terminal start.") {
+            DeveloperLog.info(appContext, "Ubuntu", "Startup runtime binary validation succeeded")
         } else {
             DeveloperLog.error(appContext, "Ubuntu", "Startup runtime validation failed: $result")
         }

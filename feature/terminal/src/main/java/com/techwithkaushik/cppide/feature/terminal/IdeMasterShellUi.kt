@@ -51,9 +51,10 @@ fun IdeMasterShellUi(
 
     BoxWithConstraints(modifier.fillMaxSize().background(VsCodeBackground)) {
         val maxDock = maxHeight * 0.92f
-        val minDock = 112.dp.coerceAtMost(maxHeight)
+        val minDock = 0.dp
         val boundedMaxDock = maxDock.coerceAtLeast(minDock)
         val actualDockHeight = dockHeight.coerceIn(minDock, boundedMaxDock)
+        val dockVisible = bottomPanelVisible && actualDockHeight >= 40.dp
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth().background(VsCodeBackground)) {
@@ -66,7 +67,7 @@ fun IdeMasterShellUi(
             }
             TerminalDock(
                 selectedPanel = selectedPanel,
-                expanded = bottomPanelVisible,
+                expanded = dockVisible,
                 onSelectPanel = onSelectPanel,
                 onClose = onCloseBottomPanel,
                 onHeightDelta = { deltaPx ->
@@ -74,7 +75,7 @@ fun IdeMasterShellUi(
                     dockHeight = (dockHeight - deltaDp).coerceIn(minDock, boundedMaxDock)
                 },
                 content = terminalDock,
-                modifier = Modifier.fillMaxWidth().height(if (bottomPanelVisible) actualDockHeight else 34.dp)
+                modifier = Modifier.fillMaxWidth().height(if (dockVisible) actualDockHeight else 0.dp)
             )
             statusBarContent()
         }
