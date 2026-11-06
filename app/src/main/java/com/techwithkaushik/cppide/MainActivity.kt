@@ -399,7 +399,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                             IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg) }
                         }
-                        HorizontalHorizontalDivider(color = IdeSurfaceRaised)
+                        HorizontalDivider(color = IdeSurfaceRaised)
                         Row(Modifier.fillMaxSize()) {
                             Column(
                                 Modifier.width(116.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs),
@@ -428,7 +428,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                             Column(Modifier.weight(1f).fillMaxHeight().background(IdeSurface).padding(horizontal = 10.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                                 Text(drawerDestination.uppercase(), color = Color(0xFFE8EDF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Divider(color = IdeSurfaceRaised)
+                                HorizontalDivider(color = IdeSurfaceRaised)
                                 when (drawerDestination) {
                                     "File Explorer" -> FileExplorerSheet(
                                         projectName = selectedProject, activeFile = activeFile, files = workspaceFiles.toList(),
@@ -1708,7 +1708,7 @@ private fun FileExplorerSheet(
                 Text("Try a different file name.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
             }
         }
-        Divider(color = IdeSurfaceRaised)
+        HorizontalDivider(color = IdeSurfaceRaised)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Workspace files", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
             Text("Linux runtime inactive", color = Color(0xFFE5B978), fontSize = 10.sp)
@@ -1972,7 +1972,7 @@ private fun ToolStatusCard(
                 Text(status, color = Color(0xFFE8EDF5), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
             Text(description, color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
-            Divider(color = IdeSurfaceRaised)
+            HorizontalDivider(color = IdeSurfaceRaised)
             Text(detail, color = accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace)        }
     }
 }
