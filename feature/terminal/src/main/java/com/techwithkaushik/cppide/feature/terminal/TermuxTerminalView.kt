@@ -17,6 +17,8 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
+import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentHashMap
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -56,6 +58,54 @@ private class PtyResizeListener(
     fun resize(view: View) {
         onLayoutChange(view, view.left, view.top, view.right, view.bottom,
             view.left, view.top, view.right, view.bottom)
+    }
+}
+
+/**
+ * Tracks the view currently rendering each session. Session callbacks may arrive on
+ * PTY reader threads, so all view work is posted to the view's UI queue.
+ */
+private object TerminalViewInvalidationRegistry {
+    private val views = ConcurrentHashMap<TerminalSession, WeakReference<TerminalView>>()
+
+    fun attach(session: TerminalSession, view: TerminalView) {
+        views[session] = WeakReference(view)
+        invalidate(session)
+    }
+
+    fun detach(session: TerminalSession, view: TerminalView) {
+        val current = views[session]?.get()
+        if (current === view) views.remove(session)
+    }
+
+    fun invalidate(session: TerminalSession) {
+        val view = views[session]?.get()
+        if (view == null) {
+            views.remove(session)
+            return
+        }
+        view.post {
+            if (view.mTermSession === session) {
+                view.notifySessionChanged()
+                view.invalidate()
+            }
+        }
+    }
+
+    fun invalidateAll() {
+        views.entries.toList().forEach { (session, reference) ->
+            val view = reference.get()
+            if (view == null) {
+                views.remove(session, reference)
+            } else {
+                view.post {
+                    if (view.mTermSession === session) {
+                        view.notifySessionChanged()
+                        view.invalidate()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -133,6 +183,7 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
                 setTerminalViewClient(createTerminalViewClient(context, this, zoomController))
                 addOnLayoutChangeListener(resizeListener)
                 attachSession(session)
+                TerminalViewInvalidationRegistry.attach(session, this)
                 isFocusable = true
                 isFocusableInTouchMode = true
                 requestFocus()
@@ -141,7 +192,11 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
         },
         update = { view ->
             controllers.zoomController?.updateConfiguredFontSize(fontSizeSp)
-            if (view.mTermSession !== session) view.attachSession(session)
+            if (view.mTermSession !== session) {
+                view.mTermSession?.let { TerminalViewInvalidationRegistry.detach(it, view) }
+                view.attachSession(session)
+                TerminalViewInvalidationRegistry.attach(session, view)
+            }
             view.isFocusable = true
             view.isFocusableInTouchMode = true
             view.requestFocus()
@@ -149,13 +204,16 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
         onRelease = { view ->
             controllers.resizeListener?.let(view::removeOnLayoutChangeListener)
             controllers.clear()
+            TerminalViewInvalidationRegistry.detach(session, view)
             if (view.mTermSession === session) view.attachSession(null)
         }
     )
 }
 
 internal fun createTermuxSessionClient(context: Context, onSessionFinished: (TerminalSession) -> Unit = {}): TerminalSessionClient = object : TerminalSessionClient {
-    override fun onTextChanged(changedSession: TerminalSession) = Unit
+    override fun onTextChanged(changedSession: TerminalSession) {
+        TerminalViewInvalidationRegistry.invalidate(changedSession)
+    }
     override fun onTitleChanged(changedSession: TerminalSession) = Unit
     override fun onSessionFinished(finishedSession: TerminalSession) = onSessionFinished.invoke(finishedSession)
     override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
@@ -168,7 +226,9 @@ internal fun createTermuxSessionClient(context: Context, onSessionFinished: (Ter
     }
     override fun onBell(session: TerminalSession) = Unit
     override fun onColorsChanged(session: TerminalSession) = Unit
-    override fun onTerminalCursorStateChange(state: Boolean) = Unit
+    override fun onTerminalCursorStateChange(state: Boolean) {
+        TerminalViewInvalidationRegistry.invalidateAll()
+    }
     override fun getTerminalCursorStyle(): Int = 0
     override fun logError(tag: String, message: String) = DeveloperLog.error("Termux/$tag", message)
     override fun logWarn(tag: String, message: String) = DeveloperLog.warn("Termux/$tag", message)
