@@ -35,7 +35,7 @@ private class PtyResizeListener(
     private var lastColumns = 0
     private var lastRows = 0
 
-    fun setFontSize(fontSizeSp: Int) {
+    fun updateFontSize(fontSizeSp: Int) {
         val size = fontSizeSp * density
         if (abs(paint.textSize - size) > 0.01f) { paint.textSize = size; lastColumns = 0; lastRows = 0 }
     }
@@ -53,6 +53,8 @@ private class PtyResizeListener(
         lastColumns = columns
         lastRows = rows
         session.updateSize(columns, rows)
+        view.requestLayout()
+        view.postInvalidate()
     }
 
     fun resize(view: View) {
@@ -134,7 +136,7 @@ private class TerminalZoomController(
         fontSizeSp = newFontSizeSp.coerceIn(MIN_FONT_SP, MAX_FONT_SP)
         lastScale = 1f
         view.setTextSize(fontSizeSp)
-        resizeListener.setFontSize(fontSizeSp)
+        resizeListener.updateFontSize(fontSizeSp)
         view.requestLayout()
         resizeListener.resize(view)
     }
@@ -147,7 +149,7 @@ private class TerminalZoomController(
             if (nextSize != fontSizeSp) {
                 fontSizeSp = nextSize
                 view.setTextSize(fontSizeSp)
-                resizeListener.setFontSize(fontSizeSp)
+                resizeListener.updateFontSize(fontSizeSp)
                 view.requestLayout()
                 resizeListener.resize(view)
             }
@@ -157,7 +159,7 @@ private class TerminalZoomController(
     }
 
     companion object {
-        private const val MIN_FONT_SP = 8
+        private const val MIN_FONT_SP = 10
         private const val MAX_FONT_SP = 32
         private const val MIN_SCALE = 0.65f
         private const val MAX_SCALE = 2.0f
@@ -174,6 +176,7 @@ internal fun TermuxTerminalView(session: TerminalSession, modifier: Modifier = M
             TerminalView(context, null).apply {
                 setTextSize(fontSizeSp)
                 setTypeface(Typeface.MONOSPACE)
+                setPadding(0, 0, 0, 0)
                 val resizeListener = PtyResizeListener(session, resources.displayMetrics.density, fontSizeSp)
                 val zoomController = TerminalZoomController(this, resizeListener, fontSizeSp)
                 controllers.resizeListener = resizeListener
