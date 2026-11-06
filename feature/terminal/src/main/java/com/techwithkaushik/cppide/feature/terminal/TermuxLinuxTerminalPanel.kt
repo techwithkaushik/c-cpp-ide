@@ -265,27 +265,6 @@ fun TermuxLinuxTerminalPanel(
     }
 
     Column(modifier.fillMaxSize().background(Color(0xFF0B0F14))) {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TermuxLinuxTabs.tabs.forEach { tab ->
-                OutlinedButton(
-                    onClick = { TermuxLinuxTabs.selectedId = tab.id },
-                    modifier = Modifier.height(28.dp),
-                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)
-                ) {
-                    Text(
-                        if (tab.id == TermuxLinuxTabs.selectedId) "● ${tab.id}" else "${tab.id}",
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp
-                    )
-                }
-                Text("×", color = Color(0xFFFF8A80), modifier = Modifier.clickable { TermuxLinuxTabs.close(tab.id) }.padding(horizontal = 3.dp, vertical = 4.dp), fontSize = 12.sp)
-            }
-            Button(enabled = !busy, onClick = ::startUbuntu) { Text("+") }
-        }
-
         val active = TermuxLinuxTabs.tabs.firstOrNull { it.id == TermuxLinuxTabs.selectedId }
         if (active != null) {
             TermuxTerminalView(
