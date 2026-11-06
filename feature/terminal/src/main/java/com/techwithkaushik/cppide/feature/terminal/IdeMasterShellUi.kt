@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -28,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
 
 val VsCodeBg = Color(0xFF1E1E1E)
 val VsCodeSidebarBg = Color(0xFF252526)
@@ -42,54 +46,41 @@ fun IdeMasterShellUi(
     modifier: Modifier = Modifier,
     bottomPanelVisible: Boolean,
     onCloseBottomPanel: () -> Unit,
-    sidebarContent: @Composable () -> Unit,
     workspaceContent: @Composable () -> Unit,
     terminalDock: @Composable () -> Unit,
 ) {
-    var sidebarExpanded by remember { mutableStateOf(false) }
-    val sidebarWidth by animateDpAsState(
-        targetValue = if (sidebarExpanded) 232.dp else 48.dp,
-        animationSpec = tween(durationMillis = 220),
-        label = "ide-sidebar-width",
-    )
+    var dockFraction by remember { mutableStateOf(0.42f) }
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier.fillMaxSize().background(VsCodeBg)) {
+    val availableHeight = maxHeight
     val dockHeight by animateDpAsState(
-        targetValue = if (bottomPanelVisible) 300.dp else 0.dp,
+        targetValue = if (bottomPanelVisible) availableHeight * dockFraction else 0.dp,
         animationSpec = tween(durationMillis = 220),
         label = "ide-terminal-dock-height",
     )
 
-    Column(modifier.fillMaxSize().background(VsCodeBg)) {
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-            Column(
-                Modifier.width(sidebarWidth).fillMaxHeight()
-                    .background(VsCodeSidebarBg)
-                    .animateContentSize(),
-            ) {
-                Box(
-                    Modifier.fillMaxWidth().height(44.dp)
-                        .clickable { sidebarExpanded = !sidebarExpanded }
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Text(if (sidebarExpanded) "‹  Explorer" else "▤", color = Color(0xFFCCCCCC), fontSize = 14.sp)
-                }
-                if (sidebarExpanded) {
-                    Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)) {
-                        sidebarContent()
-                    }
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
-            }
-            Box(Modifier.weight(1f).fillMaxHeight().background(VsCodeBg)) {
-                workspaceContent()
-            }
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxWidth().background(VsCodeBg)) {
+            workspaceContent()
         }
         Column(
             Modifier.fillMaxWidth().height(dockHeight)
                 .background(VsCodeTerminalBg, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
         ) {
             if (bottomPanelVisible) {
+                Box(
+                    Modifier.fillMaxWidth().height(12.dp)
+                        .pointerInput(availableHeight) {
+                            detectVerticalDragGestures { change, dragAmount ->
+                                change.consume()
+                                val maxPx = with(density) { availableHeight.toPx() }.coerceAtLeast(1f)
+                                dockFraction = (dockFraction - dragAmount / maxPx).coerceIn(0.22f, 0.72f)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.width(42.dp).height(4.dp).background(Color(0xFF666666), RoundedCornerShape(2.dp)))
+                }
                 Row(
                     Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -103,5 +94,6 @@ fun IdeMasterShellUi(
                 }
             }
         }
+    }
     }
 }
