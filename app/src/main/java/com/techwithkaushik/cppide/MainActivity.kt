@@ -1463,6 +1463,8 @@ private fun WorkspaceScreen(
         modifier = Modifier.fillMaxSize(),
         bottomPanelVisible = showToolPanel,
         onCloseBottomPanel = onCloseToolPanel,
+        selectedPanel = selectedPanel.name.uppercase(),
+        onSelectPanel = { label -> onPanel(ToolPanel.valueOf(label.lowercase().replaceFirstChar { it.titlecase() })) },
         workspaceContent = {
                 Scaffold(
         containerColor = IdeBackground,
@@ -1504,33 +1506,6 @@ private fun WorkspaceScreen(
         },
         bottomBar = {
             Column(Modifier.fillMaxWidth().background(IdeSurface)) {
-                Row(
-                    Modifier.fillMaxWidth().height(30.dp).horizontalScroll(rememberScrollState())
-                        .padding(start = IdeDesignTokens.Spacing.sm, end = IdeDesignTokens.Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf(
-                        Triple("TERMINAL", ToolPanel.Terminal, "terminal"),
-                        Triple("BUILD", ToolPanel.Build, "build"),
-                        Triple("PROBLEMS", ToolPanel.Problems, "problems"),
-                        Triple("OUTPUT", ToolPanel.Output, "output")
-                    ).forEach { (label, panel, icon) ->
-                        val selected = selectedPanel == panel
-                        Column(
-                            Modifier.clickable { onPanel(panel) }.padding(end = 10.dp, top = 3.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                IdeIcon(icon, if (selected) IdeAccent else IdeMuted, 15.dp)
-                                Text(label, color = if (selected) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-                            }
-                            Spacer(Modifier.height(IdeDesignTokens.Spacing.xs))
-                            Box(Modifier.width(IdeDesignTokens.Spacing.xl).height(IdeDesignTokens.Spacing.xxs).background(if (selected) IdeAccent else Color.Transparent))
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text(if (showToolPanel) "⌄" else "⌃", Modifier.clickable { if (showToolPanel) onCloseToolPanel() else onPanel(selectedPanel) }.padding(horizontal = 10.dp, vertical = 6.dp), color = IdeMuted, fontSize = 16.sp)
-                }
                 Row(
                     Modifier.fillMaxWidth().height(20.dp).background(Color(0xFF007ACC)).padding(horizontal = 7.dp, vertical = 1.dp),
                     verticalAlignment = Alignment.CenterVertically
