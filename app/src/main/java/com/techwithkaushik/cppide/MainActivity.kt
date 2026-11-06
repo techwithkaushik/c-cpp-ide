@@ -414,7 +414,10 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         }
                         Divider(color = IdeSurfaceRaised)
                         Row(Modifier.fillMaxSize()) {
-                            Column(Modifier.width(48.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(
+                                Modifier.width(116.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
                                 listOf(
                                     Triple("File Explorer", "folder", "Explorer"),
                                     Triple("Search", "search", "Search"),
@@ -422,17 +425,17 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                     Triple("Run and Debug", "run", "Run and Debug"),
                                     Triple("Extensions", "extensions", "Extensions"),
                                     Triple("Settings", "settings", "Settings")
-                                ).forEach { (destination, icon, _) ->
+                                ).forEach { (destination, icon, label) ->
                                     val active = drawerDestination == destination
-                                    Column(
+                                    Row(
                                         Modifier.fillMaxWidth().clickable { drawerDestination = destination }
-                                            .background(if (active) Color(0xFF202B37) else Color.Transparent).padding(vertical = 10.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
+                                            .background(if (active) Color(0xFF202B37) else Color.Transparent)
+                                            .padding(horizontal = 9.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                            if (active) Box(Modifier.align(Alignment.CenterStart).width(IdeDesignTokens.Spacing.xxs).height(25.dp).background(IdeAccent))
-                                            IdeIcon(icon, if (active) Color(0xFFE8EDF5) else IdeMuted, 20.dp)
-                                        }
+                                        IdeIcon(icon, if (active) Color(0xFFE8EDF5) else IdeMuted, 18.dp)
+                                        Text(label, color = if (active) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, maxLines = 1)
                                     }
                                 }
                             }
@@ -1459,21 +1462,6 @@ private fun WorkspaceScreen(
         modifier = Modifier.fillMaxSize(),
         bottomPanelVisible = showToolPanel,
         onCloseBottomPanel = onCloseToolPanel,
-        sidebarContent = {
-            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("OPEN EDITORS", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                openFiles.forEach { file ->
-                    Text(
-                        file,
-                        Modifier.fillMaxWidth().clickable { onSelectFile(file) }.padding(vertical = 5.dp, horizontal = 4.dp),
-                        color = if (file == activeFile) IdeAccent else IdeMuted,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        },
         workspaceContent = {
                 Scaffold(
         containerColor = IdeBackground,
