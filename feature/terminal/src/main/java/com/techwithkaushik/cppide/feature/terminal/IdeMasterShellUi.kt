@@ -44,6 +44,8 @@ fun IdeMasterShellUi(
     bottomPanelVisible: Boolean,
     onCloseBottomPanel: () -> Unit,
     workspaceContent: @Composable () -> Unit,
+    selectedPanel: String,
+    onSelectPanel: (String) -> Unit,
     terminalDock: @Composable () -> Unit,
 ) {
     var dockFraction by remember { mutableStateOf(0.38f) }
@@ -91,30 +93,35 @@ fun IdeMasterShellUi(
                     }
 
                     Row(
-                        Modifier.fillMaxWidth().height(30.dp)
+                        Modifier.fillMaxWidth().height(38.dp)
                             .background(VsCodeTerminalBg)
-                            .padding(horizontal = 12.dp),
+                            .padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
-                        Column(
-                            Modifier.height(30.dp),
-                            verticalArrangement = Arrangement.Bottom
-                        ) {
-                            Text(
-                                "TERMINAL",
-                                color = Color(0xFFE7E7E7),
-                                fontSize = 11.sp,
-                                lineHeight = 13.sp,
-                                modifier = Modifier.padding(bottom = 5.dp)
-                            )
-                            Box(Modifier.fillMaxWidth().height(2.dp).background(VsCodeAccent))
+                        listOf("TERMINAL", "BUILD", "PROBLEMS", "OUTPUT").forEach { panel ->
+                            Column(
+                                Modifier.clickable { onSelectPanel(panel) }
+                                    .height(38.dp),
+                                verticalArrangement = Arrangement.Bottom
+                            ) {
+                                Text(
+                                    panel,
+                                    color = if (selectedPanel == panel) Color(0xFFE7E7E7) else Color(0xFF9DA5B0),
+                                    fontSize = 11.sp,
+                                    lineHeight = 13.sp,
+                                    modifier = Modifier.padding(bottom = 7.dp)
+                                )
+                                Box(
+                                    Modifier.fillMaxWidth().height(2.dp)
+                                        .background(if (selectedPanel == panel) VsCodeAccent else Color.Transparent)
+                                )
+                            }
                         }
                         Box(Modifier.weight(1f))
                         Text(
                             "×",
-                            Modifier.clickable(onClick = onCloseBottomPanel)
-                                .padding(horizontal = 5.dp),
+                            Modifier.clickable(onClick = onCloseBottomPanel).padding(horizontal = 5.dp),
                             color = Color(0xFFCCCCCC),
                             fontSize = 16.sp
                         )
