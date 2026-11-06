@@ -398,6 +398,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     } else {
         ModalNavigationDrawer(
             drawerState = drawerState,
+            gesturesEnabled = false,
             drawerContent = {
                 ModalDrawerSheet(
                     drawerContainerColor = IdeSurface,
@@ -1538,9 +1539,9 @@ private fun WorkspaceScreen(
                     Spacer(Modifier.width(6.dp))
                     Text("main", color = Color.White, fontSize = 10.sp)
                     Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
-                    Text("✓ UI Prototype", color = Color.White, fontSize = 10.sp)
+                    Text(if (dirtyFiles.contains(activeFile)) "● Unsaved" else "✓ ${projectName}", color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.weight(1f))
-                    Text(if (activeFile.endsWith(".cpp")) "C++  •  UTF-8  •  Ln 1, Col 1" else if (activeFile.endsWith(".c")) "C  •  UTF-8  •  Ln 1, Col 1" else "UTF-8  •  Ln 1, Col 1", color = Color.White, fontSize = 10.sp)
+                    Text(when (activeFile.substringAfterLast(".", "").lowercase()) { "cpp", "cc", "cxx", "hpp", "h" -> "C++"; "c" -> "C"; "py" -> "Python"; "js", "mjs" -> "JavaScript"; "ts", "tsx" -> "TypeScript"; "html", "htm" -> "HTML"; "css" -> "CSS"; "json" -> "JSON"; "md" -> "Markdown"; "sh", "bash" -> "Shell"; "rs" -> "Rust"; else -> "Plain Text" } + "  •  UTF-8", color = Color.White, fontSize = 10.sp)
                 }
             }
         }
@@ -1884,36 +1885,6 @@ private fun ToolPanelContent(
         Modifier.fillMaxWidth().fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ToolPanel.entries.forEach { panel ->
-                val label = when (panel) {
-                    ToolPanel.Terminal -> "Terminal"
-                    ToolPanel.Build -> "Build"
-                    ToolPanel.Problems -> "Problems"
-                    ToolPanel.Output -> "Output"
-                }
-                Box(
-                    Modifier.background(
-                        if (panel == selected) IdeAccent else Color(0xFF171D26),
-                        RoundedCornerShape(18.dp)
-                    ).clickable { onSelect(panel) }
-                        .padding(horizontal = 13.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        label,
-                        color = if (panel == selected) Color(0xFF0D1722) else IdeMuted,
-                        fontSize = 11.sp,
-                        fontWeight = if (panel == selected) FontWeight.SemiBold else FontWeight.Medium,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
         when (selected) {
             ToolPanel.Terminal -> {
                 TermuxLinuxTerminalPanel(
