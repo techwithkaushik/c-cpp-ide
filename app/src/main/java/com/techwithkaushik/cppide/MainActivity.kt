@@ -172,7 +172,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     // Validate the app-owned Ubuntu runtime once on every cold app launch.
     // The result is cached for this launch so users do not need to open Settings.
     LaunchedEffect(appContext) {
-        DeveloperLog.info(appContext, "Ubuntu", "Startup runtime validation started")
+        val runtimeValidationStartedAt = System.nanoTime()
+        DeveloperLog.event("Application", "runtime_validation_started", mapOf("sdk" to android.os.Build.VERSION.SDK_INT, "abi" to android.os.Build.SUPPORTED_ABIS.firstOrNull(), "nativeLibraryDir" to appContext.applicationInfo.nativeLibraryDir))
         val runtimePrefs = appContext.getSharedPreferences("linux_runtime_validation", android.content.Context.MODE_PRIVATE)
         val result = withContext(Dispatchers.IO) {
             val paths = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
@@ -182,6 +183,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 // Also validates ELF format and device ABI, not just file presence.
                 ProotDownloader(paths).downloadAndInstall()
             }
+            prootCheck.onSuccess { DeveloperLog.event("Application", "bundled_proot_validated", mapOf("abi" to it.abi, "bytes" to it.bytes, "release" to it.release)) }
+                .onFailure { DeveloperLog.failure("Application", "bundled_proot_validation_failed", it, mapOf("proot" to paths.proot.absolutePath, "loader" to paths.prootLoader.absolutePath)) }
+            DeveloperLog.event("Application", "rootfs_validation_result", mapOf("rootfsExists" to paths.hasRootfs(), "rootfsDiagnostic" to paths.rootfsDiagnostic()))
             when {
                 !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
                 prootCheck.isFailure -> "Bundled Android PRoot validation failed: ${prootCheck.exceptionOrNull()?.message ?: "unknown error"}"
@@ -193,8 +197,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         } else {
             DeveloperLog.error(appContext, "Ubuntu", "Startup runtime validation failed: $result")
         }
+        DeveloperLog.event("Application", "runtime_validation_finished", mapOf("result" to result, "durationMs" to (System.nanoTime() - runtimeValidationStartedAt) / 1_000_000))
         runtimePrefs.edit()
-            .putBoolean("ready", result == "Ubuntu runtime ready.")
+            .putBoolean("ready", result.startsWith("Ubuntu runtime binaries ready"))
             .putString("message", result)
             .putLong("checked_at", System.currentTimeMillis())
             .apply()
@@ -240,13 +245,16 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var showRecentFiles by rememberSaveable { mutableStateOf(false) }
     var recentFiles = remember { mutableStateListOf<String>() }
     fun openFile(file: String) {
+        DeveloperLog.event(appContext, "Workspace", "file_open_requested", mapOf("project" to selectedProject, "file" to file, "cached" to fileContents.containsKey(file)))
         if (!openFiles.contains(file)) openFiles.add(file)
         activeFile = file
         code = fileContents[file] ?: sampleCode(file).also { fileContents[file] = it }
         recentFiles.remove(file)
         recentFiles.add(0, file)
+        DeveloperLog.event(appContext, "Workspace", "file_opened", mapOf("project" to selectedProject, "file" to file, "characters" to code.length, "openTabCount" to openFiles.size))
     }
     fun closeFile(file: String) {
+        DeveloperLog.event(appContext, "Workspace", "file_close_requested", mapOf("project" to selectedProject, "file" to file, "dirty" to dirtyFiles.contains(file)))
         if (dirtyFiles.contains(file)) { pendingCloseError = null; pendingCloseFile = file; return }
         openFiles.remove(file)
         if (openFiles.isEmpty()) openFiles.add("README.md")
@@ -292,13 +300,20 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     LaunchedEffect(workspaceDirectory?.absolutePath, clangdGuestPath, screen, runtimeValidationComplete) {
         clangdSession = null
         if (runtimeValidationComplete && screen == IdeScreen.Workspace && workspaceDirectory != null) {
+            DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_creation_started", mapOf("projectPath" to workspaceDirectory.absolutePath, "configuredClangd" to clangdGuestPath, "runtimeReady" to runtimePaths.ready()))
             clangdSession = withContext(Dispatchers.IO) {
                 ClangdProjectSession(workspaceDirectory, runtimePaths, clangdGuestPath)
             }
+            DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_creation_finished", mapOf("projectPath" to workspaceDirectory.absolutePath, "status" to clangdSession?.status?.value?.label, "detail" to clangdSession?.status?.value?.detail, "error" to clangdSession?.status?.value?.error))
+        } else {
+            DeveloperLog.debug(appContext, "ClangdLsp", "workspace_session_creation_skipped; screen=$screen; runtimeValidationComplete=$runtimeValidationComplete; workspaceExists=${workspaceDirectory != null}")
         }
     }
     DisposableEffect(clangdSession) {
-        onDispose { runCatching { clangdSession?.close() } }
+        onDispose {
+            DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_dispose_requested", mapOf("present" to (clangdSession != null)))
+            runCatching { clangdSession?.close() }.onFailure { DeveloperLog.failure("ClangdLsp", "workspace_session_dispose_failed", it) }
+        }
     }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
