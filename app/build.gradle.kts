@@ -98,7 +98,7 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 configurations.configureEach { exclude(group = "com.google.guava", module = "listenablefuture") }
 dependencies {
     implementation(project(":core:aidl"))
-    implementation(project(":core:designsystem"))
+    implementation(project(":ui:design-system"))
     implementation(project(":core:logging"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:terminal"))
