@@ -22,7 +22,7 @@ class LinuxRuntimeSmokeTest(private val paths: LinuxRuntimePaths) {
         if (!paths.hasProot()) return failed("proot_check", Result(false, null, "", "PRoot or its bundled loader is missing from files/usr/bin."))
         // Keep host Android supplementary GIDs named inside Ubuntu, just as the
         // interactive session does, so `groups` and login scripts stay clean.
-        LocalLinuxSession.ensureSupplementaryGroupNames(paths.ubuntuRoot)
+        LinuxGuestCompatibility.ensureSupplementaryGroupNames(paths.ubuntuRoot)
         val root = paths.ubuntuRoot.absolutePath
         val hostTemp = paths.usrTmp.apply {
             if (!exists() && !mkdirs()) return failed("host_temp_create", Result(false, null, "", "Cannot create PRoot host temporary directory: $absolutePath"))
