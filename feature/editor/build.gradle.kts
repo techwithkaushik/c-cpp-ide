@@ -29,7 +29,7 @@ dependencies {
     implementation(libs.sora.language.textmate)
     implementation(libs.sora.editor.lsp)
     implementation(libs.lsp4j)
-    implementation(project(":core:designsystem"))
+    implementation(project(":ui:design-system"))
     implementation(project(":core:logging"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
