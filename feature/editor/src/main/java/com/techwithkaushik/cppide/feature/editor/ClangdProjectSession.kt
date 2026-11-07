@@ -359,7 +359,6 @@ private class ProotClangdConnectionProvider(
         }.start()
         process = child
         DeveloperLog.event("ClangdLsp", "proot_process_started", mapOf(
-            "pid" to runCatching { child.pid() }.getOrNull(),
             "proot" to runtime.proot.absolutePath,
             "nativeLibraryDir" to runtime.nativeLibraryDir?.absolutePath,
             "clangd" to clangdGuestPath,
