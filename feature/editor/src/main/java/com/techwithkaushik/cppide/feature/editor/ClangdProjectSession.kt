@@ -1,9 +1,9 @@
 package com.techwithkaushik.cppide.feature.editor
 
 import com.techwithkaushik.cppide.core.contracts.editor.EditorDiagnostics
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxToolchainAccess
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
-import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
 import io.github.rosemoe.sora.lsp.editor.LspEditor
@@ -56,7 +56,8 @@ typealias EditorProblem = com.techwithkaushik.cppide.core.contracts.editor.Edito
  */
 class ClangdProjectSession(
     workspaceDirectory: File,
-    private val runtime: LinuxRuntimePaths,
+    private val runtime: LinuxRuntimeEnvironment,
+    private val toolchains: LinuxToolchainAccess,
     configuredClangdGuestPath: String?
 ) : EditorDiagnostics, AutoCloseable {
 
@@ -128,17 +129,15 @@ class ClangdProjectSession(
             require(runtime.ready()) { "Ubuntu rootfs or the bundled PRoot runtime is not ready." }
             val root = runtime.ubuntuRoot.canonicalFile
             ensureFallbackCompilationDatabase(root)
-            val toolchainDiscovery = LinuxToolchainDiscovery()
+            
             val selectedClangdPath = configuredClangdGuestPath?.also { configured ->
-                require(toolchainDiscovery.resolveExecutable(root, configured) != null) {
+                require(toolchains.resolveExecutable(root, configured) != null) {
                     "Configured clangd path '$configured' does not resolve to an executable inside Ubuntu. Clear the override or select a valid guest path in C/C++ Language Settings."
                 }
-            } ?: toolchainDiscovery.discover(root)
-                .find("clangd")
-                ?.executable
-                ?.let { discovered -> toolchainDiscovery.toGuestPath(root, File(discovered)) }
+            } ?: toolchains.findExecutable(root, "clangd")
+                ?.let { discovered -> toolchains.toGuestPath(root, discovered) }
                 ?: throw IllegalStateException("clangd is not installed in the Ubuntu runtime. Install clangd from C/C++ Language Settings.")
-            val clangd = requireNotNull(toolchainDiscovery.resolveExecutable(root, selectedClangdPath)) {
+            val clangd = requireNotNull(toolchains.resolveExecutable(root, selectedClangdPath)) {
                 "clangd is missing or not executable at $selectedClangdPath. Install clangd in Ubuntu or correct its Language Settings path."
             }
             DeveloperLog.event("ClangdLsp", "clangd_executable_resolved", mapOf("configuredPath" to configuredClangdGuestPath, "selectedGuestPath" to selectedClangdPath, "resolvedHostPath" to clangd.absolutePath, "executable" to clangd.canExecute(), "sizeBytes" to clangd.length()))
@@ -216,10 +215,8 @@ class ClangdProjectSession(
         val database = File(workspace, "compile_commands.json")
         val marker = File(workspace, ".cppide-compile-commands.generated")
         if (database.exists() && !marker.exists()) return
-        val discovery = LinuxToolchainDiscovery().discover(root)
         fun guestCompiler(name: String): String? {
-            val raw = discovery.find(name)?.executable ?: return null
-            val executable = File(raw).canonicalFile
+            val executable = toolchains.findExecutable(root, name)?.canonicalFile ?: return null
             if (!executable.toPath().startsWith(root.toPath()) || !executable.isFile || !executable.canExecute()) return null
             return "/" + executable.relativeTo(root).invariantSeparatorsPath
         }
@@ -602,7 +599,7 @@ internal fun clangdLanguageIdForExtension(extension: String): String? = when (ex
 private val CPP_DOCUMENT_EXTENSIONS = setOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
 
 private class ProotClangdConnectionProvider(
-    private val runtime: LinuxRuntimePaths,
+    private val runtime: LinuxRuntimeEnvironment,
     private val workspace: File,
     private val clangdGuestPath: String,
     private val onUnexpectedExit: (Int, String) -> Unit
