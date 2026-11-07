@@ -9,6 +9,7 @@ import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import io.github.rosemoe.sora.lsp.events.EventContext
 import io.github.rosemoe.sora.lsp.events.EventListener
+import io.github.rosemoe.sora.text.CharPosition
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 import java.io.File
@@ -288,15 +289,56 @@ class ClangdProjectSession(
                 throw IllegalStateException("clangd did not complete the LSP initialize handshake. Check the clangd executable, PRoot loader and runtime logs.")
             }
             editor.isEnableInlayHint = true
+            val capabilities = editor.languageServerWrapper.getCachedServerCapabilities()
+            val advertisedFeatures = buildList {
+                if (capabilities?.completionProvider != null) add("completion")
+                if (capabilities?.hoverProvider != null) add("hover")
+                if (capabilities?.definitionProvider != null) add("definition")
+                if (capabilities?.referencesProvider != null) add("references")
+                if (capabilities?.signatureHelpProvider != null) add("signature help")
+                if (capabilities?.documentFormattingProvider != null) add("formatting")
+                if (capabilities?.renameProvider != null) add("rename")
+                if (capabilities?.codeActionProvider != null) add("code actions")
+                if (capabilities?.documentSymbolProvider != null) add("document symbols")
+                if (capabilities?.semanticTokensProvider != null) add("semantic tokens")
+                if (capabilities?.inlayHintProvider != null) add("inlay hints")
+            }
+            val completionResponse = if (capabilities?.completionProvider != null) {
+                withTimeoutOrNull(FEATURE_PROBE_TIMEOUT_MS) {
+                    editor.eventManager.emitAsync("textDocument/completion", CharPosition(0, 0))
+                }
+            } else {
+                null
+            }
+            val completionItems = completionResponse
+                ?.getOrNull<List<org.eclipse.lsp4j.CompletionItem>>("completion-items")
+            val completionProbe = when {
+                capabilities?.completionProvider == null -> "not advertised"
+                completionResponse == null -> "request timed out"
+                completionItems == null -> "no response payload"
+                else -> "responded (${completionItems.size} items)"
+            }
+            val featureDetail = buildString {
+                append("LSP initialize and didOpen succeeded. ")
+                append("Server features: ")
+                append(advertisedFeatures.takeIf { it.isNotEmpty() }?.joinToString() ?: "none advertised")
+                append(". Completion request: ")
+                append(completionProbe)
+                append(".")
+            }
             mutableStatus.value = EditorLspStatus(
                 "clangd connected",
-                "LSP initialization completed and the document opened. Individual language features still require runtime verification.",
-                connected = true
+                featureDetail,
+                connected = true,
+                error = completionResponse == null && capabilities?.completionProvider != null
             )
             DeveloperLog.event("ClangdLsp", "connect_succeeded", mapOf(
                 "file" to editor.uri.path,
                 "connected" to editor.isConnected,
-                "requestManagers" to editor.requestManagers.size
+                "requestManagers" to editor.requestManagers.size,
+                "advertisedFeatures" to advertisedFeatures,
+                "completionProbe" to completionProbe,
+                "completionItemCount" to completionItems?.size
             ))
         } catch (error: CancellationException) {
             connectionAttempts.remove(editor)
@@ -355,6 +397,7 @@ class ClangdProjectSession(
 
     private companion object {
         const val LSP_CONNECT_TIMEOUT_MS = 45_000L
+        const val FEATURE_PROBE_TIMEOUT_MS = 12_000L
         const val GUEST_WORKSPACE = "/workspace"
         val SOURCE_EXTENSIONS = setOf("c", "cc", "cpp", "cxx")
         val EXCLUDED_SOURCE_DIRECTORIES = setOf(".git", ".cppide-build", "build", "out", ".gradle")
