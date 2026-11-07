@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import com.techwithkaushik.cppide.feature.editor.ClangdProjectSession
+import com.techwithkaushik.cppide.core.contracts.workspace.WorkspaceIdentity
+import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import com.techwithkaushik.cppide.feature.editor.EditorLspStatus
 import com.techwithkaushik.cppide.feature.editor.EditorProblem
 import androidx.activity.ComponentActivity
@@ -306,7 +308,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         if (runtimeValidationComplete && screen == IdeScreen.Workspace && workspaceDirectory != null) {
             DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_creation_started", mapOf("projectPath" to workspaceDirectory.absolutePath, "configuredClangd" to clangdGuestPath, "runtimeReady" to runtimePaths.ready()))
             clangdSession = withContext(Dispatchers.IO) {
-                ClangdProjectSession(workspaceDirectory, runtimePaths, clangdGuestPath)
+                ClangdProjectSession(WorkspaceIdentity(workspaceDirectory, selectedProject), runtimePaths, LinuxToolchainDiscovery(), clangdGuestPath)
             }
             DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_creation_finished", mapOf("projectPath" to workspaceDirectory.absolutePath, "status" to clangdSession?.status?.value?.label, "detail" to clangdSession?.status?.value?.detail, "error" to clangdSession?.status?.value?.error))
         } else {
