@@ -217,6 +217,17 @@ private class ProotClangdConnectionProvider(
 
     override fun start() {
         if (process != null) return
+        val root = runtime.ubuntuRoot.canonicalFile
+        val workspaceMount = File(root, "workspace").canonicalFile
+        require(workspaceMount.toPath().startsWith(root.toPath())) {
+            "The clangd workspace mount escapes the Ubuntu rootfs."
+        }
+        if (!workspaceMount.exists() && !workspaceMount.mkdirs()) {
+            throw IOException("Cannot create the /workspace mount point inside Ubuntu.")
+        }
+        if (!workspaceMount.isDirectory) {
+            throw IOException("The /workspace mount point inside Ubuntu is not a directory.")
+        }
         val command = listOf(
             runtime.proot.absolutePath,
             "-0", "-v", "0",

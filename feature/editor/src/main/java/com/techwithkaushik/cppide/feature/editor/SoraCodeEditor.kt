@@ -24,6 +24,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.lsp.editor.LspEditor
+import io.github.rosemoe.sora.lsp.editor.LspLanguage
 import io.github.rosemoe.sora.lsp.events.EventType
 import io.github.rosemoe.sora.lsp.events.code.codeAction
 import io.github.rosemoe.sora.lsp.utils.asLspRange
@@ -74,7 +75,7 @@ private object CppTextMateSupport {
         initialized = true
     }
 
-    fun apply(editor: CodeEditor, fileName: String, themeName: String) {
+    fun apply(editor: CodeEditor, fileName: String, themeName: String): TextMateLanguage? {
         val extension = fileName.substringAfterLast('.', "").lowercase()
         val scope = when (extension) {
             "c" -> "source.c"
@@ -83,10 +84,8 @@ private object CppTextMateSupport {
         }
         if (scope == null) {
             scopeByEditor.remove(editor)
-            if (editor.editorLanguage !is EmptyLanguage) {
-                editor.setEditorLanguage(EmptyLanguage())
-            }
-            return
+            if (editor.editorLanguage !is EmptyLanguage) editor.setEditorLanguage(EmptyLanguage())
+            return null
         }
 
         ensureInitialized(editor.context)
@@ -104,13 +103,25 @@ private object CppTextMateSupport {
             editor.colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
         }
 
+        // Keep Sora's LspLanguage installed. TextMate is its delegate; replacing
+        // the wrapper on every Compose update disables LSP completion and hover.
         val currentLanguage = editor.editorLanguage
-        if (currentLanguage is TextMateLanguage) {
-            if (scopeByEditor[editor] != scope) currentLanguage.updateLanguage(scope)
-        } else {
-            editor.setEditorLanguage(TextMateLanguage.create(scope, false))
+        val currentTextMate = when (currentLanguage) {
+            is LspLanguage -> currentLanguage.wrapperLanguage as? TextMateLanguage
+            is TextMateLanguage -> currentLanguage
+            else -> null
+        }
+        val textMateLanguage = currentTextMate ?: TextMateLanguage.create(scope, false)
+        if (currentTextMate != null && scopeByEditor[editor] != scope) {
+            textMateLanguage.updateLanguage(scope)
+        }
+        if (currentLanguage is LspLanguage) {
+            currentLanguage.wrapperLanguage = textMateLanguage
+        } else if (currentLanguage !== textMateLanguage) {
+            editor.setEditorLanguage(textMateLanguage)
         }
         scopeByEditor[editor] = scope
+        return textMateLanguage
     }
 
     fun detach(editor: CodeEditor) {
@@ -273,10 +284,12 @@ fun SoraCodeEditor(
                 setTabWidth(4)
                 setScrollBarEnabled(true)
                 setHorizontalScrollBarEnabled(true)
-                CppTextMateSupport.apply(this, fileName, themeName)
+                val textMateLanguage = CppTextMateSupport.apply(this, fileName, themeName)
                 configureEditorTheme(this, themeName)
                 lspEditor?.let { languageEditor ->
-                    languageEditor.wrapperLanguage = editorLanguage
+                    languageEditor.wrapperLanguage = requireNotNull(textMateLanguage) {
+                        "A C/C++ language server cannot be attached to a non-C/C++ document."
+                    }
                     languageEditor.editor = this
                     lspAttached.value = true
                 }
@@ -303,7 +316,7 @@ fun SoraCodeEditor(
         update = { editor ->
             editor.setTextSize(fontSize)
             editor.setTypefaceText(Typeface.MONOSPACE)
-            CppTextMateSupport.apply(editor, fileName, themeName)
+            val textMateLanguage = CppTextMateSupport.apply(editor, fileName, themeName)
             configureEditorTheme(editor, themeName)
             editor.isWordwrap = wordWrap
             editor.setLineNumberEnabled(true)
@@ -312,10 +325,15 @@ fun SoraCodeEditor(
             editor.setScrollBarEnabled(true)
             editor.setHorizontalScrollBarEnabled(true)
             controller?.attach(editor)
-            if (lspEditor != null && lspEditor.editor !== editor) {
-                lspEditor.wrapperLanguage = editor.editorLanguage
-                lspEditor.editor = editor
-                lspAttached.value = true
+            if (lspEditor != null && textMateLanguage != null) {
+                val activeLspLanguage = editor.editorLanguage as? LspLanguage
+                if (lspEditor.editor !== editor || activeLspLanguage?.editor !== lspEditor) {
+                    lspEditor.wrapperLanguage = textMateLanguage
+                    lspEditor.editor = editor
+                    lspAttached.value = true
+                } else {
+                    activeLspLanguage.wrapperLanguage = textMateLanguage
+                }
             }
             if (editor.text.toString() != code) {
                 suppressProgrammaticChanges.set(true)
@@ -328,7 +346,6 @@ fun SoraCodeEditor(
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
         onRelease = { editor ->
-            if (lspEditor?.editor === editor) runCatching { lspEditor.dispose() }
             controller?.detach(editor)
             CppTextMateSupport.detach(editor)
             editor.release()
