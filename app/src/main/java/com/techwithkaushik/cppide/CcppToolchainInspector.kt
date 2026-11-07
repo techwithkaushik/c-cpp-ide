@@ -126,7 +126,7 @@ internal class CcppToolchainInspector(context: Context) {
         val process = try {
             ProcessBuilder(
                 runtime.proot.absolutePath,
-                "-0", "-v", "0",
+                "-0", "-v", "0", "--link2symlink",
                 "-r", runtime.ubuntuRoot.absolutePath,
                 "-w", "/root",
                 "-b", "/dev:/dev",
