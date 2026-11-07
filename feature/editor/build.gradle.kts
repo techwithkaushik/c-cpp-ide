@@ -23,6 +23,7 @@ kotlin {
 
 dependencies {
     api(project(":core:contracts"))
+    api(project(":lsp:api"))
     implementation(platform(libs.sora.editor.bom))
     implementation(libs.sora.editor)
     implementation(libs.sora.language.textmate)
