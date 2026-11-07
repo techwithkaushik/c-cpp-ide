@@ -11,7 +11,7 @@ import java.io.File
  * selected distro, resolve configured executable overrides first, then install missing tools only
  * after user consent. Plain text and documentation files do not trigger compiler installation.
  */
-internal object LanguageToolingCatalog {
+object LanguageToolingCatalog {
     enum class Role { Runtime, Compiler, LanguageServer, Formatter, Linter, Debugger }
 
     data class Spec(
@@ -133,7 +133,7 @@ internal object LanguageToolingCatalog {
 }
 
 /** User-provided absolute executable paths for tools installed or downloaded outside the IDE. */
-internal class ToolPathPreferences(context: Context) {
+class ToolPathPreferences(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     fun get(languageId: String, role: LanguageToolingCatalog.Role): String? =

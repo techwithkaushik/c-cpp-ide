@@ -7,7 +7,7 @@ import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-internal data class CppToolStatus(
+data class CppToolStatus(
     val executable: String,
     val path: String?,
     val installed: Boolean,
@@ -16,14 +16,14 @@ internal data class CppToolStatus(
     val manuallyConfigured: Boolean = false
 )
 
-internal data class CppWorkspaceFiles(
+data class CppWorkspaceFiles(
     val clangdConfig: String?,
     val clangFormat: String?,
     val compileCommands: String?,
     val buildSystemFiles: List<String>
 )
 
-internal data class CppToolchainReport(
+data class CppToolchainReport(
     val runtimeReady: Boolean,
     val runtimeMessage: String,
     val tools: List<CppToolStatus>,
@@ -45,7 +45,7 @@ internal data class CppToolchainReport(
  * invoking its version command through Android's system linker and the installed shell.
  * It never installs packages and never treats a file existing on disk as proof it runs.
  */
-internal class CcppToolchainInspector(context: Context) {
+class CcppToolchainInspector(context: Context) {
     private val appContext = context.applicationContext
     private val runtime = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
     private val pathPreferences = ToolPathPreferences(appContext)
