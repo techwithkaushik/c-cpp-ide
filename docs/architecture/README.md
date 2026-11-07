@@ -12,21 +12,24 @@ The application is the composition root. Features communicate through stable con
 
 | Current Gradle module | Current responsibility | Target ownership |
 |---|---|---|
-| `:app` | Android app, Compose shell, startup and dependency composition | `app` |
-| `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, and workspace identity contracts | `core:contracts` |\n| `:lsp:api` | Protocol-agnostic language-server lifecycle status and session contract | `lsp/api` |
-| `:core:aidl` | AIDL contracts for process/service communication | `core:ipc` (after migration) |
-| `:core:jni` | Native C/C++ and PTY bridge | `core:jni` |
-| `:lsp:api` | Protocol-agnostic language service lifecycle contract | `lsp` |
-| `:ui:design-system` | Shared Compose design system and design tokens | `ui/design-system` |
-| `:core:logging` | Shared logging | `core:logging` |
-| `:feature:editor` | Sora editor integration and editor UI | `editor` plus UI adapter |
-| `:feature:terminal` | Terminal UI, local PTY session, and SSH shell session | `terminal` plus UI adapter |
-| `:feature:explorer` | File/project explorer | `workspace` plus UI adapter |
-| `:services:daemon` | Isolated compiler daemon | `runtime` / process service boundary |
-| `:integrations:toolchain` | Toolchain discovery | `runtime:toolchains` |
-| `:integrations:linux-runtime` | PRoot, rootfs, Linux process and SSH integration | `runtime` |
+| `:app` | Android application, Compose shell, startup and dependency composition | `app` |
+| `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, workspace identity | `core:contracts` |
+| `:core:ipc` | Compiler and LSP Binder/AIDL contracts | `core:ipc` |
+| `:core:jni` | Native editor engine, PTY and terminal screen bridge | `core:jni` |
+| `:core:logging` | Shared structured developer logging | `core:logging` |
+| `:lsp:api` | Language service status and session lifecycle contract | `lsp/api` |
+| `:ui:design-system` | Compose design tokens and theme primitives | `ui/design-system` |
+| `:feature:editor` | Sora editor adapter, TextMate grammar and clangd integration | `editor` |
+| `:feature:terminal` | Terminal UI, local PTY session, SSH shell session and terminal components | `terminal` |
+| `:integrations:toolchain` | Linux toolchain discovery and bootstrap artifact handling | `runtime:toolchains` |
+| `:integrations:linux-runtime` | PRoot, rootfs install/validation and guest compatibility | `runtime` |
+| `:workspace:api` | Workspace repository and project model contracts | `workspace/api` |
+| `:workspace:impl` | App-private project storage and safe file operations | `workspace/impl` |
+| `:workspace:ui` | Project file explorer UI | `workspace/explorer` |
 
-The target names are architectural ownership labels, not an instruction to move every source file immediately. Preserve existing Gradle paths until a migration has a clear benefit and tests.
+The former `:feature:explorer` and `:services:daemon` modules were removed because they contained no implementation (the daemon module only declared a service class that did not exist). The Binder contracts remain in `:core:ipc`; a real daemon module will be reintroduced when its service implementation is migrated from working app code and has lifecycle tests.
+
+The target names are architectural ownership labels, not an instruction to create empty modules. Preserve working functionality and introduce new Gradle boundaries only when code and tests justify them.
 
 ## 3. Target capability boundaries
 
