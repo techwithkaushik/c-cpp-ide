@@ -165,6 +165,7 @@ class MainActivity : ComponentActivity() {
 private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> Unit) {
     val appContext = LocalContext.current.applicationContext
     val projectStorage = remember(appContext) { ProjectStorage(appContext) }
+    var runtimeValidationComplete by remember { mutableStateOf(false) }
 
     // Validate the app-owned Ubuntu runtime once on every cold app launch.
     // The result is cached for this launch so users do not need to open Settings.
@@ -195,6 +196,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             .putString("message", result)
             .putLong("checked_at", System.currentTimeMillis())
             .apply()
+        runtimeValidationComplete = true
     }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
     val localView = LocalView.current
@@ -283,9 +285,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd")
     }
     var clangdSession by remember { mutableStateOf<ClangdProjectSession?>(null) }
-    LaunchedEffect(workspaceDirectory?.absolutePath, clangdGuestPath, screen) {
+    LaunchedEffect(workspaceDirectory?.absolutePath, clangdGuestPath, screen, runtimeValidationComplete) {
         clangdSession = null
-        if (screen == IdeScreen.Workspace && workspaceDirectory != null) {
+        if (runtimeValidationComplete && screen == IdeScreen.Workspace && workspaceDirectory != null) {
             clangdSession = withContext(Dispatchers.IO) {
                 ClangdProjectSession(workspaceDirectory, runtimePaths, clangdGuestPath)
             }
