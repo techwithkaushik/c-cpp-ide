@@ -3,8 +3,7 @@ package com.techwithkaushik.cppide.feature.terminal
 import android.content.Context
 import com.termux.terminal.TerminalSession
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
-import com.techwithkaushik.cppide.integration.linuxruntime.HostResolverConfig
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
 import java.io.File
 import java.util.UUID
 
@@ -15,7 +14,7 @@ import java.util.UUID
 internal object UbuntuTermuxSession {
     fun create(
         context: Context,
-        paths: LinuxRuntimePaths,
+        paths: LinuxRuntimeEnvironment,
         transcriptRows: Int = 5_000,
         onFinished: (TerminalSession) -> Unit = {},
     ): TerminalSession {
@@ -28,7 +27,7 @@ internal object UbuntuTermuxSession {
         val temp = paths.usrTmp.apply {
             if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.")
         }
-        val resolver = HostResolverConfig.prepare(temp, sessionId)
+        val resolver = paths.prepareResolver(temp, sessionId)
         val proot = paths.proot.absolutePath
         val rootfs = paths.ubuntuRoot.absolutePath
         val loader = paths.prootLoader.absolutePath
