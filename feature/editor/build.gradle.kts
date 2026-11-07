@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.sora.editor.lsp)
     implementation(libs.lsp4j)
     implementation(project(":core:designsystem"))
+    implementation(project(":core:logging"))
     implementation(project(":core:lsp"))
     implementation(project(":integrations:linux-runtime"))
     implementation(project(":integrations:toolchain"))
