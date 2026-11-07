@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.integration.toolchain
 
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxToolchainAccess
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,7 +38,7 @@ data class LinuxToolchainInventory(
  * absolute symlink such as /usr/bin/clangd -> /usr/lib/llvm-XX/bin/clangd
  * must resolve below the rootfs, not against the Android host filesystem.
  */
-class LinuxToolchainDiscovery {
+class LinuxToolchainDiscovery : LinuxToolchainAccess {
     private val recommended = listOf(
         "sh", "clang", "clang++", "clangd", "clang-format", "clang-tidy",
         "lldb", "lldb-dap", "cmake", "make", "gdb"
@@ -101,7 +102,10 @@ class LinuxToolchainDiscovery {
      * Resolve an absolute Linux guest executable path without following absolute
      * symlinks on the Android host. Returns the physical file below rootfs only.
      */
-    fun resolveExecutable(rootfs: File, guestPath: String): File? {
+    override fun findExecutable(rootfs: File, name: String, environmentPath: String? = null): File? =
+        discover(rootfs, environmentPath).find(name)?.executable?.let(::File)
+
+    override fun resolveExecutable(rootfs: File, guestPath: String): File? {
         if (!guestPath.startsWith("/") || '\u0000' in guestPath) return null
         val root = rootfs.canonicalFile.toPath()
         val candidate = resolveInsideRootfs(root, root.resolve(guestPath.removePrefix("/")).normalize())
@@ -113,7 +117,7 @@ class LinuxToolchainDiscovery {
     /**
      * Convert a physical rootfs file into its absolute Linux guest path.
      */
-    fun toGuestPath(rootfs: File, executable: File): String? {
+    override fun toGuestPath(rootfs: File, executable: File): String? {
         val root = rootfs.canonicalFile.toPath()
         val file = executable.toPath().toAbsolutePath().normalize()
         if (!file.startsWith(root)) return null
