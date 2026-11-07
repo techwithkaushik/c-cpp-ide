@@ -37,7 +37,7 @@ object DeveloperLog {
     }
 
     fun isEnabled(context: Context): Boolean =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(ENABLED, false)
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(ENABLED, true)
     fun isEnabled(): Boolean = appContext?.let(::isEnabled) == true
 
     fun setEnabled(context: Context, enabled: Boolean) {
