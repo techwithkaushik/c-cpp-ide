@@ -270,8 +270,7 @@ fun SoraCodeEditor(
         DeveloperLog.event("SoraEditor", "lsp_document_composition_started", mapOf("file" to fileName, "hasSession" to (lspSession != null), "hasLspEditor" to (lspEditor != null)))
         onDispose {
             DeveloperLog.event("SoraEditor", "lsp_document_composition_disposed", mapOf("file" to fileName, "connected" to (lspEditor?.isConnected == true), "attached" to (lspEditor?.editor != null)))
-            runCatching { lspEditor?.dispose() }
-                .onFailure { DeveloperLog.failure("SoraEditor", "lsp_editor_dispose_failed", it, mapOf("file" to fileName)) }
+            ClangdProjectSession.disposeEditorAsync(lspEditor)
         }
     }
 
