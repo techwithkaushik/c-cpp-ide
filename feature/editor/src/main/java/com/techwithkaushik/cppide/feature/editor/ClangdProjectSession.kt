@@ -51,6 +51,7 @@ class ClangdProjectSession(
     private val project = LspProject(GUEST_WORKSPACE)
     private var available = false
     private val problemsByFile = ConcurrentHashMap<String, List<EditorProblem>>()
+    private val connectionAttempts = ConcurrentHashMap.newKeySet<LspEditor>()
     private val mutableStatus = MutableStateFlow(
         EditorLspStatus("clangd unavailable", "C/C++ language services have not been validated.", error = true)
     )
@@ -186,8 +187,9 @@ class ClangdProjectSession(
     }
 
     suspend fun connect(editor: LspEditor) {
-        if (!available || editor.isConnected) return
+        if (!available || editor.isConnected || !connectionAttempts.add(editor)) return
         if (editor.editor == null) {
+            connectionAttempts.remove(editor)
             mutableStatus.value = EditorLspStatus(
                 "clangd not started",
                 "The C/C++ document is not attached to Sora yet; reopen the file to retry.",
@@ -211,6 +213,7 @@ class ClangdProjectSession(
                 connected = true
             )
         } catch (error: CancellationException) {
+            connectionAttempts.remove(editor)
             throw error
         } catch (error: Exception) {
             val reason = generateSequence(error as Throwable?) { it.cause }
@@ -230,6 +233,7 @@ class ClangdProjectSession(
         project.eventEmitter.removeListener(diagnosticsListener)
         project.dispose()
         problemsByFile.clear()
+        connectionAttempts.clear()
         mutableProblems.value = emptyList()
         available = false
     }
