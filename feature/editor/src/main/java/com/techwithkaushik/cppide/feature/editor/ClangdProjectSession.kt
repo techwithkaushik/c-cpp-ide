@@ -257,6 +257,9 @@ class ClangdProjectSession(
                 "file" to editor.uri.path,
                 "attached" to (editor.editor != null)
             ))
+            // A failed handshake must not permanently suppress a later retry
+            // after the user fixes the runtime or clangd installation.
+            connectionAttempts.remove(editor)
         }
     }
 
