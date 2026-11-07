@@ -39,8 +39,8 @@ The current implementation is organized in these modules:
 | `:terminal` | Terminal UI and terminal sessions |
 | `:feature:explorer` | File and project explorer |
 | `:services:daemon` | Isolated compiler/process daemon |
-| `:integrations:toolchain` | Toolchain discovery and integration |
-| `:integrations:linux-runtime` | PRoot, rootfs, Linux process, and SSH integration |
+| `:runtime:toolchains` | Toolchain discovery and integration |
+| `:runtime:linux` | PRoot, rootfs, Linux process, and SSH integration |
 
 These paths are the compatibility baseline. Do not rename or move modules merely to make the directory tree look like the target design. Migrate only when a stable interface and measurable benefit exist.
 
@@ -137,8 +137,8 @@ kcode/
 | `:ui:design-system` | UI design system |
 | `:editor` | Editor engine adapter and editor UI |
 | `:terminal` | Terminal emulator, local PTY and SSH sessions |
-| `:integrations:toolchain` | Runtime toolchain discovery |
-| `:integrations:linux-runtime` | PRoot, rootfs and runtime management |
+| `:runtime:toolchains` | Runtime toolchain discovery |
+| `:runtime:linux` | PRoot, rootfs and runtime management |
 | `:workspace:api` | Workspace repository contracts |
 | `:workspace:impl` | Workspace storage implementation |\n| `:workspace:ui` | Workspace explorer UI adapter |
 | `:workspace:ui` | Workspace explorer UI |
@@ -332,7 +332,7 @@ Subsystem-specific acceptance criteria:
 - [ ] Integrate diagnostics and completion into the editor surface rather than unrelated bottom panels.
 
 ### Phase 4 — Runtime and terminal reliability
-- [x] Separate runtime provisioning and validation behind `:core:contracts` runtime operations; terminal UI receives the adapter from `:app`.\n- [x] Remove the direct `:integrations:linux-runtime` dependency from `:terminal`.\n- [ ] Further separate terminal session state from runtime installation state at the workspace/application lifecycle level.
+- [x] Separate runtime provisioning and validation behind `:core:contracts` runtime operations; terminal UI receives the adapter from `:app`.\n- [x] Remove the direct `:runtime:linux` dependency from `:terminal`.\n- [ ] Further separate terminal session state from runtime installation state at the workspace/application lifecycle level.
 - [ ] Verify PTY lifecycle, resize, signals, and cleanup.
 - [ ] Verify Ubuntu rootfs integrity and interrupted-install recovery.
 - [ ] Verify SSH host-key handling and connection lifecycle.
