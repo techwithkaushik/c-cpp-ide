@@ -141,7 +141,7 @@ class SoraEditorController {
     fun paste() { editor?.pasteText() }
     fun cut() { editor?.cutText() }
     fun format() { formatAction?.invoke() ?: editor?.formatCodeAsync() }
-    internal fun setFormatAction(action: (() -> Unit)?) { formatAction = action }
+    fun setFormatAction(action: (() -> Unit)?) { formatAction = action }
 
     fun selectLine(line: Int) = selectPosition(line, 1)
 
