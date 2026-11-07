@@ -75,6 +75,15 @@ internal class ProjectStorage(context: Context) {
             .toList()
     }
 
+    fun listDirectories(projectName: String): List<String> {
+        val project = projectDirectory(projectName)
+        return project.walkTopDown()
+            .filter { it.isDirectory && it != project }
+            .map { it.relativeTo(project).invariantSeparatorsPath }
+            .sorted()
+            .toList()
+    }
+
     fun createDirectory(projectName: String, relativePath: String) {
         require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) { "Invalid relative directory path" }
         val project = projectDirectory(projectName)
