@@ -90,6 +90,13 @@ class ClangdProjectSession(
             val relativePath = editor.uri.path
                 .removePrefix("$GUEST_WORKSPACE/")
                 .takeIf { it.isNotBlank() && it != editor.uri.path }
+                ?.let { candidate ->
+                    runCatching { File(workspace, candidate).canonicalFile }
+                        .getOrNull()
+                        ?.takeIf { it.toPath().startsWith(workspace.toPath()) }
+                        ?.relativeTo(workspace)
+                        ?.invariantSeparatorsPath
+                }
                 ?: return
             val diagnostics = context.getOrNull<List<Diagnostic>>("data").orEmpty()
             val mapped = diagnostics.map { diagnostic ->
@@ -261,7 +268,7 @@ class ClangdProjectSession(
 
     /** Returns null for unsupported files or when the real runtime/tool is unavailable. */
     fun createEditor(relativeFilePath: String): LspEditor? {
-        if (!available) return null
+        if (!available || disposed.get()) return null
         val source = File(workspace, relativeFilePath).canonicalFile
         if (!source.toPath().startsWith(workspace.toPath()) || source == workspace || source.isDirectory) return null
         val extension = source.extension.lowercase()
@@ -290,7 +297,7 @@ class ClangdProjectSession(
     }
 
     suspend fun connect(editor: LspEditor) {
-        if (!available) { DeveloperLog.warn("ClangdLsp", "connect_skipped_session_unavailable; file=${editor.uri.path}"); return }
+        if (!available || disposed.get()) { DeveloperLog.warn("ClangdLsp", "connect_skipped_session_unavailable; file=${editor.uri.path}"); return }
         if (editor.isConnected) { DeveloperLog.debug("ClangdLsp", "connect_skipped_already_connected; file=${editor.uri.path}"); return }
         if (!connectionAttempts.add(editor)) { DeveloperLog.debug("ClangdLsp", "connect_skipped_attempt_in_progress; file=${editor.uri.path}"); return }
         if (editor.editor == null) {
@@ -626,7 +633,6 @@ private class ProotClangdConnectionProvider(
             "-b", "/sys:/sys",
             clangdGuestPath,
             "--background-index",
-            "--clang-tidy",
             "--completion-style=detailed",
             "--compile-commands-dir=/workspace"
         )
