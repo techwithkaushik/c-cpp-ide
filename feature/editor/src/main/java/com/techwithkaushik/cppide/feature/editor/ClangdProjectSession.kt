@@ -1,6 +1,5 @@
 package com.techwithkaushik.cppide.feature.editor
 
-import android.net.Uri
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
@@ -63,7 +62,9 @@ class ClangdProjectSession(
 
         override fun handle(context: EventContext) {
             val editor = context.getOrNull<LspEditor>("lsp-editor") ?: return
-            val relativePath = Uri.decode(editor.uri.path)
+            // FileUri stores the raw filesystem path; its toUri() method performs URI escaping.
+            // Decoding here would corrupt literal '%' sequences and encoded paths with spaces.
+            val relativePath = editor.uri.path
                 .removePrefix("$GUEST_WORKSPACE/")
                 .takeIf { it.isNotBlank() && it != editor.uri.path }
                 ?: return
@@ -176,9 +177,10 @@ class ClangdProjectSession(
         val extension = source.extension.lowercase()
         if (extension !in SUPPORTED_EXTENSIONS) return null
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
-        val encodedGuestPath = Uri.encode("$GUEST_WORKSPACE/$relative", "/")
+        // Pass a filesystem path, not an already-encoded URI: FileUri.toUri() encodes it once.
+        val guestPath = "$GUEST_WORKSPACE/$relative"
         val languageId = if (extension == "c") "c" else "cpp"
-        return project.getOrCreateEditor(encodedGuestPath, languageId).apply {
+        return project.getOrCreateEditor(guestPath, languageId).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
