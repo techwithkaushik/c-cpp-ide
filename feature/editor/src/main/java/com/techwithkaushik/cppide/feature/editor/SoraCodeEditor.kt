@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.feature.editor
 
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.view.MenuItem
@@ -283,6 +284,11 @@ fun SoraCodeEditor(
                         "A C/C++ language server cannot be attached to a non-C/C++ document."
                     }
                     languageEditor.editor = this
+                    DeveloperLog.event("SoraEditor", "lsp_editor_attached_factory", mapOf(
+                        "file" to fileName,
+                        "editorAttached" to (languageEditor.editor === this),
+                        "language" to (editorLanguage?.javaClass?.simpleName ?: "none")
+                    ))
                     lspSession?.let { session ->
                         languageEditor.coroutineScope.launch { session.connect(languageEditor) }
                     }
@@ -338,9 +344,20 @@ fun SoraCodeEditor(
                 }
             }
             if (lspEditor != null && lspEditor.editor === editor) {
+                DeveloperLog.event("SoraEditor", "lsp_editor_attached_update", mapOf(
+                    "file" to fileName,
+                    "editorAttached" to true,
+                    "language" to (editor.editorLanguage?.javaClass?.simpleName ?: "none")
+                ))
                 lspSession?.let { session ->
                     lspEditor.coroutineScope.launch { session.connect(lspEditor) }
                 }
+            } else if (lspEditor != null) {
+                DeveloperLog.event("SoraEditor", "lsp_editor_not_attached", mapOf(
+                    "file" to fileName,
+                    "editorAttached" to false,
+                    "textMateAvailable" to (textMateLanguage != null)
+                ))
             }
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
