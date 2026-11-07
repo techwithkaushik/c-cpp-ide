@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 
 data class EditorLspStatus(
@@ -186,6 +187,14 @@ class ClangdProjectSession(
 
     suspend fun connect(editor: LspEditor) {
         if (!available || editor.isConnected) return
+        if (editor.editor == null) {
+            mutableStatus.value = EditorLspStatus(
+                "clangd not started",
+                "The C/C++ document is not attached to Sora yet; reopen the file to retry.",
+                error = true
+            )
+            return
+        }
         mutableStatus.value = EditorLspStatus(
             "Starting clangd…",
             "Launching clangd through Ubuntu/PRoot and waiting for the LSP initialize handshake."
@@ -201,6 +210,8 @@ class ClangdProjectSession(
                 "LSP initialized and the document was opened. Completion, diagnostics, hover and signature help are active.",
                 connected = true
             )
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             val reason = generateSequence(error as Throwable?) { it.cause }
                 .mapNotNull { it.message?.takeIf(String::isNotBlank) }
