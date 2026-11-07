@@ -219,16 +219,14 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     val onboardingPreferences = remember(appContext) { appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, android.content.Context.MODE_PRIVATE) }
     var screen by rememberSaveable { mutableStateOf(if (onboardingPreferences.getBoolean(IdeDesignTokens.Preference.WELCOME_COMPLETED, false)) IdeScreen.Projects else IdeScreen.Welcome) }
     var selectedProject by rememberSaveable { mutableStateOf("Welcome Workspace") }
-    var activeFile by rememberSaveable { mutableStateOf("README.md") }
-    var code by rememberSaveable { mutableStateOf("# Welcome Workspace\n\nOpen any file to edit it.\n") }
-    val openFiles = remember { mutableStateListOf("README.md") }
+    var activeFile by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    val openFiles = remember { mutableStateListOf<String>() }
     val dirtyFiles = remember { mutableStateListOf<String>() }
     // One source of truth for Explorer, tabs, search, and editor.
-    val workspaceFiles = remember { mutableStateListOf("README.md") }
+    val workspaceFiles = remember { mutableStateListOf<String>() }
     val workspaceDirectories = remember { mutableStateListOf<String>() }
-    val fileContents = remember {
-        mutableStateMapOf("README.md" to code)
-    }
+    val fileContents = remember { mutableStateMapOf<String, String>() }
     var newProjectDialog by rememberSaveable { mutableStateOf(false) }
     var newFileDialog by rememberSaveable { mutableStateOf(false) }
     var newFileName by rememberSaveable { mutableStateOf("") }
@@ -237,6 +235,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var newProjectName by rememberSaveable { mutableStateOf("") }
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
+    var createEmptyProject by rememberSaveable { mutableStateOf(false) }
+    var pendingDeleteProject by rememberSaveable { mutableStateOf<String?>(null) }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
     var showExplorer by rememberSaveable { mutableStateOf(false) }
@@ -257,11 +257,10 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         DeveloperLog.event(appContext, "Workspace", "file_close_requested", mapOf("project" to selectedProject, "file" to file, "dirty" to dirtyFiles.contains(file)))
         if (dirtyFiles.contains(file)) { pendingCloseError = null; pendingCloseFile = file; return }
         openFiles.remove(file)
-        if (openFiles.isEmpty()) openFiles.add("README.md")
         if (activeFile == file) {
-            val next = openFiles.last()
-            activeFile = next
-            code = fileContents[next] ?: sampleCode(next).also { fileContents[next] = it }
+            val next = openFiles.lastOrNull()
+            activeFile = next.orEmpty()
+            code = next?.let { fileContents[it] ?: sampleCode(it).also { content -> fileContents[it] = content } }.orEmpty()
         }
     }
     var settingsReturnScreen by rememberSaveable { mutableStateOf(IdeScreen.Projects) }
@@ -450,18 +449,15 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         runCatching { projectStorage.readFile(project.name, file) }
                             .onSuccess { fileContents[file] = it }
                     }
-                    val entryFile = entryFileForLanguage(project.language)
-                    if (workspaceFiles.isEmpty()) {
-                        workspaceFiles.addAll(listOf(entryFile, "README.md").distinct())
-                        fileContents[entryFile] = sampleCode(entryFile)
-                        fileContents["README.md"] = sampleCode("README.md")
-                    }
                     openFiles.clear()
                     dirtyFiles.clear()
-                    openFile(if (entryFile in workspaceFiles) entryFile else workspaceFiles.first())
+                    activeFile = ""
+                    code = ""
+                    if (workspaceFiles.isNotEmpty()) openFile(workspaceFiles.first())
                     screen = IdeScreen.Workspace
                 },
                 onNew = { newProjectDialog = true },
+                onDelete = { pendingDeleteProject = it.name },
                 onSettings = { settingsReturnScreen = screen; screen = IdeScreen.Settings }
             )
             else -> Unit
@@ -1347,6 +1343,7 @@ private fun ProjectListScreen(
     projects: List<IdeProject>,
     onOpen: (IdeProject) -> Unit,
     onNew: () -> Unit,
+    onDelete: (IdeProject) -> Unit,
     onSettings: () -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -1571,6 +1568,9 @@ private fun ProjectListScreen(
                                 Text("Updated ${project.updated}", color = IdeMuted, fontSize = 10.sp)
                                 Spacer(Modifier.weight(1f))
                                 Text("OPEN PROJECT", color = IdeAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+                                IconButton(onClick = { onDelete(project) }, modifier = Modifier.size(30.dp)) {
+                                    IdeIcon("trash-2", Color(0xFFFF8A80), 16.dp)
+                                }
                             }
                         }
                     }
