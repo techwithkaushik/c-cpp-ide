@@ -85,7 +85,7 @@ fun FileExplorerSheet(projectName: String, activeFile: String, files: List<Strin
             IconButton(onClick = { searchExpanded = !searchExpanded; if (!searchExpanded) query = "" }, modifier = Modifier.size(32.dp)) { iconRenderer(if (searchExpanded) "close" else "search", palette.accent, 18.dp) }
             if (searchExpanded) OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f).heightIn(min = 40.dp), singleLine = true, shape = androidx.compose.ui.graphics.RectangleShape, placeholder = { Text("Search files", fontSize = 12.sp) })
         }
-        ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry, palette = palette, iconRenderer = iconRenderer)
+        ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry, palette = palette)
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
             if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry, palette = palette, iconRenderer = iconRenderer)
             else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp, { onOpenFile(node.path) }, onRenameEntry, onDeleteEntry, onMoveEntry, palette = palette, iconRenderer = iconRenderer)
@@ -184,8 +184,7 @@ private fun ExplorerFileRow(
     onRenameEntry: (String, String) -> Unit,
     onDeleteEntry: (String) -> Unit,
     onMoveEntry: (String, String) -> Unit,
-    palette: ExplorerPalette,
-    iconRenderer: @Composable (String, Color, Dp) -> Unit
+    palette: ExplorerPalette
 ) {
     var menu by remember(description) { mutableStateOf(false) }
     var renameDialog by remember(description) { mutableStateOf(false) }
