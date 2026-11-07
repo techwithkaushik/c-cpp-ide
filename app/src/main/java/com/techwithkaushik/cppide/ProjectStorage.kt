@@ -85,7 +85,6 @@ internal class ProjectStorage(context: Context) {
                 File(git, "config").writeText("[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n")
                 File(git, "description").writeText("Unnamed repository; edit this file to name the repository.\n")
             }
-            }
             if (!staging.renameTo(target)) throw IOException("Unable to finalize project directory")
         } catch (error: Throwable) {
             staging.deleteRecursively()
