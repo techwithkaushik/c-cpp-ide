@@ -1,6 +1,5 @@
 package com.techwithkaushik.cppide.feature.editor
 
-import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import org.junit.Assert.assertEquals
