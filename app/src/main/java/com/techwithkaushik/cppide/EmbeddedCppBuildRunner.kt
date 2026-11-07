@@ -142,6 +142,16 @@ internal class EmbeddedCppBuildRunner(context: Context) {
 
     private fun execute(arguments: List<String>, workingDirectory: File, timeoutSeconds: Long): CommandResult {
         if (!runtime.ready()) return CommandResult(null, "", error = "Ubuntu runtime or PRoot is missing.")
+        // Use a project-local temporary directory that is guaranteed to be visible
+        // through the /workspace bind mount. This avoids relying on distro /tmp
+        // permissions or an absent /tmp directory on older extracted rootfs images.
+        val guestTempDirectory = File(workingDirectory, ".cppide-build/tmp")
+        if (!guestTempDirectory.exists() && !guestTempDirectory.mkdirs()) {
+            return CommandResult(null, "", error = "Unable to create the project temporary directory.")
+        }
+        if (!guestTempDirectory.isDirectory || !guestTempDirectory.canWrite()) {
+            return CommandResult(null, "", error = "The project temporary directory is not writable.")
+        }
         val process = try {
             ProcessBuilder(
                 runtime.proot.absolutePath,
@@ -160,8 +170,9 @@ internal class EmbeddedCppBuildRunner(context: Context) {
                 environment()["LOGNAME"] = "root"
                 environment()["SHELL"] = "/bin/bash"
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-                environment()["TMPDIR"] = "/tmp"
-                environment()["TMP"] = "/tmp"
+                environment()["TMPDIR"] = "/workspace/.cppide-build/tmp"
+                environment()["TMP"] = "/workspace/.cppide-build/tmp"
+                environment()["TEMP"] = "/workspace/.cppide-build/tmp"
                 environment()["PROOT_TMP_DIR"] = runtime.usrTmp.absolutePath
                 environment()["PROOT_NO_SECCOMP"] = "1"
                 environment()["PROOT_LOADER"] = runtime.prootLoader.absolutePath
