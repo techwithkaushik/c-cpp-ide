@@ -1974,7 +1974,7 @@ private fun FileTypeIcon(
         else -> "·" to Color(0xFF9AA8BA)
     }
     Box(
-        modifier = modifier.size(iconSize).background(color.copy(alpha = 0.13f), RoundedCornerShape(IdeDesignTokens.Spacing.xs)),
+        modifier = modifier.size(iconSize).background(color.copy(alpha = 0.13f), androidx.compose.ui.graphics.RectangleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(label, color = color, fontSize = if (label.length > 2) 7.sp else if (label.length == 2) 9.sp else 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -1994,15 +1994,13 @@ private fun ExplorerFileRow(
             .padding(start = indent)
             .background(if (selected) Color(0xFF1D3047) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = 11.dp),
+            .height(28.dp)
+            .padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FileTypeIcon(name, 20.dp, Modifier.width(30.dp))
-        Column(Modifier.weight(1f)) {
-            Text(name, color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(description, color = IdeMuted, fontSize = 10.sp)
-        }
-        if (selected) Text("●", color = IdeAccent, fontSize = 10.sp)
+        FileTypeIcon(name, 15.dp, Modifier.width(22.dp))
+        Text(name, Modifier.weight(1f), color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (selected) Text("●", color = IdeAccent, fontSize = 8.sp)
     }
 }
 
