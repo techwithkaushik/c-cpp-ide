@@ -332,7 +332,7 @@ Subsystem-specific acceptance criteria:
 - [ ] Integrate diagnostics and completion into the editor surface rather than unrelated bottom panels.
 
 ### Phase 4 — Runtime and terminal reliability
-- [ ] Separate runtime installation state from terminal session state.
+- [x] Separate runtime provisioning and validation behind `:core:contracts` runtime operations; terminal UI receives the adapter from `:app`.\n- [x] Remove the direct `:integrations:linux-runtime` dependency from `:feature:terminal`.\n- [ ] Further separate terminal session state from runtime installation state at the workspace/application lifecycle level.
 - [ ] Verify PTY lifecycle, resize, signals, and cleanup.
 - [ ] Verify Ubuntu rootfs integrity and interrupted-install recovery.
 - [ ] Verify SSH host-key handling and connection lifecycle.
