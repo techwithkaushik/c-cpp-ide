@@ -24,12 +24,15 @@ internal class UbuntuClangFormatRunner(private val runtime: LinuxRuntimePaths, p
         require(formatter.toPath().startsWith(root.toPath()) && formatter.isFile && formatter.canExecute())
         val guestFormatter = "/" + formatter.relativeTo(root).invariantSeparatorsPath
         val guestFile = "/workspace/" + file.relativeTo(base).invariantSeparatorsPath
-        val command = listOf(runtime.proot.absolutePath, "-0", "-v", "0", "-r", root.absolutePath, "-w", "/workspace",
+        val command = listOf(runtime.proot.absolutePath, "-0", "-v", "0", "--link2symlink", "-r", root.absolutePath, "-w", "/workspace",
             "-b", "${base.absolutePath}:/workspace", "-b", "/dev:/dev", "-b", "/proc:/proc", "-b", "/sys:/sys",
             guestFormatter, "--assume-filename=$guestFile")
         val process = ProcessBuilder(command).directory(base).apply {
-            val inherited = environment()["LD_LIBRARY_PATH"].orEmpty()
-            runtime.nativeLibraryDir?.absolutePath?.let { environment()["LD_LIBRARY_PATH"] = listOf(it, inherited).filter(String::isNotBlank).joinToString(File.pathSeparator) }
+            // Do not expose Android APK libraries to Ubuntu's glibc linker.
+            environment().remove("LD_LIBRARY_PATH")
+            environment().remove("LD_PRELOAD")
+            environment().remove("PREFIX")
+            environment().remove("BOOTSTRAP_ROOT")
             environment()["HOME"] = "/root"; environment()["USER"] = "root"; environment()["LOGNAME"] = "root"
             environment()["SHELL"] = "/bin/bash"; environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             environment()["TMPDIR"] = runtime.usrTmp.absolutePath; environment()["TMP"] = runtime.usrTmp.absolutePath
