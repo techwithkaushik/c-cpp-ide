@@ -27,6 +27,8 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
 import kotlinx.coroutines.future.await
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +67,7 @@ class ClangdProjectSession(
     private val workspace = workspaceDirectory.canonicalFile
     private val project = LspProject(GUEST_WORKSPACE)
     private var available = false
+    private val disposed = AtomicBoolean(false)
     private val problemsByFile = ConcurrentHashMap<String, List<EditorProblem>>()
     private val connectionAttempts = ConcurrentHashMap.newKeySet<LspEditor>()
     private val eventLoggedEditors = ConcurrentHashMap.newKeySet<LspEditor>()
@@ -464,25 +467,51 @@ class ClangdProjectSession(
         }
     }
 
+    /**
+     * Detach the workspace immediately and perform Sora/LSP/process teardown away from
+     * the Compose thread. project.dispose() closes language-server transports and can
+     * wait for child processes; doing that from DisposableEffect freezes project navigation.
+     */
     override fun close() {
-        DeveloperLog.event("ClangdLsp", "session_dispose_started", mapOf("workspace" to workspace.absolutePath, "connectionAttempts" to connectionAttempts.size, "problemCount" to mutableProblems.value.size))
-        project.eventEmitter.removeListener(diagnosticsListener)
-        project.dispose()
-        project.eventEmitter.removeListener(ClangdProtocolEventListener::class.java)
-        previousProjectThrowableListener?.let { project.eventEmitter.throwableListener = it }
-        previousProjectThrowableListener = null
-        eventLoggedEditors.clear()
+        if (!disposed.compareAndSet(false, true)) return
+        available = false
+        val attempts = connectionAttempts.size
+        val problemCount = mutableProblems.value.size
         problemsByFile.clear()
         connectionAttempts.clear()
         mutableProblems.value = emptyList()
-        available = false
-        DeveloperLog.event("ClangdLsp", "session_disposed", mapOf("workspace" to workspace.absolutePath))
+        DeveloperLog.event("ClangdLsp", "session_dispose_requested", mapOf(
+            "workspace" to workspace.absolutePath,
+            "connectionAttempts" to attempts,
+            "problemCount" to problemCount,
+            "thread" to Thread.currentThread().name
+        ))
+        SESSION_DISPOSER.execute {
+            val startedAt = System.nanoTime()
+            runCatching {
+                project.eventEmitter.removeListener(diagnosticsListener)
+                project.eventEmitter.removeListener(ClangdProtocolEventListener::class.java)
+                previousProjectThrowableListener?.let { project.eventEmitter.throwableListener = it }
+                previousProjectThrowableListener = null
+                project.dispose()
+                eventLoggedEditors.clear()
+                DeveloperLog.event("ClangdLsp", "session_disposed", mapOf(
+                    "workspace" to workspace.absolutePath,
+                    "durationMs" to (System.nanoTime() - startedAt) / 1_000_000
+                ))
+            }.onFailure { error ->
+                DeveloperLog.failure("ClangdLsp", "session_dispose_failed", error, mapOf("workspace" to workspace.absolutePath))
+            }
+        }
     }
 
     private companion object {
         const val LSP_CONNECT_TIMEOUT_MS = 45_000L
         const val FEATURE_PROBE_TIMEOUT_MS = 12_000L
         const val GUEST_WORKSPACE = "/workspace"
+        val SESSION_DISPOSER = Executors.newCachedThreadPool(ThreadFactory { task ->
+            Thread(task, "cppide-lsp-dispose").apply { isDaemon = true }
+        })
         val SOURCE_EXTENSIONS = setOf("c", "cc", "cpp", "cxx")
         val EXCLUDED_SOURCE_DIRECTORIES = setOf(".git", ".cppide-build", "build", "out", ".gradle")
         val CPP_EXTENSIONS = CPP_DOCUMENT_EXTENSIONS
