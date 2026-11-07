@@ -1490,7 +1490,7 @@ private fun WorkspaceScreen(
     LaunchedEffect(activeFile, pendingProblem) {
         val target = pendingProblem
         if (target != null && target.filePath == activeFile) {
-            editorController.selectLine(target.line)
+            editorController.selectPosition(target.line, target.column)
             pendingProblem = null
         }
     }
@@ -1632,7 +1632,7 @@ private fun WorkspaceScreen(
                 lspStatus = lspStatus,
                 onProblemSelected = { problem ->
                     if (problem.filePath == activeFile) {
-                        editorController.selectLine(problem.line)
+                        editorController.selectPosition(problem.line, problem.column)
                     } else {
                         pendingProblem = problem
                         onFile(problem.filePath)
