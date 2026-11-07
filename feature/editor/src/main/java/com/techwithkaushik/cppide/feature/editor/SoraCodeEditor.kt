@@ -232,7 +232,7 @@ fun SoraCodeEditor(
 
     DisposableEffect(lspEditor) {
         onDispose {
-            lspEditor?.dispose()
+            runCatching { lspEditor?.dispose() }
         }
     }
 

@@ -286,7 +286,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         workspaceDirectory?.let { ClangdProjectSession(it, runtimePaths, clangdGuestPath) }
     }
     DisposableEffect(clangdSession) {
-        onDispose { clangdSession?.close() }
+        onDispose { runCatching { clangdSession?.close() } }
     }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()

@@ -33,6 +33,7 @@ sora-editor-bom={ module="io.github.rosemoe:editor-bom", version.ref="soraEditor
 sora-editor={ module="io.github.rosemoe:editor" }
 sora-language-textmate={ module="io.github.rosemoe:language-textmate" }
 sora-editor-lsp={ module="io.github.rosemoe:editor-lsp", version.ref="soraEditor" }
+lsp4j={ module="org.eclipse.lsp4j:org.eclipse.lsp4j", version="0.24.0" }
 androidx-compose-ui={ module="androidx.compose.ui:ui" }
 androidx-compose-ui-graphics={ module="androidx.compose.ui:ui-graphics" }
 androidx-compose-ui-tooling={ module="androidx.compose.ui:ui-tooling" }
