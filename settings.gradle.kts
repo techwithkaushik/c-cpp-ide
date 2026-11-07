@@ -11,7 +11,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "KCode"
 include(":app", ":core:contracts", ":core:ipc", ":core:jni", ":core:logging", ":editor", ":terminal")
-include(":integrations:toolchain", ":integrations:linux-runtime")
+include(":runtime:toolchains", ":runtime:linux")
 include(":workspace:api", ":workspace:impl", ":workspace:ui")
 include(":lsp:api")
 include(":ui:design-system")
