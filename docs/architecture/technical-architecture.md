@@ -35,8 +35,8 @@ The current implementation is organized in these modules:
 | `:core:lsp` | Existing language-server integration |
 | `:core:designsystem` | Shared Compose design system |
 | `:core:logging` | Shared logging |
-| `:feature:editor` | Sora editor integration and editor UI |
-| `:feature:terminal` | Terminal UI and terminal sessions |
+| `:editor` | Sora editor integration and editor UI |
+| `:terminal` | Terminal UI and terminal sessions |
 | `:feature:explorer` | File and project explorer |
 | `:services:daemon` | Isolated compiler/process daemon |
 | `:integrations:toolchain` | Toolchain discovery and integration |
@@ -135,8 +135,8 @@ kcode/
 | `:core:logging` | Logging |
 | `:lsp:api` | Language-server lifecycle API |
 | `:ui:design-system` | UI design system |
-| `:feature:editor` | Editor engine adapter and editor UI |
-| `:feature:terminal` | Terminal emulator, local PTY and SSH sessions |
+| `:editor` | Editor engine adapter and editor UI |
+| `:terminal` | Terminal emulator, local PTY and SSH sessions |
 | `:integrations:toolchain` | Runtime toolchain discovery |
 | `:integrations:linux-runtime` | PRoot, rootfs and runtime management |
 | `:workspace:api` | Workspace repository contracts |
@@ -332,7 +332,7 @@ Subsystem-specific acceptance criteria:
 - [ ] Integrate diagnostics and completion into the editor surface rather than unrelated bottom panels.
 
 ### Phase 4 — Runtime and terminal reliability
-- [x] Separate runtime provisioning and validation behind `:core:contracts` runtime operations; terminal UI receives the adapter from `:app`.\n- [x] Remove the direct `:integrations:linux-runtime` dependency from `:feature:terminal`.\n- [ ] Further separate terminal session state from runtime installation state at the workspace/application lifecycle level.
+- [x] Separate runtime provisioning and validation behind `:core:contracts` runtime operations; terminal UI receives the adapter from `:app`.\n- [x] Remove the direct `:integrations:linux-runtime` dependency from `:terminal`.\n- [ ] Further separate terminal session state from runtime installation state at the workspace/application lifecycle level.
 - [ ] Verify PTY lifecycle, resize, signals, and cleanup.
 - [ ] Verify Ubuntu rootfs integrity and interrupted-install recovery.
 - [ ] Verify SSH host-key handling and connection lifecycle.
