@@ -13,6 +13,9 @@ import io.github.rosemoe.sora.lsp.events.AsyncEventListener
 import io.github.rosemoe.sora.lsp.events.document.DocumentOpenEvent
 import io.github.rosemoe.sora.lsp.utils.toFileUri
 import io.github.rosemoe.sora.text.CharPosition
+import io.github.rosemoe.sora.event.ContentChangeEvent
+import org.eclipse.lsp4j.CompletionItem
+import java.util.concurrent.atomic.AtomicInteger
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
@@ -64,6 +67,11 @@ class ClangdProjectSession(
     private var available = false
     private val problemsByFile = ConcurrentHashMap<String, List<EditorProblem>>()
     private val connectionAttempts = ConcurrentHashMap.newKeySet<LspEditor>()
+    private data class EditorEventLogging(
+        val listeners: List<EventListener>,
+        val previousThrowableListener: (Throwable) -> Unit
+    )
+    private val editorEventLogging = ConcurrentHashMap<LspEditor, EditorEventLogging>()
     private val mutableStatus = MutableStateFlow(
         EditorLspStatus("clangd unavailable", "C/C++ language services have not been validated.", error = true)
     )
@@ -290,6 +298,7 @@ class ClangdProjectSession(
             )
             return
         }
+        installEditorEventLogging(editor)
         DeveloperLog.event("ClangdLsp", "connect_requested", mapOf(
             "file" to editor.uri.path,
             "attached" to (editor.editor != null),
@@ -385,6 +394,75 @@ class ClangdProjectSession(
         }
     }
 
+    /**
+     * Observe Sora's real event dispatch after its built-in handler has completed.
+     * This records protocol operations without logging source text or request payloads.
+     */
+    private fun installEditorEventLogging(editor: LspEditor) {
+        if (editorEventLogging.containsKey(editor)) return
+        val previousThrowableListener = editor.eventManager.throwableListener
+        editor.eventManager.throwableListener = { error ->
+            DeveloperLog.failure("ClangdLsp", "editor_event_dispatch_failed", error, mapOf(
+                "file" to editor.uri.path,
+                "connected" to editor.isConnected
+            ))
+            previousThrowableListener(error)
+        }
+        val requestCounts = ConcurrentHashMap<String, AtomicInteger>()
+        val methods = listOf(
+            "textDocument/didChange",
+            "textDocument/completion",
+            "textDocument/hover",
+            "textDocument/signatureHelp",
+            "textDocument/formatting",
+            "textDocument/rangeFormatting",
+            "textDocument/codeAction",
+            "textDocument/documentHighlight",
+            "textDocument/inlayHint",
+            "textDocument/documentColor",
+            "textDocument/didSave",
+            "textDocument/didClose"
+        )
+        val listeners = methods.map { method ->
+            object : EventListener {
+                override val eventName: String = method
+
+                override fun handle(context: EventContext) {
+                    val sequence = requestCounts.getOrPut(method) { AtomicInteger() }.incrementAndGet()
+                    val position = context.getOrNull<CharPosition>(CharPosition::class.java.name)
+                    val change = context.getOrNull<ContentChangeEvent>(ContentChangeEvent::class.java.name)
+                    val completionItems = context.getOrNull<List<CompletionItem>>("completion-items")
+                    DeveloperLog.debug("ClangdLsp", buildString {
+                        append("event=editor_lsp_event_completed")
+                        append(" method=").append(method)
+                        append(" file=").append(editor.uri.path)
+                        append(" sequence=").append(sequence)
+                        append(" connected=").append(editor.isConnected)
+                        if (position != null) {
+                            append(" line=").append(position.line + 1)
+                            append(" column=").append(position.column + 1)
+                        }
+                        if (change != null) {
+                            append(" changeAction=").append(change.action)
+                            append(" changedCharacters=").append(change.changedText.length)
+                        }
+                        if (completionItems != null) append(" completionItems=").append(completionItems.size)
+                    })
+                }
+            }
+        }
+        val logging = EditorEventLogging(listeners, previousThrowableListener)
+        if (editorEventLogging.putIfAbsent(editor, logging) == null) {
+            listeners.forEach(editor.eventManager::addListener)
+            DeveloperLog.event("ClangdLsp", "editor_event_logging_installed", mapOf(
+                "file" to editor.uri.path,
+                "observedMethods" to methods
+            ))
+        } else {
+            editor.eventManager.throwableListener = previousThrowableListener
+        }
+    }
+
     /** Notify clangd after the corresponding workspace file has been written successfully. */
     fun saveDocument(relativeFilePath: String) {
         val startedAt = System.nanoTime()
@@ -424,6 +502,11 @@ class ClangdProjectSession(
     override fun close() {
         DeveloperLog.event("ClangdLsp", "session_dispose_started", mapOf("workspace" to workspace.absolutePath, "connectionAttempts" to connectionAttempts.size, "problemCount" to mutableProblems.value.size))
         project.eventEmitter.removeListener(diagnosticsListener)
+        editorEventLogging.forEach { (editor, logging) ->
+            logging.listeners.forEach(editor.eventManager::removeListener)
+            editor.eventManager.throwableListener = logging.previousThrowableListener
+        }
+        editorEventLogging.clear()
         project.dispose()
         problemsByFile.clear()
         connectionAttempts.clear()
