@@ -5,7 +5,7 @@
     <application
         android:name=".CppIdeApplication"
         android:allowBackup="false"
-        android:label="Code Studio"
+        android:label="KCode"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
