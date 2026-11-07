@@ -228,3 +228,11 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 ## 14. Terminal/runtime ownership map correction
 
 The local PTY session and SSH shell/session implementation now belong to `:feature:terminal`. PRoot, rootfs acquisition/extraction, executable validation, runtime smoke tests, and guest compatibility remain in `:integrations:linux-runtime`. The remaining direct calls from terminal UI into runtime installers are an adapter boundary still to be completed; this migration does not claim that separation is finished.
+
+
+## 15. IPC module ownership migration
+
+- [x] Moved compiler and LSP AIDL contracts from `:core:aidl` to `:core:ipc`.
+- [x] Preserved the generated AIDL package `com.techwithkaushik.cppide.ipc` so Binder interface names remain compatible.
+- [x] Updated app, daemon, and settings Gradle references to `:core:ipc`.
+- [ ] Verify AIDL generation and ARM32 release build in CI.
