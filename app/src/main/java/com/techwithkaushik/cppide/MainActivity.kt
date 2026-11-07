@@ -268,6 +268,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var editorTheme by rememberSaveable(appContext) { mutableStateOf(appContext.getSharedPreferences(IdeDesignTokens.Preference.FILE, 0).getString(IdeDesignTokens.Preference.EDITOR_THEME, "Dark+ (VS Code)") ?: "Dark+ (VS Code)") }
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
+    var drawerSidebarOpen by rememberSaveable { mutableStateOf(false) }
     val projects = remember(projectStorage) {
         mutableStateListOf<IdeProject>().apply {
             projectStorage.listProjects().forEach { project ->
@@ -336,6 +337,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         // keyboard focus; it must not be forwarded into the shell.
         when {
             showToolPanel -> showToolPanel = false
+            drawerState.isOpen && drawerSidebarOpen -> drawerSidebarOpen = false
             drawerState.isOpen -> scope.launch { drawerState.close() }
             else -> when (screen) {
                 IdeScreen.Workspace -> screen = IdeScreen.Projects
@@ -447,20 +449,50 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 ModalDrawerSheet(
                     drawerContainerColor = IdeSurface,
                     drawerContentColor = Color(0xFFE8EDF5),
-                    modifier = Modifier.width(304.dp)
+                    modifier = Modifier.width(if (drawerSidebarOpen) 296.dp else 56.dp),
+                    drawerShape = androidx.compose.ui.graphics.RectangleShape
                 ) {
-                    Column(Modifier.fillMaxSize()) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Code Studio", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = IdeAccent)
-                                Text(selectedProject, color = IdeMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.fillMaxSize().background(IdeSurface)) {
+                        if (drawerSidebarOpen) {
+                            Row(
+                                Modifier.fillMaxWidth().height(44.dp).background(Color(0xFF151F29))
+                                    .padding(horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { drawerSidebarOpen = false },
+                                    modifier = Modifier.size(32.dp)
+                                ) { IdeIcon("chevronRight", IdeMuted, 18.dp) }
+                                Text(
+                                    drawerDestination.uppercase(),
+                                    modifier = Modifier.weight(1f),
+                                    color = Color(0xFFE8EDF5),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                IconButton(
+                                    onClick = { scope.launch { drawerState.close() } },
+                                    modifier = Modifier.size(30.dp)
+                                ) { IdeIcon("close", IdeMuted, 16.dp) }
                             }
-                            IconButton(onClick = { scope.launch { drawerState.close() } }, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg) }
+                            HorizontalDivider(color = IdeSurfaceRaised, thickness = 1.dp)
+                        } else {
+                            Box(
+                                Modifier.fillMaxWidth().height(44.dp).background(Color(0xFF151F29)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                IdeIcon("code", IdeAccent, 22.dp)
+                            }
+                            HorizontalDivider(color = IdeSurfaceRaised, thickness = 1.dp)
                         }
-                        HorizontalDivider(color = IdeSurfaceRaised)
                         Row(Modifier.fillMaxSize()) {
                             Column(
-                                Modifier.width(116.dp).fillMaxHeight().background(Color(0xFF111820)).padding(vertical = IdeDesignTokens.Spacing.xs),
+                                Modifier.width(56.dp).fillMaxHeight()
+                                    .background(Color(0xFF111820))
+                                    .padding(top = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 listOf(
@@ -471,63 +503,138 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                     Triple("Extensions", "extensions", "Extensions"),
                                     Triple("Settings", "settings", "Settings")
                                 ).forEach { (destination, icon, label) ->
-                                    val active = drawerDestination == destination
-                                    Row(
-                                        Modifier.fillMaxWidth().clickable { drawerDestination = destination }
-                                            .background(if (active) Color(0xFF202B37) else Color.Transparent)
-                                            .padding(horizontal = 9.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    val active = drawerDestination == destination && drawerSidebarOpen
+                                    Box(
+                                        Modifier.fillMaxWidth().height(48.dp)
+                                            .clickable {
+                                                drawerDestination = destination
+                                                drawerSidebarOpen = true
+                                            }
+                                            .background(if (active) Color(0xFF263747) else Color.Transparent),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        IdeIcon(icon, if (active) Color(0xFFE8EDF5) else IdeMuted, 18.dp)
-                                        Text(label, color = if (active) Color(0xFFE8EDF5) else IdeMuted, fontSize = 10.sp, maxLines = 1)
+                                        if (active) {
+                                            Box(
+                                                Modifier.align(Alignment.CenterStart).width(2.dp)
+                                                    .height(30.dp).background(IdeAccent)
+                                            )
+                                        }
+                                        androidx.compose.material3.IconButton(
+                                            onClick = {
+                                                drawerDestination = destination
+                                                drawerSidebarOpen = true
+                                            },
+                                            modifier = Modifier.size(44.dp)
+                                        ) {
+                                            IdeIcon(
+                                                icon,
+                                                if (active) Color(0xFFE8EDF5) else IdeMuted,
+                                                21.dp
+                                            )
+                                        }
                                     }
                                 }
+                                Spacer(Modifier.weight(1f))
+                                Box(
+                                    Modifier.fillMaxWidth().height(44.dp)
+                                        .clickable { scope.launch { drawerState.close() } },
+                                    contentAlignment = Alignment.Center
+                                ) { IdeIcon("close", IdeMuted, 19.dp) }
                             }
-                            Column(Modifier.weight(1f).fillMaxHeight().background(IdeSurface).padding(horizontal = 10.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
-                                Text(drawerDestination.uppercase(), color = Color(0xFFE8EDF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                HorizontalDivider(color = IdeSurfaceRaised)
-                                when (drawerDestination) {
-                                    "File Explorer" -> FileExplorerSheet(
-                                        projectName = selectedProject, activeFile = activeFile, files = workspaceFiles.toList(),
-                                        onOpenFile = { openFile(it); scope.launch { drawerState.close() } },
-                                        onCreateFile = { file -> if (file !in workspaceFiles) workspaceFiles.add(file); if (file !in fileContents) fileContents[file] = sampleCode(file); openFile(file); scope.launch { drawerState.close() } },
-                                        onClose = { scope.launch { drawerState.close() } }, sidebarMode = true
-                                    )
-                                    "Search" -> {
-                                        OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search files") }, leadingIcon = { IdeIcon("search", IdeAccent, 17.dp) })
-                                        Button(onClick = { searchInProject = true; showSearch = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Search project") }
-                                    }
-                                    "Source Control" -> {
-                                        Text(if (dirtyFiles.isEmpty()) "No changes" else "${dirtyFiles.size} changed file(s)", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
-                                        dirtyFiles.forEach { Text("M  $it", color = IdeGreen, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                                        Button(onClick = {
-                                            var saveFailed = false
-                                            dirtyFiles.toList().forEach { file ->
-                                                val contents = if (file == activeFile) code else fileContents[file].orEmpty()
-                                                runCatching { projectStorage.writeFile(selectedProject, file, contents) }
-                                                    .onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }
-                                                    .onFailure { saveFailed = true }
+                            if (drawerSidebarOpen) {
+                                Column(
+                                    Modifier.weight(1f).fillMaxHeight()
+                                        .background(IdeSurface)
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    when (drawerDestination) {
+                                        "File Explorer" -> FileExplorerSheet(
+                                            projectName = selectedProject,
+                                            activeFile = activeFile,
+                                            files = workspaceFiles.toList(),
+                                            onOpenFile = { openFile(it); scope.launch { drawerState.close() } },
+                                            onCreateFile = {
+                                                file -> if (file !in workspaceFiles) workspaceFiles.add(file)
+                                                if (file !in fileContents) fileContents[file] = sampleCode(file)
+                                                openFile(file)
+                                                scope.launch { drawerState.close() }
+                                            },
+                                            onClose = { drawerSidebarOpen = false },
+                                            sidebarMode = true
+                                        )
+                                        "Search" -> {
+                                            OutlinedTextField(
+                                                value = searchQuery,
+                                                onValueChange = { searchQuery = it },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                singleLine = true,
+                                                placeholder = { Text("Search files", fontSize = 12.sp) },
+                                                leadingIcon = { IdeIcon("search", IdeAccent, 17.dp) }
+                                            )
+                                            Button(
+                                                onClick = {
+                                                    searchInProject = true
+                                                    showSearch = true
+                                                    scope.launch { drawerState.close() }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = androidx.compose.ui.graphics.RectangleShape
+                                            ) { Text("Search project", fontSize = 12.sp) }
+                                        }
+                                        "Source Control" -> {
+                                            Text(
+                                                if (dirtyFiles.isEmpty()) "No changes" else "${dirtyFiles.size} changed file(s)",
+                                                color = IdeMuted,
+                                                fontSize = 12.sp
+                                            )
+                                            dirtyFiles.forEach {
+                                                Text("M  $it", color = IdeGreen, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
-                                            if (saveFailed) {
-                                                selectedPanel = ToolPanel.Problems
-                                                showToolPanel = true
-                                            }
-                                        }, modifier = Modifier.fillMaxWidth()) { Text("Save all") }
+                                            Button(
+                                                onClick = {
+                                                    var saveFailed = false
+                                                    dirtyFiles.toList().forEach { file ->
+                                                        val contents = if (file == activeFile) code else fileContents[file].orEmpty()
+                                                        runCatching { projectStorage.writeFile(selectedProject, file, contents) }
+                                                            .onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }
+                                                            .onFailure { saveFailed = true }
+                                                    }
+                                                    if (saveFailed) {
+                                                        selectedPanel = ToolPanel.Problems
+                                                        showToolPanel = true
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = androidx.compose.ui.graphics.RectangleShape
+                                            ) { Text("Save all", fontSize = 12.sp) }
+                                        }
+                                        "Run and Debug" -> {
+                                            Button(
+                                                onClick = { selectedPanel = ToolPanel.Build; showToolPanel = true; scope.launch { drawerState.close() } },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = androidx.compose.ui.graphics.RectangleShape
+                                            ) { Text("Build", fontSize = 12.sp) }
+                                            OutlinedButton(
+                                                onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true; scope.launch { drawerState.close() } },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = androidx.compose.ui.graphics.RectangleShape
+                                            ) { Text("Run / Output", fontSize = 12.sp) }
+                                        }
+                                        "Extensions" -> Text("No extensions installed.", color = IdeMuted, fontSize = 12.sp)
+                                        "Settings" -> Button(
+                                            onClick = { settingsReturnScreen = screen; screen = IdeScreen.Settings; scope.launch { drawerState.close() } },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = androidx.compose.ui.graphics.RectangleShape
+                                        ) { Text("Open settings", fontSize = 12.sp) }
                                     }
-                                    "Run and Debug" -> {
-                                        Button(onClick = { selectedPanel = ToolPanel.Build; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Build") }
-                                        OutlinedButton(onClick = { selectedPanel = ToolPanel.Output; showToolPanel = true; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Run / Output") }
-                                    }
-                                    "Extensions" -> Text("Extension installation is not available yet.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
-                                    "Settings" -> Button(onClick = { settingsReturnScreen = screen; screen = IdeScreen.Settings; scope.launch { drawerState.close() } }, modifier = Modifier.fillMaxWidth()) { Text("Open settings") }
                                 }
                             }
                         }
                     }
                 }
             }
-        ) {
+        ){
             Box(Modifier.fillMaxSize().background(IdeBackground)) {
                 WorkspaceScreen(
                     projectName = selectedProject, activeFile = activeFile, code = code,
