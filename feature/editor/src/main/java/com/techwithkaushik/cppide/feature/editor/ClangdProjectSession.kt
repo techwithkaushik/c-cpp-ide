@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.feature.editor
 
+import com.techwithkaushik.cppide.core.contracts.editor.EditorDiagnostics
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
@@ -45,13 +46,8 @@ data class EditorLspStatus(
     val error: Boolean = false
 )
 
-data class EditorProblem(
-    val filePath: String,
-    val line: Int,
-    val column: Int,
-    val severity: String,
-    val message: String
-)
+/** Backward-compatible package alias; the model is owned by :core:contracts. */
+typealias EditorProblem = com.techwithkaushik.cppide.core.contracts.editor.EditorProblem
 
 /**
  * Owns one clangd process per workspace and exposes Sora's native LSP-backed language.
@@ -62,7 +58,7 @@ class ClangdProjectSession(
     workspaceDirectory: File,
     private val runtime: LinuxRuntimePaths,
     configuredClangdGuestPath: String?
-) : AutoCloseable {
+) : EditorDiagnostics, AutoCloseable {
 
     private val workspace = workspaceDirectory.canonicalFile
     private val project = LspProject(GUEST_WORKSPACE)
@@ -78,7 +74,7 @@ class ClangdProjectSession(
     private val mutableProblems = MutableStateFlow<List<EditorProblem>>(emptyList())
 
     val status: StateFlow<EditorLspStatus> = mutableStatus.asStateFlow()
-    val problems: StateFlow<List<EditorProblem>> = mutableProblems.asStateFlow()
+    override val problems: StateFlow<List<EditorProblem>> = mutableProblems.asStateFlow()
 
     private val diagnosticsListener = object : EventListener {
         override val eventName: String = "editor/publishDiagnostics"
