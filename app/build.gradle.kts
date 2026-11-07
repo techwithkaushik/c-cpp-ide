@@ -103,6 +103,7 @@ dependencies {
     implementation(project(":feature:editor"))
     implementation(project(":feature:terminal"))
     implementation(project(":feature:explorer"))
+    implementation(project(":workspace:impl"))
     implementation(project(":services:daemon"))
     implementation(project(":integrations:toolchain"))
     implementation(project(":integrations:linux-runtime"))
