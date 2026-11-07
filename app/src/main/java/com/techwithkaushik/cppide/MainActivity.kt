@@ -2,9 +2,7 @@ package com.techwithkaushik.cppide
 
 import com.techwithkaushik.cppide.feature.terminal.TermuxLinuxTerminalPanel
 import com.techwithkaushik.cppide.feature.terminal.IdeMasterShellUi
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
-import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
+import com.techwithkaushik.cppide.integration.linuxruntime.DefaultLinuxRuntimeOperations
 import com.techwithkaushik.cppide.ui.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 
@@ -22,6 +20,7 @@ import com.techwithkaushik.cppide.workspace.ui.ExplorerPalette
 import com.techwithkaushik.cppide.workspace.ui.FileExplorerSheet
 import com.techwithkaushik.cppide.workspace.api.WorkspaceRepository
 import com.techwithkaushik.cppide.core.contracts.workspace.WorkspaceIdentity
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeOperations
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import com.techwithkaushik.cppide.feature.editor.EditorLspStatus
 import com.techwithkaushik.cppide.feature.editor.EditorProblem
@@ -175,6 +174,7 @@ class MainActivity : ComponentActivity() {
 private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> Unit) {
     val appContext = LocalContext.current.applicationContext
     val workspaceRepository: WorkspaceRepository = remember(appContext) { ProjectStorage(appContext) }
+    val runtimeOperations: LinuxRuntimeOperations = remember(appContext) { DefaultLinuxRuntimeOperations(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir) }
     var runtimeValidationComplete by remember { mutableStateOf(false) }
 
     // Validate the app-owned Ubuntu runtime once on every cold app launch.
@@ -184,12 +184,12 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         DeveloperLog.event("Application", "runtime_validation_started", mapOf("sdk" to android.os.Build.VERSION.SDK_INT, "abi" to android.os.Build.SUPPORTED_ABIS.firstOrNull(), "nativeLibraryDir" to appContext.applicationInfo.nativeLibraryDir))
         val runtimePrefs = appContext.getSharedPreferences("linux_runtime_validation", android.content.Context.MODE_PRIVATE)
         val result = withContext(Dispatchers.IO) {
-            val paths = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
+            val paths = runtimeOperations.environment
             // Materialize APK-bundled PRoot aliases before checking readiness. The
             // native executables live in nativeLibraryDir, not files/usr/bin.
             val prootCheck = runCatching {
                 // Also validates ELF format and device ABI, not just file presence.
-                ProotDownloader(paths).downloadAndInstall()
+                runtimeOperations.validateProot()
             }
             prootCheck.onSuccess { DeveloperLog.event("Application", "bundled_proot_validated", mapOf("bytes" to it.bytes, "release" to it.release)) }
                 .onFailure { DeveloperLog.failure("Application", "bundled_proot_validation_failed", it, mapOf("proot" to paths.proot.absolutePath, "loader" to paths.prootLoader.absolutePath)) }
@@ -297,9 +297,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         }
     }
     val editorController = remember { SoraEditorController() }
-    val runtimePaths = remember(appContext) {
-        LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
-    }
+    val runtimePaths = runtimeOperations.environment
     val workspaceDirectory = remember(selectedProject) {
         workspaceRepository.listProjects().firstOrNull { it.name == selectedProject }?.directory
     }
@@ -1869,6 +1867,7 @@ private fun WorkspaceScreen(
         terminalDock = {
             ToolPanelContent(
                 selected = selectedPanel,
+                runtimeOperations = runtimeOperations,
                 projectName = projectName,
                 activeFile = activeFile,
                 code = code,
@@ -2015,6 +2014,7 @@ private val CompilerDiagnosticPattern =
 @Composable
 private fun ToolPanelContent(
     selected: ToolPanel,
+    runtimeOperations: LinuxRuntimeOperations,
     projectName: String,
     activeFile: String,
     code: String,
@@ -2065,7 +2065,8 @@ private fun ToolPanelContent(
         when (selected) {
             ToolPanel.Terminal -> {
                 TermuxLinuxTerminalPanel(
-                    Modifier.weight(1f).fillMaxWidth(),
+                    runtime = runtimeOperations,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     onOpenSettings = onOpenSettings,
                     onCloseTerminal = onClose
                 )
