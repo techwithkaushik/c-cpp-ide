@@ -102,7 +102,7 @@ class LinuxToolchainDiscovery : LinuxToolchainAccess {
      * Resolve an absolute Linux guest executable path without following absolute
      * symlinks on the Android host. Returns the physical file below rootfs only.
      */
-    override fun findExecutable(rootfs: File, name: String, environmentPath: String? = null): File? =
+    override fun findExecutable(rootfs: File, name: String, environmentPath: String?): File? =
         discover(rootfs, environmentPath).find(name)?.executable?.let(::File)
 
     override fun resolveExecutable(rootfs: File, guestPath: String): File? {
