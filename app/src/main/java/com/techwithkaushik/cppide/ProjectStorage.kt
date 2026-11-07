@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide
 
 import android.content.Context
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import java.io.File
 import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
@@ -24,27 +25,35 @@ internal class ProjectStorage(context: Context) {
     }
 
     init {
+        DeveloperLog.event("ProjectStorage", "initialize_started", mapOf("root" to projectsRoot.absolutePath, "exists" to projectsRoot.exists()))
         if (!projectsRoot.exists() && !projectsRoot.mkdirs()) {
             throw IOException("Unable to create projects directory")
         }
         if (!projectsRoot.isDirectory) throw IOException("Projects path is not a directory")
+        DeveloperLog.event("ProjectStorage", "initialize_completed", mapOf("root" to projectsRoot.absolutePath, "projectCount" to projectsRoot.listFiles().orEmpty().count { it.isDirectory }))
     }
 
     @Synchronized
-    fun listProjects(): List<Project> = projectsRoot.listFiles()
-        .orEmpty()
-        .filter { it.isDirectory && File(it, ".cppide-project").isFile }
-        .mapNotNull { directory ->
-            runCatching {
-                val metadata = File(directory, ".cppide-project").readLines()
-                val language = metadata.getOrNull(0)?.takeIf(String::isNotBlank) ?: "C17"
-                Project(directory.name, language, directory.canonicalFile, directory.lastModified())
-            }.getOrNull()
-        }
-        .sortedByDescending { it.updatedAt }
+    fun listProjects(): List<Project> {
+        val startedAt = System.nanoTime()
+        return projectsRoot.listFiles()
+            .orEmpty()
+            .filter { it.isDirectory && File(it, ".cppide-project").isFile }
+            .mapNotNull { directory ->
+                runCatching {
+                    val metadata = File(directory, ".cppide-project").readLines()
+                    val language = metadata.getOrNull(0)?.takeIf(String::isNotBlank) ?: "C17"
+                    Project(directory.name, language, directory.canonicalFile, directory.lastModified())
+                }.onFailure { DeveloperLog.failure("ProjectStorage", "project_metadata_read_failed", it, mapOf("directory" to directory.name)) }.getOrNull()
+            }
+            .sortedByDescending { it.updatedAt }
+            .also { DeveloperLog.event("ProjectStorage", "projects_listed", mapOf("count" to it.size, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000)) }
+    }
 
     @Synchronized
     fun createProject(name: String, language: String, starterName: String, starterContent: String): Project {
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("ProjectStorage", "project_create_started", mapOf("name" to name, "language" to language, "starterFile" to starterName, "starterBytes" to starterContent.toByteArray().size))
         validateName(name)
         require(starterName.isNotBlank() && starterName == File(starterName).name &&
             starterName != "." && starterName != "..") { "Invalid starter filename" }
@@ -63,28 +72,36 @@ internal class ProjectStorage(context: Context) {
             staging.deleteRecursively()
             throw error
         }
-        return Project(name, language, target, target.lastModified())
+        return Project(name, language, target, target.lastModified()).also {
+            DeveloperLog.event("ProjectStorage", "project_create_completed", mapOf("name" to name, "path" to target.absolutePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+        }
     }
 
     fun listFiles(projectName: String): List<String> {
+        val startedAt = System.nanoTime()
         val project = projectDirectory(projectName)
         return project.walkTopDown()
             .filter { it.isFile && it.name != ".cppide-project" }
             .map { it.relativeTo(project).invariantSeparatorsPath }
             .sorted()
             .toList()
+            .also { DeveloperLog.event("ProjectStorage", "files_listed", mapOf("project" to projectName, "count" to it.size, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000)) }
     }
 
     fun listDirectories(projectName: String): List<String> {
+        val startedAt = System.nanoTime()
         val project = projectDirectory(projectName)
         return project.walkTopDown()
             .filter { it.isDirectory && it != project }
             .map { it.relativeTo(project).invariantSeparatorsPath }
             .sorted()
             .toList()
+            .also { DeveloperLog.event("ProjectStorage", "directories_listed", mapOf("project" to projectName, "count" to it.size, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000)) }
     }
 
     fun createDirectory(projectName: String, relativePath: String) {
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("ProjectStorage", "directory_create_started", mapOf("project" to projectName, "path" to relativePath))
         require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) { "Invalid relative directory path" }
         val project = projectDirectory(projectName)
         val directory = File(project, relativePath).canonicalFile
@@ -94,16 +111,25 @@ internal class ProjectStorage(context: Context) {
         if (directory.exists()) throw IOException("A file or folder with this name already exists")
         if (!directory.mkdirs()) throw IOException("Unable to create directory")
         directory.setLastModified(System.currentTimeMillis())
+        DeveloperLog.event("ProjectStorage", "directory_create_completed", mapOf("project" to projectName, "path" to relativePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
     }
 
     fun readFile(projectName: String, relativePath: String): String {
+        val startedAt = System.nanoTime()
         val file = resolveFile(projectName, relativePath)
         if (!file.isFile) throw IOException("File does not exist: $relativePath")
-        return file.readText()
+        return try {
+            file.readText().also { DeveloperLog.event("ProjectStorage", "file_read", mapOf("project" to projectName, "path" to relativePath, "bytes" to file.length(), "durationMs" to (System.nanoTime() - startedAt) / 1_000_000)) }
+        } catch (error: Exception) {
+            DeveloperLog.failure("ProjectStorage", "file_read_failed", error, mapOf("project" to projectName, "path" to relativePath))
+            throw error
+        }
     }
 
     fun writeFile(projectName: String, relativePath: String, content: String) {
+        val startedAt = System.nanoTime()
         val file = resolveFile(projectName, relativePath)
+        DeveloperLog.event("ProjectStorage", "file_write_started", mapOf("project" to projectName, "path" to relativePath, "bytes" to content.toByteArray().size))
         if (file.name == ".cppide-project") throw SecurityException("Project metadata is managed by the IDE")
         val parent = file.parentFile ?: throw IOException("Invalid file path")
         if (!parent.exists() && !parent.mkdirs()) throw IOException("Unable to create file directory")
@@ -122,10 +148,14 @@ internal class ProjectStorage(context: Context) {
                 // file intact until the replacement is ready, then use the platform fallback.
                 Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
+        } catch (error: Exception) {
+            DeveloperLog.failure("ProjectStorage", "file_write_failed", error, mapOf("project" to projectName, "path" to relativePath, "bytes" to content.toByteArray().size))
+            throw error
         } finally {
             temporary.delete()
         }
         file.setLastModified(System.currentTimeMillis())
+        DeveloperLog.event("ProjectStorage", "file_write_completed", mapOf("project" to projectName, "path" to relativePath, "bytes" to file.length(), "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
     }
 
     private fun projectDirectory(name: String): File {
