@@ -1761,45 +1761,9 @@ private fun WorkspaceScreen(
         workspaceContent = {
                 Scaffold(
         containerColor = IdeBackground,
-        topBar = {
-            TopAppBar(
-                modifier = Modifier.height(42.dp),
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FileTypeIcon(activeFile, 21.dp)
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(activeFile + if (dirtyFiles.contains(activeFile)) "  ●" else "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text(projectName, fontSize = 10.sp, color = IdeMuted, maxLines = 1)
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) { IdeIcon("menu", IdeAccent, 20.dp) }
-                },
-                actions = {
-                    IconButton(onClick = { onAction("Undo") }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) { IdeIcon("undo", IdeAccent, 17.dp) }
-                    IconButton(onClick = { onAction("Redo") }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) { IdeIcon("redo", IdeAccent, 17.dp) }
-                    IconButton(onClick = { onAction("Save") }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) { IdeIcon("save", IdeAccent, IdeDesignTokens.Spacing.lg) }
-                    var showOverflow by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { showOverflow = true }) { IdeIcon("more", IdeMuted, 20.dp) }
-                        androidx.compose.material3.DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
-                            listOf("Command Palette", "Find", "Find in Project", "Select All", "Copy", "Cut", "Paste", "Undo", "Redo", "Toggle Word Wrap", "Save All", "File Explorer", "Terminal", "Build", "Problems", "Output", if (fullScreen) "Exit Full Screen" else "Full Screen", "Settings", "Sync Project", "Cancel Build").forEach { action ->
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(action) },
-                                    leadingIcon = { IdeIcon(when (action) { "Find", "Find in Project", "Command Palette" -> "search"; "File Explorer" -> "folder"; "Terminal" -> "terminal"; "Build", "Cancel Build" -> "build"; "Problems" -> "problems"; "Output", "Sync Project" -> "output"; "Settings" -> "settings"; "Full Screen", "Exit Full Screen" -> "fullscreen"; else -> "save" }, IdeAccent, 18.dp) },
-                                    onClick = { showOverflow = false; when (action) { "File Explorer" -> onExplorer(); "Full Screen", "Exit Full Screen" -> onToggleFullScreen(); "Terminal", "Build", "Problems", "Output" -> onAction(action); else -> onAction(action) } }
-                                )
-                            }
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = IdeSurface)
-            )
-        },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).background(IdeBackground)
+            Modifier.fillMaxSize().background(IdeBackground)
         ) {
             IdeMenuBar(
                 onAction = onAction,
