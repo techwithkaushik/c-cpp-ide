@@ -112,7 +112,7 @@ class StandaloneBuildRunner(
                     environment()["LD_LIBRARY_PATH"] = File(root, "lib").absolutePath
                 }
                 .start()
-            DeveloperLog.event("BuildRunner", "process_started", mapOf("stage" to stage, "pid" to process.pid()))
+            DeveloperLog.event("BuildRunner", "process_started", mapOf("stage" to stage, "processClass" to process.javaClass.name, "isAlive" to process.isAlive))
             // Always drain process output, but cap retained diagnostics to prevent a noisy
             // compiler or program from exhausting the IDE process memory.
             val output = StringBuilder()
