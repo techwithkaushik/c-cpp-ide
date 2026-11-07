@@ -132,7 +132,7 @@ internal class EmbeddedCppBuildRunner(context: Context) {
         val process = try {
             ProcessBuilder(
                 runtime.proot.absolutePath,
-                "-0", "-v", "0",
+                "-0", "-v", "0", "--link2symlink",
                 "-r", runtime.ubuntuRoot.absolutePath,
                 "-w", "/workspace",
                 "-b", "${workingDirectory.absolutePath}:/workspace",
