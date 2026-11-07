@@ -44,11 +44,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import com.termux.terminal.TerminalSession
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
-import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
-import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
-import com.techwithkaushik.cppide.integration.linuxruntime.RootfsArchitectureInspector
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeOperations
+import com.techwithkaushik.cppide.core.contracts.runtime.RootfsArchitectureReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -103,12 +100,13 @@ internal object TermuxLinuxTabs {
 /** The app's terminal UI is exclusively backed by Termux TerminalView/TerminalSession. */
 @Composable
 fun TermuxLinuxTerminalPanel(
+    runtime: LinuxRuntimeOperations,
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit = {},
     onCloseTerminal: () -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
-    val paths = remember(context) { LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir) }
+    val paths = runtime.environment
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -140,7 +138,7 @@ fun TermuxLinuxTerminalPanel(
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val installed = RootfsInstaller(paths).install(
+                    val installed = runtime.installRootfs(
                         open = { context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot open the selected archive.") },
                         archiveName = archiveName
                     )
@@ -167,7 +165,7 @@ fun TermuxLinuxTerminalPanel(
         scope.launch {
             val inspection = withContext(Dispatchers.IO) {
                 runCatching {
-                    RootfsArchitectureInspector.inspect(
+                    runtime.inspectRootfs(
                         open = { context.contentResolver.openInputStream(uri) ?: throw IllegalStateException("Cannot read the selected archive.") },
                         archiveName = archiveName
                     )
@@ -196,7 +194,7 @@ fun TermuxLinuxTerminalPanel(
         localInstallStatus = "Downloading and installing Ubuntu Base…"
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader(paths).downloadAndInstall() }
+                runCatching { runtime.downloadAndInstallUbuntu() }
             }
             busy = false
             localInstallStatus = null
@@ -219,8 +217,8 @@ fun TermuxLinuxTerminalPanel(
                     paths.ensureDirectories()
                     check(paths.hasRootfs()) { "Ubuntu rootfs is not installed or incomplete. Open Runtime & Bootstrap settings." }
                     if (!paths.ready()) {
-                        ProotDownloader(paths).downloadAndInstall()
-                        val smoke = LinuxRuntimeSmokeTest(paths).run()
+                        runtime.validateProot()
+                        val smoke = runtime.runSmokeTest()
                         check(smoke.success) {
                             smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." }
                         }
