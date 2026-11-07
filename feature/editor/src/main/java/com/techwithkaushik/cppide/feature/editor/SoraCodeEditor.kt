@@ -297,7 +297,7 @@ fun SoraCodeEditor(
                     .onFailure { DeveloperLog.failure("SoraEditor", "textmate_language_setup_failed", it, mapOf("file" to fileName, "theme" to themeName)) }
                     .getOrNull()
                 configureEditorTheme(this, themeName)
-                DeveloperLog.event("SoraEditor", "android_editor_view_created", mapOf("file" to fileName, "language" to (editorLanguage?.javaClass?.simpleName ?: "none"), "textMateScope" to (textMateLanguage?.scopeName ?: "none"), "durationMs" to (System.nanoTime() - factoryStartedAt) / 1_000_000))
+                DeveloperLog.event("SoraEditor", "android_editor_view_created", mapOf("file" to fileName, "language" to (editorLanguage?.javaClass?.simpleName ?: "none"), "textMateLanguageCreated" to (textMateLanguage != null), "durationMs" to (System.nanoTime() - factoryStartedAt) / 1_000_000))
                 lspEditor?.let { languageEditor ->
                     languageEditor.wrapperLanguage = requireNotNull(textMateLanguage) {
                         "A C/C++ language server cannot be attached to a non-C/C++ document."
