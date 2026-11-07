@@ -174,7 +174,7 @@ class ClangdProjectSession(
         // Pass a filesystem path, not an already-encoded URI: FileUri.toUri() encodes it once.
         val guestPath = "$GUEST_WORKSPACE/$relative"
         val languageId = if (extension == "c") "c" else "cpp"
-        return (project.getEditor(guestPath) ?: project.createEditor(guestPath, languageId)).apply {
+        return (project.getEditor(guestPath) ?: project.createEditor(guestPath)).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
