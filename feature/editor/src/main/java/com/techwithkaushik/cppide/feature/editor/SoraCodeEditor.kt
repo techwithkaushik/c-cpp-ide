@@ -324,7 +324,9 @@ fun SoraCodeEditor(
                 if (lspEditor.editor !== editor || activeLspLanguage?.editor !== lspEditor) {
                     lspEditor.wrapperLanguage = textMateLanguage
                     lspEditor.editor = editor
-                    lspAttached.value = true
+                    lspSession?.let { session ->
+                        lspEditor.coroutineScope.launch { session.connect(lspEditor) }
+                    }
                 } else {
                     activeLspLanguage.wrapperLanguage = textMateLanguage
                 }
