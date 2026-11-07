@@ -16,6 +16,7 @@ interface LinuxRuntimeEnvironment {
     val nativeLibraryDir: File?
 
     fun ensureDirectories()
+    fun hasRootfs(): Boolean
     fun ready(): Boolean
 }
 
