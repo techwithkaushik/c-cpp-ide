@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.integration.toolchain
 
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -40,10 +41,14 @@ class StandaloneBuildRunner(
         language: Language,
         arguments: List<String> = emptyList()
     ): Result {
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("BuildRunner", "compile_run_requested", mapOf("language" to language, "source" to source.absolutePath, "workingDirectory" to workingDirectory.absolutePath, "argumentsCount" to arguments.size, "toolchainReady" to status.ready, "timeoutSeconds" to timeoutSeconds))
         if (!status.ready || status.root == null || status.clang == null || status.clangxx == null) {
+            DeveloperLog.warn("BuildRunner", "compile_run_rejected_toolchain_not_ready")
             return Result(null, null, "", "", error = "Standalone compiler runtime is not ready.")
         }
         if (timeoutSeconds !in 1..120) {
+            DeveloperLog.warn("BuildRunner", "compile_run_rejected_invalid_timeout; timeoutSeconds=$timeoutSeconds")
             return Result(null, null, "", "", error = "Timeout must be between 1 and 120 seconds.")
         }
         if (arguments.size > MAX_ARGUMENTS ||
@@ -70,14 +75,18 @@ class StandaloneBuildRunner(
         val compileCommand = listOf(
             compiler.absolutePath, standard, source.absolutePath, "-o", executable.absolutePath
         )
-        val compile = execute(compileCommand, workingDirectory, status.root)
+        val compile = execute(compileCommand, workingDirectory, status.root, "compile")
+        DeveloperLog.event("BuildRunner", "compile_stage_finished", mapOf("exitCode" to compile.exitCode, "timedOut" to compile.timedOut, "outputCharacters" to compile.output.length, "error" to compile.error?.take(500)))
         if (compile.timedOut || compile.exitCode != 0) {
+            DeveloperLog.event("BuildRunner", "compile_run_stopped_after_compile", mapOf("durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
             return Result(compile.exitCode, null, compile.output, "", compile.timedOut, compile.error)
         }
         if (!executable.isFile || !executable.setExecutable(true, true)) {
+            DeveloperLog.error("BuildRunner", "compiled_executable_missing_or_not_executable; path=${executable.absolutePath}")
             return Result(compile.exitCode, null, compile.output, "", error = "Compiler did not produce an executable file.")
         }
-        val run = execute(listOf(executable.absolutePath) + arguments, workingDirectory, status.root)
+        val run = execute(listOf(executable.absolutePath) + arguments, workingDirectory, status.root, "run")
+        DeveloperLog.event("BuildRunner", "program_run_finished", mapOf("exitCode" to run.exitCode, "timedOut" to run.timedOut, "outputCharacters" to run.output.length, "error" to run.error?.take(500), "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
         return Result(compile.exitCode, run.exitCode, compile.output, run.output, run.timedOut, run.error)
     }
 
@@ -88,7 +97,9 @@ class StandaloneBuildRunner(
         val error: String? = null
     )
 
-    private fun execute(command: List<String>, cwd: File, root: File): CommandResult {
+    private fun execute(command: List<String>, cwd: File, root: File, stage: String): CommandResult {
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("BuildRunner", "process_start_requested", mapOf("stage" to stage, "executable" to command.firstOrNull(), "argumentCount" to (command.size - 1), "cwd" to cwd.absolutePath, "root" to root.absolutePath))
         return try {
             val process = ProcessBuilder(command)
                 .directory(cwd)
@@ -101,6 +112,7 @@ class StandaloneBuildRunner(
                     environment()["LD_LIBRARY_PATH"] = File(root, "lib").absolutePath
                 }
                 .start()
+            DeveloperLog.event("BuildRunner", "process_started", mapOf("stage" to stage, "pid" to runCatching { process.pid() }.getOrNull()))
             // Always drain process output, but cap retained diagnostics to prevent a noisy
             // compiler or program from exhausting the IDE process memory.
             val output = StringBuilder()
@@ -130,11 +142,15 @@ class StandaloneBuildRunner(
                 process.destroy()
                 if (!process.waitFor(500, TimeUnit.MILLISECONDS)) process.destroyForcibly()
                 reader.join(500)
+                DeveloperLog.warn("BuildRunner", "process_timed_out; stage=$stage; timeoutSeconds=$timeoutSeconds; durationMs=${(System.nanoTime() - startedAt) / 1_000_000}")
                 return CommandResult(null, synchronized(output) { output.toString() }, true, "Command timed out.")
             }
             reader.join(500)
-            CommandResult(process.exitValue(), synchronized(output) { output.toString() })
+            val result = CommandResult(process.exitValue(), synchronized(output) { output.toString() })
+            DeveloperLog.event("BuildRunner", "process_exited", mapOf("stage" to stage, "exitCode" to result.exitCode, "outputCharacters" to result.output.length, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+            result
         } catch (e: Exception) {
+            DeveloperLog.failure("BuildRunner", "process_execution_failed", e, mapOf("stage" to stage, "executable" to command.firstOrNull(), "cwd" to cwd.absolutePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
             CommandResult(null, "", error = e.message ?: "Unable to execute standalone compiler.")
         }
     }
