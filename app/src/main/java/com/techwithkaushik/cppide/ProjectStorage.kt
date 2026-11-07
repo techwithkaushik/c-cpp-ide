@@ -62,8 +62,10 @@ internal class ProjectStorage(context: Context) {
         val startedAt = System.nanoTime()
         DeveloperLog.event("ProjectStorage", "project_create_started", mapOf("name" to name, "language" to language, "starterFile" to starterName, "starterBytes" to starterContent.toByteArray().size))
         validateName(name)
-        require(starterName.isNotBlank() && starterName == File(starterName).name &&
-            starterName != "." && starterName != "..") { "Invalid starter filename" }
+        if (starterName != null) {
+            require(starterName.isNotBlank() && starterName == File(starterName).name &&
+                starterName != "." && starterName != "..") { "Invalid starter filename" }
+        }
         val target = File(projectsRoot, name).canonicalFile
         require(target.parentFile == projectsRoot) { "Project path escapes workspace" }
         if (target.exists()) throw IOException("A project with this name already exists")
