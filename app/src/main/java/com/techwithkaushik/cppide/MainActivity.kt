@@ -289,7 +289,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var selectedPanel by rememberSaveable { mutableStateOf(ToolPanel.Terminal) }
     var drawerDestination by rememberSaveable { mutableStateOf("File Explorer") }
     var drawerSidebarOpen by rememberSaveable { mutableStateOf(false) }
-    val projects = remember(projectStorage) {
+    val projects = remember(workspaceRepository) {
         mutableStateListOf<IdeProject>().apply {
             workspaceRepository.listProjects().forEach { project ->
                 add(IdeProject(project.name, project.language, project.path, "Saved"))
