@@ -129,16 +129,15 @@ class ClangdProjectSession(
                 )
             }
 
-            // Use one server definition per LSP language, not one process per extension.
-            // clangd expects "c" or "cpp" as textDocument/didOpen.languageId; extensions
-            // such as .cc, .cxx and .hpp are not valid language IDs.
+            // Sora 0.24.4 keys server definitions by every declared extension.
+            // Keep one definition per language family and map all C++ extensions to
+            // the same clangd wrapper so opening .cc/.hpp files does not spawn new daemons.
             project.addServerDefinition(
                 CustomLanguageServerDefinition(
                     ext = "c",
                     serverConnectProvider = clangdConnectionProvider,
                     name = "clangd-c",
-                    extensionsOverride = listOf("c"),
-                    languageId = "c"
+                    extensionsOverride = listOf("c")
                 )
             )
             project.addServerDefinition(
@@ -146,8 +145,7 @@ class ClangdProjectSession(
                     ext = "cpp",
                     serverConnectProvider = clangdConnectionProvider,
                     name = "clangd-cpp",
-                    extensionsOverride = CPP_EXTENSIONS.toList(),
-                    languageId = "cpp"
+                    extensionsOverride = CPP_EXTENSIONS.toList()
                 )
             )
             project.init()
@@ -176,8 +174,7 @@ class ClangdProjectSession(
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
         // Pass a filesystem path, not an already-encoded URI: FileUri.toUri() encodes it once.
         val guestPath = "$GUEST_WORKSPACE/$relative"
-        val languageId = if (extension == "c") "c" else "cpp"
-        return (project.getEditor(guestPath) ?: project.createEditor(guestPath, languageId)).apply {
+        return (project.getEditor(guestPath) ?: project.createEditor(guestPath)).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
