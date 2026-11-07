@@ -1,5 +1,8 @@
 package com.techwithkaushik.cppide.workspace.impl
 
+import com.techwithkaushik.cppide.workspace.api.WorkspaceProject
+import com.techwithkaushik.cppide.workspace.api.WorkspaceRepository
+
 import android.content.Context
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import java.io.File
@@ -12,17 +15,8 @@ import java.nio.file.StandardCopyOption
  * Single source of truth for project metadata and files.
  * All project paths stay under app-private filesDir/projects.
  */
-class ProjectStorage(context: Context) {
+class ProjectStorage(context: Context) : WorkspaceRepository {
     private val projectsRoot = File(context.filesDir, "projects").canonicalFile
-
-    data class Project(
-        val name: String,
-        val language: String,
-        val directory: File,
-        val updatedAt: Long
-    ) {
-        val path: String get() = "projects/${directory.name}"
-    }
 
     init {
         DeveloperLog.event("ProjectStorage", "initialize_started", mapOf("root" to projectsRoot.absolutePath, "exists" to projectsRoot.exists()))
@@ -34,7 +28,7 @@ class ProjectStorage(context: Context) {
     }
 
     @Synchronized
-    fun listProjects(): List<Project> {
+    override fun listProjects(): List<WorkspaceProject> {
         val startedAt = System.nanoTime()
         return projectsRoot.listFiles()
             .orEmpty()
@@ -51,14 +45,14 @@ class ProjectStorage(context: Context) {
     }
 
     @Synchronized
-    fun createEmptyProject(name: String, language: String, includeReadme: Boolean = false, initializeGit: Boolean = false): Project =
+    override fun createEmptyProject(name: String, language: String, includeReadme: Boolean = false, initializeGit: Boolean = false): WorkspaceProject =
         createProjectInternal(name, language, null, "", includeReadme, initializeGit)
 
     @Synchronized
-    fun createProject(name: String, language: String, starterName: String, starterContent: String, includeReadme: Boolean = true, initializeGit: Boolean = false): Project =
+    override fun createProject(name: String, language: String, starterName: String, starterContent: String, includeReadme: Boolean = true, initializeGit: Boolean = false): WorkspaceProject =
         createProjectInternal(name, language, starterName, starterContent, includeReadme, initializeGit)
 
-    private fun createProjectInternal(name: String, language: String, starterName: String?, starterContent: String, includeReadme: Boolean, initializeGit: Boolean): Project {
+    private fun createProjectInternal(name: String, language: String, starterName: String?, starterContent: String, includeReadme: Boolean, initializeGit: Boolean): WorkspaceProject {
         val startedAt = System.nanoTime()
         DeveloperLog.event("ProjectStorage", "project_create_started", mapOf("name" to name, "language" to language, "starterFile" to starterName, "starterBytes" to starterContent.toByteArray().size))
         validateName(name)
@@ -90,20 +84,20 @@ class ProjectStorage(context: Context) {
             staging.deleteRecursively()
             throw error
         }
-        return Project(name, language, target, target.lastModified()).also {
+        return WorkspaceProject(name, language, target, target.lastModified()).also {
             DeveloperLog.event("ProjectStorage", "project_create_completed", mapOf("name" to name, "path" to target.absolutePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
         }
     }
 
     @Synchronized
-    fun deleteProject(projectName: String) {
+    override fun deleteProject(projectName: String) {
         val startedAt = System.nanoTime()
         val directory = projectDirectory(projectName)
         if (!directory.deleteRecursively()) throw IOException("Unable to delete project")
         DeveloperLog.event("ProjectStorage", "project_deleted", mapOf("name" to projectName, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
     }
 
-    fun listFiles(projectName: String): List<String> {
+    override fun listFiles(projectName: String): List<String> {
         val startedAt = System.nanoTime()
         val project = projectDirectory(projectName)
         return project.walkTopDown()
@@ -114,7 +108,7 @@ class ProjectStorage(context: Context) {
             .also { DeveloperLog.event("ProjectStorage", "files_listed", mapOf("project" to projectName, "count" to it.size, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000)) }
     }
 
-    fun listDirectories(projectName: String): List<String> {
+    override fun listDirectories(projectName: String): List<String> {
         val startedAt = System.nanoTime()
         val project = projectDirectory(projectName)
         return project.walkTopDown()
@@ -125,7 +119,7 @@ class ProjectStorage(context: Context) {
             .also { DeveloperLog.event("ProjectStorage", "directories_listed", mapOf("project" to projectName, "count" to it.size, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000)) }
     }
 
-    fun createDirectory(projectName: String, relativePath: String) {
+    override fun createDirectory(projectName: String, relativePath: String) {
         val startedAt = System.nanoTime()
         DeveloperLog.event("ProjectStorage", "directory_create_started", mapOf("project" to projectName, "path" to relativePath))
         require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) { "Invalid relative directory path" }
@@ -140,7 +134,7 @@ class ProjectStorage(context: Context) {
         DeveloperLog.event("ProjectStorage", "directory_create_completed", mapOf("project" to projectName, "path" to relativePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
     }
 
-    fun readFile(projectName: String, relativePath: String): String {
+    override fun readFile(projectName: String, relativePath: String): String {
         val startedAt = System.nanoTime()
         val file = resolveFile(projectName, relativePath)
         if (!file.isFile) throw IOException("File does not exist: $relativePath")
@@ -152,7 +146,7 @@ class ProjectStorage(context: Context) {
         }
     }
 
-    fun writeFile(projectName: String, relativePath: String, content: String) {
+    override fun writeFile(projectName: String, relativePath: String, content: String) {
         val startedAt = System.nanoTime()
         val file = resolveFile(projectName, relativePath)
         DeveloperLog.event("ProjectStorage", "file_write_started", mapOf("project" to projectName, "path" to relativePath, "bytes" to content.toByteArray().size))
@@ -185,7 +179,7 @@ class ProjectStorage(context: Context) {
     }
 
     @Synchronized
-    fun renameEntry(projectName: String, relativePath: String, newName: String) {
+    override fun renameEntry(projectName: String, relativePath: String, newName: String) {
         require(newName.isNotBlank() && newName == File(newName).name && newName !in setOf(".", "..")) { "Invalid name." }
         val source = resolveEntry(projectName, relativePath)
         val destination = File(source.parentFile, newName).canonicalFile
@@ -196,13 +190,13 @@ class ProjectStorage(context: Context) {
     }
 
     @Synchronized
-    fun deleteEntry(projectName: String, relativePath: String) {
+    override fun deleteEntry(projectName: String, relativePath: String) {
         val entry = resolveEntry(projectName, relativePath)
         if (!entry.deleteRecursively()) throw IOException("Unable to delete item.")
     }
 
     @Synchronized
-    fun moveEntry(projectName: String, relativePath: String, targetDirectory: String) {
+    override fun moveEntry(projectName: String, relativePath: String, targetDirectory: String) {
         val root = projectDirectory(projectName)
         val source = resolveEntry(projectName, relativePath)
         val target = if (targetDirectory.isBlank() || targetDirectory == ".") root else File(root, targetDirectory).canonicalFile
