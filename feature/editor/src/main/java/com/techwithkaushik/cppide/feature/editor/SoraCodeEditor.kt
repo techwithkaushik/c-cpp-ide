@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import org.eclipse.tm4e.core.registry.IThemeSource
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 
@@ -262,6 +263,7 @@ fun SoraCodeEditor(
     val currentOnCodeChange = rememberUpdatedState(onCodeChange)
     val currentOnCursorPositionChange = rememberUpdatedState(onCursorPositionChange)
     val suppressProgrammaticChanges = remember { AtomicBoolean(false) }
+    val lastAppliedCode = remember(lspSession, fileName) { AtomicReference(code) }
     val lspEditor = remember(lspSession, fileName) { lspSession?.createEditor(fileName) }
 
     DisposableEffect(lspEditor) {
@@ -329,7 +331,9 @@ fun SoraCodeEditor(
                 }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     if (!suppressProgrammaticChanges.get()) {
-                        currentOnCodeChange.value(text.toString())
+                        val updatedText = text.toString()
+                        lastAppliedCode.set(updatedText)
+                        currentOnCodeChange.value(updatedText)
                     }
                 }
                 subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
@@ -371,10 +375,14 @@ fun SoraCodeEditor(
                     activeLspLanguage.wrapperLanguage = textMateLanguage
                 }
             }
-            if (editor.text.toString() != code) {
+            // Avoid converting the full editor buffer to String on every Compose
+            // update (which happens for each keystroke). Only apply external changes
+            // such as switching files or restoring a document.
+            if (lastAppliedCode.get() != code) {
                 suppressProgrammaticChanges.set(true)
                 try {
                     editor.setText(code)
+                    lastAppliedCode.set(code)
                 } finally {
                     suppressProgrammaticChanges.set(false)
                 }
