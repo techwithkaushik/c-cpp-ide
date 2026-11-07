@@ -13,11 +13,11 @@ The application is the composition root. Features communicate through stable con
 | Current Gradle module | Current responsibility | Target ownership |
 |---|---|---|
 | `:app` | Android app, Compose shell, startup and dependency composition | `app` |
-| `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, and workspace identity contracts | `core:contracts` |
+| `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, and workspace identity contracts | `core:contracts` |\n| `:lsp:api` | Protocol-agnostic language-server lifecycle status and session contract | `lsp/api` |
 | `:core:aidl` | AIDL contracts for process/service communication | `core:ipc` (after migration) |
 | `:core:jni` | Native C/C++ and PTY bridge | `core:jni` |
 | `:core:lsp` | Existing language-server integration | `lsp` |
-| `:core:designsystem` | Shared Compose design system | `ui:design-system` |
+| `:ui:design-system` | Shared Compose design system and design tokens | `ui/design-system` |
 | `:core:logging` | Shared logging | `core:logging` |
 | `:feature:editor` | Sora editor integration and editor UI | `editor` plus UI adapter |
 | `:feature:terminal` | Terminal UI and terminal sessions | `terminal` plus UI adapter |
@@ -201,3 +201,14 @@ This is the first live contract migration. Do not move terminal, workspace, or r
 ### Current dependency boundary
 
 The editor no longer imports `:integrations:linux-runtime` or `:integrations:toolchain`; those concrete modules are wired by `:app`. Workspace persistence now lives in `:workspace:impl` and is accessed through `:workspace:api`. Terminal/runtime separation is not yet complete and remains an explicit migration item.
+
+
+## 12. LSP and UI design-system ownership migration — 2026-11-07
+
+- [x] Added `:lsp:api` with a protocol-agnostic language service status and workspace-scoped session lifecycle contract.
+- [x] Adapted `ClangdProjectSession` to the language-server API while preserving the existing `EditorLspStatus` source name as a typealias.
+- [x] Removed the empty legacy `:core:lsp` module from Gradle settings; the actual Sora/clangd adapter remains with the editor until a protocol-independent client implementation is extracted.
+- [x] Moved the Compose design token source from `:core:designsystem` to `:ui:design-system` and updated all current consumers.
+- [x] Updated app, editor, terminal, and explorer Gradle dependencies to the new design-system ownership.
+- [ ] Verify the LSP API and design-system module migration with the ARM32 release workflow.
+- [ ] Extract terminal/runtime orchestration behind `:core:contracts` APIs before removing terminal's direct runtime integration dependency.
