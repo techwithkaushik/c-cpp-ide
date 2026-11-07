@@ -6,10 +6,15 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.PopupMenu
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
@@ -18,6 +23,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
+import io.github.rosemoe.sora.lsp.editor.LspEditor
 import org.eclipse.tm4e.core.registry.IThemeSource
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -26,8 +32,8 @@ import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 
 /**
  * Loads local C/C++ TextMate grammars once and attaches the matching language to each editor.
- * Semantic completion/diagnostics remain the responsibility of clangd; this layer is only the
- * responsive local syntax/indentation provider.
+ * clangd is connected separately through Sora's LSP language so semantic completion and diagnostics
+ * remain asynchronous and never block editor keystrokes.
  */
 private object CppTextMateSupport {
     private var initialized = false
@@ -108,36 +114,16 @@ private object CppTextMateSupport {
     }
 }
 
-/**
- * Imperative command bridge for the Sora editor hosted by Compose.
- * The controller only references the currently attached view; it never owns document state.
- */
+/** Imperative command bridge for the Sora editor hosted by Compose. */
 class SoraEditorController {
     private var editor: CodeEditor? = null
 
-    fun undo() {
-        editor?.undo()
-    }
-
-    fun redo() {
-        editor?.redo()
-    }
-
-    fun selectAll() {
-        editor?.selectAll()
-    }
-
-    fun copy() {
-        editor?.copyText()
-    }
-
-    fun paste() {
-        editor?.pasteText()
-    }
-
-    fun cut() {
-        editor?.cutText()
-    }
+    fun undo() { editor?.undo() }
+    fun redo() { editor?.redo() }
+    fun selectAll() { editor?.selectAll() }
+    fun copy() { editor?.copyText() }
+    fun paste() { editor?.pasteText() }
+    fun cut() { editor?.cutText() }
 
     fun selectLine(line: Int) {
         val target = (line - 1).coerceAtLeast(0)
@@ -145,17 +131,13 @@ class SoraEditorController {
             if (target < view.lineCount) {
                 view.setSelection(target, 0)
                 view.ensurePositionVisible(target, 0)
+                view.requestFocus()
             }
         }
     }
 
-    internal fun attach(editor: CodeEditor) {
-        this.editor = editor
-    }
-
-    internal fun detach(editor: CodeEditor) {
-        if (this.editor === editor) this.editor = null
-    }
+    internal fun attach(editor: CodeEditor) { this.editor = editor }
+    internal fun detach(editor: CodeEditor) { if (this.editor === editor) this.editor = null }
 }
 
 private fun showEditorContextMenu(anchor: View) {
@@ -183,17 +165,16 @@ private fun showEditorContextMenu(anchor: View) {
     }
 }
 
-
 /** VS Code-inspired editor palettes. Keep the editor canvas and gutter in sync. */
 private fun configureEditorTheme(editor: CodeEditor, themeName: String) {
     val colors = when (themeName) {
         "Light+ (VS Code)" -> intArrayOf(
-            AndroidColor.rgb(243, 243, 243), // background
-            AndroidColor.rgb(30, 30, 30),    // text
-            AndroidColor.rgb(237, 237, 237), // gutter
-            AndroidColor.rgb(133, 133, 133), // line number
-            AndroidColor.rgb(232, 232, 232), // current line
-            AndroidColor.rgb(220, 235, 252)  // selection/caret
+            AndroidColor.rgb(243, 243, 243),
+            AndroidColor.rgb(30, 30, 30),
+            AndroidColor.rgb(237, 237, 237),
+            AndroidColor.rgb(133, 133, 133),
+            AndroidColor.rgb(232, 232, 232),
+            AndroidColor.rgb(220, 235, 252)
         )
         "Monokai" -> intArrayOf(
             AndroidColor.rgb(39, 40, 34),
@@ -239,10 +220,28 @@ fun SoraCodeEditor(
     fontSize: Float = 14f,
     wordWrap: Boolean = false,
     themeName: String = "Dark+ (VS Code)",
-    fileName: String = ""
+    fileName: String = "",
+    lspSession: ClangdProjectSession? = null,
+    onCursorPositionChange: (line: Int, column: Int) -> Unit = { _, _ -> }
 ) {
     val currentOnCodeChange = rememberUpdatedState(onCodeChange)
-    val suppressProgrammaticChanges = androidx.compose.runtime.remember { AtomicBoolean(false) }
+    val currentOnCursorPositionChange = rememberUpdatedState(onCursorPositionChange)
+    val suppressProgrammaticChanges = remember { AtomicBoolean(false) }
+    val lspEditor = remember(lspSession, fileName) { lspSession?.createEditor(fileName) }
+    val lspAttached = remember(lspEditor) { mutableStateOf(false) }
+
+    DisposableEffect(lspEditor) {
+        onDispose {
+            lspEditor?.dispose()
+        }
+    }
+
+    LaunchedEffect(lspSession, lspEditor, lspAttached.value) {
+        if (lspAttached.value && lspSession != null && lspEditor != null) {
+            lspSession.connect(lspEditor)
+        }
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -258,8 +257,13 @@ fun SoraCodeEditor(
                 setHorizontalScrollBarEnabled(true)
                 CppTextMateSupport.apply(this, fileName, themeName)
                 configureEditorTheme(this, themeName)
+                lspEditor?.let { languageEditor ->
+                    languageEditor.wrapperLanguage = editorLanguage
+                    languageEditor.editor = this
+                    lspAttached.value = true
+                }
                 controller?.attach(this)
-                // Touch long-press and mouse right-click both expose familiar editor actions.
+                currentOnCursorPositionChange.value(cursor.leftLine + 1, cursor.leftColumn + 1)
                 setOnLongClickListener { view ->
                     showEditorContextMenu(view)
                     true
@@ -272,6 +276,9 @@ fun SoraCodeEditor(
                 }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     if (!suppressProgrammaticChanges.get()) currentOnCodeChange.value(text.toString())
+                }
+                subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
+                    currentOnCursorPositionChange.value(event.left.line + 1, event.left.column + 1)
                 }
             }
         },
@@ -287,6 +294,11 @@ fun SoraCodeEditor(
             editor.setScrollBarEnabled(true)
             editor.setHorizontalScrollBarEnabled(true)
             controller?.attach(editor)
+            if (lspEditor != null && lspEditor.editor !== editor) {
+                lspEditor.wrapperLanguage = editor.editorLanguage
+                lspEditor.editor = editor
+                lspAttached.value = true
+            }
             if (editor.text.toString() != code) {
                 suppressProgrammaticChanges.set(true)
                 try {

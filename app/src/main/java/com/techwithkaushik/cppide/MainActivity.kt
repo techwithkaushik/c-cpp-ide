@@ -16,6 +16,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import com.techwithkaushik.cppide.feature.editor.SoraEditorController
+import com.techwithkaushik.cppide.feature.editor.ClangdProjectSession
+import com.techwithkaushik.cppide.feature.editor.EditorLspStatus
+import com.techwithkaushik.cppide.feature.editor.EditorProblem
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -76,6 +79,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -268,6 +273,21 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         }
     }
     val editorController = remember { SoraEditorController() }
+    val runtimePaths = remember(appContext) {
+        LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
+    }
+    val workspaceDirectory = remember(selectedProject) {
+        projectStorage.listProjects().firstOrNull { it.name == selectedProject }?.directory
+    }
+    val clangdGuestPath = remember(appContext) {
+        ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd") ?: "/usr/bin/clangd"
+    }
+    val clangdSession = remember(workspaceDirectory?.absolutePath, clangdGuestPath) {
+        workspaceDirectory?.let { ClangdProjectSession(it, runtimePaths, clangdGuestPath) }
+    }
+    DisposableEffect(clangdSession) {
+        onDispose { clangdSession?.close() }
+    }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -477,6 +497,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     onCodeChange = { updated -> code = updated; fileContents[activeFile] = updated; if (!dirtyFiles.contains(activeFile)) dirtyFiles.add(activeFile) },
                     onSelectFile = { openFile(it) }, onCloseFile = { closeFile(it) },
                     editorController = editorController, editorFontSize = editorFontSize, editorWordWrap = editorWordWrap, editorTheme = editorTheme,
+                    lspSession = clangdSession,
                     onMenu = { scope.launch { drawerState.open() } },
                     onExplorer = { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } },
                     onFile = { file -> openFile(file) },
@@ -1431,6 +1452,7 @@ private fun WorkspaceScreen(
     onSelectFile: (String) -> Unit,
     onCloseFile: (String) -> Unit,
     editorController: SoraEditorController,
+    lspSession: ClangdProjectSession?,
     editorFontSize: Float,
     editorWordWrap: Boolean,
     editorTheme: String,
@@ -1445,6 +1467,24 @@ private fun WorkspaceScreen(
     onPanel: (ToolPanel) -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    val lspStatus by lspSession?.status?.collectAsState()
+        ?: remember { mutableStateOf(EditorLspStatus("clangd unavailable", "Open a saved C/C++ project to start language services.", error = true)) }
+    val editorProblems by lspSession?.problems?.collectAsState()
+        ?: remember { mutableStateOf(emptyList<EditorProblem>()) }
+    var cursorLine by rememberSaveable(activeFile) { mutableStateOf(1) }
+    var cursorColumn by rememberSaveable(activeFile) { mutableStateOf(1) }
+    var showGoToLineDialog by rememberSaveable { mutableStateOf(false) }
+    var goToLineInput by rememberSaveable { mutableStateOf("") }
+    var pendingProblem by remember { mutableStateOf<EditorProblem?>(null) }
+
+    LaunchedEffect(activeFile, pendingProblem) {
+        val target = pendingProblem
+        if (target != null && target.filePath == activeFile) {
+            editorController.selectLine(target.line)
+            pendingProblem = null
+        }
+    }
+
     IdeMasterShellUi(
         modifier = Modifier.fillMaxSize().imePadding(),
         bottomPanelVisible = showToolPanel,
@@ -1494,6 +1534,11 @@ private fun WorkspaceScreen(
         Column(
             Modifier.fillMaxSize().padding(padding).background(IdeBackground)
         ) {
+            IdeMenuBar(
+                onAction = onAction,
+                onGoToLine = { goToLineInput = cursorLine.toString(); showGoToLineDialog = true },
+                onToggleFullScreen = onToggleFullScreen
+            )
             // Compact AndroidIDE-style open-file strip: never let a tab consume the full row width.
             Row(
                 Modifier.fillMaxWidth().height(30.dp).background(Color(0xFF151A22)),
@@ -1527,7 +1572,9 @@ private fun WorkspaceScreen(
                     fontSize = editorFontSize,
                     wordWrap = editorWordWrap,
                     themeName = editorTheme,
-                    fileName = activeFile
+                    fileName = activeFile,
+                    lspSession = lspSession,
+                    onCursorPositionChange = { line, column -> cursorLine = line; cursorColumn = column }
                 )
             }
         }
@@ -1544,6 +1591,10 @@ private fun WorkspaceScreen(
                 Spacer(Modifier.width(IdeDesignTokens.Spacing.md))
                 Text(if (dirtyFiles.contains(activeFile)) "● Unsaved" else "✓ ${projectName}", color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.weight(1f))
+                Text("Ln " + cursorLine + ", Col " + cursorColumn, color = Color.White, fontSize = 10.sp)
+                Spacer(Modifier.width(10.dp))
+                Text(lspStatus.label, color = if (lspStatus.error) Color(0xFFFF8A80) else if (lspStatus.connected) Color(0xFFB7F0C0) else Color.White, fontSize = 9.sp, maxLines = 1)
+                Spacer(Modifier.width(10.dp))
                 Text(when (activeFile.substringAfterLast(".", "").lowercase()) { "cpp", "cc", "cxx", "hpp", "h" -> "C++"; "c" -> "C"; "py" -> "Python"; "js", "mjs" -> "JavaScript"; "ts", "tsx" -> "TypeScript"; "html", "htm" -> "HTML"; "css" -> "CSS"; "json" -> "JSON"; "md" -> "Markdown"; "sh", "bash" -> "Shell"; "rs" -> "Rust"; else -> "Plain Text" } + "  •  UTF-8", color = Color.White, fontSize = 10.sp)
             }
         },
@@ -1555,10 +1606,98 @@ private fun WorkspaceScreen(
                 code = code,
                 onSelect = onPanel,
                 onClose = onCloseToolPanel,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                problems = editorProblems,
+                lspStatus = lspStatus,
+                onProblemSelected = { problem ->
+                    if (problem.filePath == activeFile) {
+                        editorController.selectLine(problem.line)
+                    } else {
+                        pendingProblem = problem
+                        onFile(problem.filePath)
+                    }
+                }
             )
         }
     )
+    if (showGoToLineDialog) {
+        AlertDialog(
+            onDismissRequest = { showGoToLineDialog = false },
+            containerColor = IdeSurface,
+            title = { Text("Go to Line", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold) },
+            text = {
+                OutlinedTextField(
+                    value = goToLineInput,
+                    onValueChange = { value -> goToLineInput = value.filter(Char::isDigit).take(8) },
+                    singleLine = true,
+                    label = { Text("Line number") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    goToLineInput.toIntOrNull()?.takeIf { it > 0 }?.let(editorController::selectLine)
+                    showGoToLineDialog = false
+                }) { Text("Go", color = IdeAccent) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGoToLineDialog = false }) { Text("Cancel", color = IdeMuted) }
+            }
+        )
+    }
+}
+
+@Composable
+private fun IdeMenuBar(
+    onAction: (String) -> Unit,
+    onGoToLine: () -> Unit,
+    onToggleFullScreen: () -> Unit
+) {
+    val menus = listOf(
+        "File" to listOf("New File", "Save", "Save All"),
+        "Edit" to listOf("Undo", "Redo", "Cut", "Copy", "Paste", "Select All", "Find", "Find in Project"),
+        "Selection" to listOf("Select All"),
+        "View" to listOf("Toggle Word Wrap", "Problems", "Output", "Full Screen"),
+        "Go" to listOf("Go to Line..."),
+        "Run" to listOf("Build", "Run", "Problems"),
+        "Terminal" to listOf("Terminal"),
+        "Help" to listOf("Settings")
+    )
+    var expandedMenu by remember { mutableStateOf<String?>(null) }
+    Row(
+        Modifier.fillMaxWidth().height(28.dp).background(Color(0xFF20252D))
+            .horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        menus.forEach { (menuName, actions) ->
+            Box {
+                Text(
+                    menuName,
+                    Modifier.clickable { expandedMenu = if (expandedMenu == menuName) null else menuName }
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                    color = if (expandedMenu == menuName) Color.White else Color(0xFFCBD3DE),
+                    fontSize = 11.sp
+                )
+                androidx.compose.material3.DropdownMenu(
+                    expanded = expandedMenu == menuName,
+                    onDismissRequest = { expandedMenu = null }
+                ) {
+                    actions.forEach { action ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(action) },
+                            onClick = {
+                                expandedMenu = null
+                                when (action) {
+                                    "Go to Line..." -> onGoToLine()
+                                    "Full Screen" -> onToggleFullScreen()
+                                    else -> onAction(action)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1827,7 +1966,10 @@ private fun ToolPanelContent(
     code: String,
     onSelect: (ToolPanel) -> Unit,
     onClose: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    problems: List<EditorProblem>,
+    lspStatus: EditorLspStatus,
+    onProblemSelected: (EditorProblem) -> Unit
 ) {
     val context = LocalContext.current.applicationContext
     val buildScope = rememberCoroutineScope()
@@ -1932,8 +2074,60 @@ private fun ToolPanelContent(
                 }
             }
             ToolPanel.Problems -> {
-                ToolStatusCard("DIAGNOSTICS", "No diagnostics", "No compiler or clangd results are available yet.", "0 errors  ·  0 warnings  ·  UI preview", IdeGreen)
-                Text("Problem list will populate when the compiler and language server are connected.", color = IdeMuted, fontSize = 11.sp)
+                val errors = problems.count { it.severity == "Error" }
+                val warnings = problems.count { it.severity == "Warning" }
+                ToolStatusCard(
+                    "DIAGNOSTICS",
+                    when {
+                        lspStatus.error -> "Language server unavailable"
+                        problems.isEmpty() && lspStatus.connected -> "No problems"
+                        problems.isEmpty() -> "Waiting for diagnostics"
+                        else -> problems.size.toString() + " problem(s)"
+                    },
+                    lspStatus.detail,
+                    errors.toString() + " errors  ·  " + warnings + " warnings  ·  " + problems.size + " total",
+                    when {
+                        errors > 0 -> Color(0xFFFF8A80)
+                        warnings > 0 -> Color(0xFFE5B978)
+                        lspStatus.connected -> IdeGreen
+                        else -> IdeAccent
+                    }
+                )
+                if (problems.isEmpty()) {
+                    Text(
+                        if (lspStatus.error) lspStatus.detail else "clangd diagnostics will appear here as you edit C/C++ files.",
+                        color = IdeMuted,
+                        fontSize = 11.sp
+                    )
+                } else {
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                        items(problems) { problem ->
+                            Row(
+                                Modifier.fillMaxWidth()
+                                    .clickable { onProblemSelected(problem) }
+                                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                IdeIcon(
+                                    if (problem.severity == "Error") "error" else if (problem.severity == "Warning") "alert-triangle" else "info",
+                                    if (problem.severity == "Error") Color(0xFFFF8A80) else if (problem.severity == "Warning") Color(0xFFE5B978) else IdeAccent,
+                                    16.dp
+                                )
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(problem.message, color = Color(0xFFE8EDF5), fontSize = 11.sp)
+                                    Text(
+                                        problem.filePath + ":" + problem.line + ":" + problem.column,
+                                        color = IdeMuted,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
+                            HorizontalDivider(color = IdeSurfaceRaised)
+                        }
+                    }
+                }
             }
             ToolPanel.Output -> {
                 ToolStatusCard("PROGRAM OUTPUT", "No output yet", "Run output will appear here after execution support is connected.", "Execution target: Linux environment", IdeAccent)
@@ -1944,8 +2138,8 @@ private fun ToolPanelContent(
                 }
             }
         }
-        if (selected == ToolPanel.Problems) {
-            Text("Compiler output is available in Build; clangd diagnostics are the next integration stage.", color = Color(0xFFE5B978), fontSize = 10.sp)
+        if (selected == ToolPanel.Problems && !lspStatus.connected && !lspStatus.error) {
+            Text("Waiting for the first C/C++ document to initialize clangd.", color = IdeMuted, fontSize = 10.sp)
         }
     }
 }

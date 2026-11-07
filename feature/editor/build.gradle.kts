@@ -22,13 +22,13 @@ kotlin {
 }
 
 dependencies {
-    // Keep all Sora modules on the same version; 0.24.4 is compatible
-    // with this project's Kotlin 2.4.x / compileSdk 36 toolchain.
     implementation(platform(libs.sora.editor.bom))
     implementation(libs.sora.editor)
     implementation(libs.sora.language.textmate)
+    implementation(libs.sora.editor.lsp)
     implementation(project(":core:designsystem"))
     implementation(project(":core:lsp"))
+    implementation(project(":integrations:linux-runtime"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
