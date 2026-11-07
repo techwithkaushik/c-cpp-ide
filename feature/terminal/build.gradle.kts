@@ -14,7 +14,7 @@ android {
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
-    implementation(project(":core:designsystem"))
+    implementation(project(":ui:design-system"))
     implementation(project(":core:logging"))
     implementation(project(":core:jni"))
     implementation(project(":core:aidl"))
