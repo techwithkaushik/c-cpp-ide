@@ -102,13 +102,18 @@ class ClangdProjectSession(
             if (mapped.isEmpty()) problemsByFile.remove(relativePath) else problemsByFile[relativePath] = mapped
             mutableProblems.value = problemsByFile.values.flatten()
                 .sortedWith(compareBy<EditorProblem>({ it.filePath }, { it.line }, { it.column }))
+            DeveloperLog.event("ClangdLsp", "diagnostics_received", mapOf("file" to relativePath, "count" to mapped.size, "errors" to mapped.count { it.severity == "Error" }, "warnings" to mapped.count { it.severity == "Warning" }, "workspaceProblemCount" to mutableProblems.value.size))
         }
     }
 
     init {
+        val initializationStartedAt = System.nanoTime()
+        DeveloperLog.event("ClangdLsp", "session_initialization_started", mapOf("workspace" to workspace.absolutePath, "workspaceExists" to workspace.isDirectory, "configuredClangd" to configuredClangdGuestPath))
         try {
             require(workspace.isDirectory) { "The selected project workspace does not exist." }
+            DeveloperLog.event("ClangdLsp", "workspace_validated", mapOf("workspace" to workspace.absolutePath))
             runtime.ensureDirectories()
+            DeveloperLog.event("ClangdLsp", "runtime_directories_ready", mapOf("rootfs" to runtime.ubuntuRoot.absolutePath, "rootfsExists" to runtime.ubuntuRoot.isDirectory, "proot" to runtime.proot.absolutePath, "prootExists" to runtime.proot.isFile, "loaderExists" to runtime.prootLoader.isFile))
             require(runtime.ready()) { "Ubuntu rootfs or the bundled PRoot runtime is not ready." }
             val root = runtime.ubuntuRoot.canonicalFile
             ensureFallbackCompilationDatabase(root)
@@ -125,6 +130,7 @@ class ClangdProjectSession(
             val clangd = requireNotNull(toolchainDiscovery.resolveExecutable(root, selectedClangdPath)) {
                 "clangd is missing or not executable at $selectedClangdPath. Install clangd in Ubuntu or correct its Language Settings path."
             }
+            DeveloperLog.event("ClangdLsp", "clangd_executable_resolved", mapOf("configuredPath" to configuredClangdGuestPath, "selectedGuestPath" to selectedClangdPath, "resolvedHostPath" to clangd.absolutePath, "executable" to clangd.canExecute(), "sizeBytes" to clangd.length()))
 
             val clangdConnectionProvider = CustomLanguageServerDefinition.ServerConnectProvider { _ ->
                 ProotClangdConnectionProvider(
@@ -167,6 +173,7 @@ class ClangdProjectSession(
             project.eventEmitter.addListener(diagnosticsListener)
             available = true
             DeveloperLog.event("ClangdLsp", "session_ready", mapOf(
+                "durationMs" to (System.nanoTime() - initializationStartedAt) / 1_000_000,
                 "workspace" to workspace.absolutePath,
                 "guestWorkspace" to GUEST_WORKSPACE,
                 "clangdPath" to selectedClangdPath,
@@ -178,6 +185,7 @@ class ClangdProjectSession(
                 "Ubuntu runtime and clangd executable validated. The server starts when a C/C++ file opens."
             )
         } catch (error: Exception) {
+            DeveloperLog.failure("ClangdLsp", "session_initialization_failed", error, mapOf("workspace" to workspace.absolutePath, "workspaceExists" to workspace.isDirectory, "rootfsExists" to runtime.ubuntuRoot.isDirectory, "prootExists" to runtime.proot.isFile, "loaderExists" to runtime.prootLoader.isFile, "durationMs" to (System.nanoTime() - initializationStartedAt) / 1_000_000))
             mutableStatus.value = EditorLspStatus(
                 "clangd unavailable",
                 error.message ?: error.javaClass.simpleName,
@@ -269,8 +277,11 @@ class ClangdProjectSession(
     }
 
     suspend fun connect(editor: LspEditor) {
-        if (!available || editor.isConnected || !connectionAttempts.add(editor)) return
+        if (!available) { DeveloperLog.warn("ClangdLsp", "connect_skipped_session_unavailable; file=${editor.uri.path}"); return }
+        if (editor.isConnected) { DeveloperLog.debug("ClangdLsp", "connect_skipped_already_connected; file=${editor.uri.path}"); return }
+        if (!connectionAttempts.add(editor)) { DeveloperLog.debug("ClangdLsp", "connect_skipped_attempt_in_progress; file=${editor.uri.path}"); return }
         if (editor.editor == null) {
+            DeveloperLog.warn("ClangdLsp", "connect_skipped_editor_not_attached; file=${editor.uri.path}")
             connectionAttempts.remove(editor)
             mutableStatus.value = EditorLspStatus(
                 "clangd not started",
@@ -288,9 +299,12 @@ class ClangdProjectSession(
             "Starting clangd…",
             "Launching clangd through Ubuntu/PRoot and waiting for the LSP initialize handshake."
         )
+        val connectStartedAt = System.nanoTime()
         try {
+            DeveloperLog.event("ClangdLsp", "initialize_handshake_started", mapOf("file" to editor.uri.path, "timeoutMs" to LSP_CONNECT_TIMEOUT_MS))
             val connected = withTimeoutOrNull(LSP_CONNECT_TIMEOUT_MS) { editor.connect() }
                 ?: throw IllegalStateException("clangd did not respond to the LSP initialize request within 45 seconds.")
+            DeveloperLog.event("ClangdLsp", "initialize_handshake_completed", mapOf("file" to editor.uri.path, "connectedResult" to connected, "editorConnected" to editor.isConnected, "durationMs" to (System.nanoTime() - connectStartedAt) / 1_000_000))
             if (!connected || !editor.isConnected) {
                 throw IllegalStateException("clangd did not complete the LSP initialize handshake. Check the clangd executable, PRoot loader and runtime logs.")
             }
@@ -309,7 +323,10 @@ class ClangdProjectSession(
                 if (capabilities?.semanticTokensProvider != null) add("semantic tokens")
                 if (capabilities?.inlayHintProvider != null) add("inlay hints")
             }
+            DeveloperLog.event("ClangdLsp", "server_capabilities_received", mapOf("file" to editor.uri.path, "requestManagers" to editor.requestManagers.size, "advertisedFeatures" to advertisedFeatures, "completionProviderPresent" to (capabilities?.completionProvider != null)))
+            val completionStartedAt = System.nanoTime()
             val completionResponse = if (capabilities?.completionProvider != null) {
+                DeveloperLog.event("ClangdLsp", "completion_probe_started", mapOf("file" to editor.uri.path, "timeoutMs" to FEATURE_PROBE_TIMEOUT_MS))
                 withTimeoutOrNull(FEATURE_PROBE_TIMEOUT_MS) {
                     editor.eventManager.emitAsync("textDocument/completion", CharPosition(0, 0))
                 }
@@ -324,6 +341,7 @@ class ClangdProjectSession(
                 completionItems == null -> "no response payload"
                 else -> "responded (${completionItems.size} items)"
             }
+            DeveloperLog.event("ClangdLsp", "completion_probe_finished", mapOf("file" to editor.uri.path, "result" to completionProbe, "itemCount" to completionItems?.size, "durationMs" to (System.nanoTime() - completionStartedAt) / 1_000_000))
             val featureDetail = buildString {
                 append("LSP initialize and didOpen succeeded. ")
                 append("Server features: ")
@@ -350,6 +368,7 @@ class ClangdProjectSession(
             connectionAttempts.remove(editor)
             throw error
         } catch (error: Exception) {
+            DeveloperLog.failure("ClangdLsp", "connect_failed", error, mapOf("file" to editor.uri.path, "attached" to (editor.editor != null), "editorConnected" to editor.isConnected, "durationMs" to (System.nanoTime() - connectStartedAt) / 1_000_000))
             val reason = generateSequence(error as Throwable?) { it.cause }
                 .mapNotNull { it.message?.takeIf(String::isNotBlank) }
                 .distinct()
@@ -393,12 +412,14 @@ class ClangdProjectSession(
     }
 
     override fun close() {
+        DeveloperLog.event("ClangdLsp", "session_dispose_started", mapOf("workspace" to workspace.absolutePath, "connectionAttempts" to connectionAttempts.size, "problemCount" to mutableProblems.value.size))
         project.eventEmitter.removeListener(diagnosticsListener)
         project.dispose()
         problemsByFile.clear()
         connectionAttempts.clear()
         mutableProblems.value = emptyList()
         available = false
+        DeveloperLog.event("ClangdLsp", "session_disposed", mapOf("workspace" to workspace.absolutePath))
     }
 
     private companion object {
@@ -420,6 +441,8 @@ private class ClangdDocumentOpenEvent : AsyncEventListener() {
         val editor = context.get<LspEditor>("lsp-editor")
         val languageId = clangdLanguageIdForExtension(editor.fileExt)
             ?: throw IllegalArgumentException("Unsupported clangd document extension: ${editor.fileExt}")
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("ClangdLsp", "did_open_sending", mapOf("uri" to editor.uri.path, "extension" to editor.fileExt, "languageId" to languageId, "documentLength" to editor.editorContent.length, "version" to 0))
         val params = DidOpenTextDocumentParams().apply {
             // Start at version zero; Sora's incremental-change version counter
             // starts at one for this URI on the first didChange notification.
@@ -430,7 +453,13 @@ private class ClangdDocumentOpenEvent : AsyncEventListener() {
                 editor.editorContent
             )
         }
-        CompletableFuture.runAsync { editor.requestManager.didOpen(params) }.await()
+        try {
+            CompletableFuture.runAsync { editor.requestManager.didOpen(params) }.await()
+            DeveloperLog.event("ClangdLsp", "did_open_sent", mapOf("uri" to editor.uri.path, "languageId" to languageId, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+        } catch (error: Exception) {
+            DeveloperLog.failure("ClangdLsp", "did_open_failed", error, mapOf("uri" to editor.uri.path, "languageId" to languageId, "documentLength" to editor.editorContent.length))
+            throw error
+        }
     }
 }
 
@@ -482,7 +511,9 @@ private class ProotClangdConnectionProvider(
             "--completion-style=detailed",
             "--compile-commands-dir=/workspace"
         )
-        val child = ProcessBuilder(command).directory(workspace).apply {
+        DeveloperLog.event("ClangdLsp", "proot_process_start_requested", mapOf("command" to command.joinToString(" "), "rootfsExists" to root.isDirectory, "prootExists" to runtime.proot.isFile, "loaderExists" to runtime.prootLoader.isFile, "workspaceMount" to workspaceMount.absolutePath))
+        val child = try {
+            ProcessBuilder(command).directory(workspace).apply {
             // Keep Android host linker variables out of the Ubuntu guest. PRoot's
             // loader is selected explicitly; leaking the APK nativeLibraryDir into
             // guest LD_LIBRARY_PATH can make clangd load Android .so files instead
@@ -502,7 +533,11 @@ private class ProotClangdConnectionProvider(
             environment()["PROOT_LOADER"] = runtime.prootLoader.absolutePath
             environment()["TERM"] = "xterm-256color"
             environment()["LANG"] = "C.UTF-8"
-        }.start()
+            }.start()
+        } catch (error: Exception) {
+            DeveloperLog.failure("ClangdLsp", "proot_process_start_failed", error, mapOf("command" to command.joinToString(" "), "rootfsExists" to root.isDirectory, "workspaceMountExists" to workspaceMount.isDirectory))
+            throw error
+        }
         process = child
         DeveloperLog.event("ClangdLsp", "proot_process_started", mapOf(
             "proot" to runtime.proot.absolutePath,
@@ -519,6 +554,7 @@ private class ProotClangdConnectionProvider(
                             if (stderr.length > MAX_STDERR_CHARS) stderr.delete(0, stderr.length - MAX_STDERR_CHARS)
                             stderr.append(line).append('\n')
                         }
+                        DeveloperLog.warn("ClangdLsp", "clangd_stderr: ${line.take(1800)}")
                     }
                 }
             }
