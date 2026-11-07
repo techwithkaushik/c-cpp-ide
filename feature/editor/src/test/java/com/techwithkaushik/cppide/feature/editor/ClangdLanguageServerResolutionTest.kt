@@ -3,48 +3,44 @@ package com.techwithkaushik.cppide.feature.editor
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ClangdLanguageServerResolutionTest {
 
     @Test
-    fun everySupportedExtensionResolvesToTheSharedLanguageServerDefinition() {
+    fun everySupportedExtensionResolvesToOneWorkspaceClangdDefinition() {
         val project = LspProject("/workspace")
         val provider = CustomLanguageServerDefinition.ServerConnectProvider {
             error("A resolution test must not launch clangd.")
         }
-        val cppExtensions = listOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
+        val extensions = listOf("c", "cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
 
-        project.addServerDefinition(
-            CustomLanguageServerDefinition(
-                ext = "c",
-                serverConnectProvider = provider,
-                name = "clangd-c",
-                extensionsOverride = listOf("c")
-            )
-        )
         project.addServerDefinition(
             CustomLanguageServerDefinition(
                 ext = "cpp",
                 serverConnectProvider = provider,
-                name = "clangd-cpp",
-                extensionsOverride = cppExtensions
+                name = "clangd",
+                extensionsOverride = extensions
             )
         )
 
-        assertEquals("clangd", project.getServerDefinitions("c").single().name)
-        cppExtensions.forEach { extension ->
+        extensions.forEach { extension ->
             assertEquals("clangd", project.getServerDefinitions(extension).single().name)
-        }
-
-        // Exercise the same LspEditor construction path used by the Android editor.
-        // This catches a definition that is registered but cannot actually resolve
-        // when Sora opens a document with that extension.
-        (listOf("c") + cppExtensions).forEach { extension ->
             val editor = project.createEditor("/workspace/probe.$extension")
             assertEquals(extension, editor.fileExt)
             editor.dispose()
         }
         project.dispose()
+    }
+
+    @Test
+    fun clangdReceivesProtocolLanguageIdsInsteadOfFileExtensions() {
+        assertEquals("c", clangdLanguageIdForExtension("c"))
+        listOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx").forEach { extension ->
+            assertEquals("cpp", clangdLanguageIdForExtension(extension))
+        }
+        assertEquals("cpp", clangdLanguageIdForExtension("CPP"))
+        assertNull(clangdLanguageIdForExtension("py"))
     }
 }
