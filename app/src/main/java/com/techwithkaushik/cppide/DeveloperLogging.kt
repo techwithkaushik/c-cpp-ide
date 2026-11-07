@@ -87,7 +87,7 @@ internal fun DeveloperOptionsPanel() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text("Developer logging", color = IdeDesignTokens.Color.TextPrimary, fontSize = 13.sp)
-                    Text("Capture app-generated Ubuntu, PRoot, terminal, SSH, editor and crash diagnostics. Android system Logcat is never read. Logging is off by default.",
+                    Text("Capture app-generated Ubuntu, PRoot, terminal, SSH, editor and crash diagnostics. Android system Logcat is never read. Logging is enabled by default.",
                         color = IdeDesignTokens.Color.TextSecondary, fontSize = 11.sp)
                 }
                 Switch(checked = enabled, onCheckedChange = {
