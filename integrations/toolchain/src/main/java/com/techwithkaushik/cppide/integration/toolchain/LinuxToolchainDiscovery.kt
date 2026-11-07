@@ -1,6 +1,8 @@
 package com.techwithkaushik.cppide.integration.toolchain
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Discovers tools inside an installed Linux rootfs without assuming that they
@@ -29,9 +31,11 @@ data class LinuxToolchainInventory(
 
 /**
  * Resolves known development commands using the rootfs PATH first, then
- * conventional locations for manually extracted toolchains. Paths returned
- * by this class are absolute paths in the host-visible rootfs tree; callers
- * must translate them to rootfs paths when invoking the Linux runtime.
+ * conventional locations for manually extracted toolchains.
+ *
+ * Paths are resolved using Linux rootfs symlink semantics. In particular, an
+ * absolute symlink such as /usr/bin/clangd -> /usr/lib/llvm-XX/bin/clangd
+ * must resolve below the rootfs, not against the Android host filesystem.
  */
 class LinuxToolchainDiscovery {
     private val recommended = listOf(
@@ -42,6 +46,7 @@ class LinuxToolchainDiscovery {
     fun discover(rootfs: File, environmentPath: String? = null): LinuxToolchainInventory {
         require(rootfs.isDirectory) { "Root filesystem directory does not exist" }
         val canonicalRoot = rootfs.canonicalFile
+        val rootPath = canonicalRoot.toPath()
         val pathEntries = (environmentPath ?: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
             .split(':')
             .filter { it.isNotBlank() }
@@ -75,10 +80,10 @@ class LinuxToolchainDiscovery {
             }
 
             val found = candidates.firstNotNullOfOrNull { (candidate, source) ->
-                val canonical = runCatching { candidate.canonicalFile }.getOrNull() ?: return@firstNotNullOfOrNull null
-                if (!canonical.toPath().startsWith(canonicalRoot.toPath())) return@firstNotNullOfOrNull null
-                if (canonical.isFile && canonical.canExecute()) {
-                    LinuxTool(name, canonical.absolutePath, source)
+                val resolved = resolveInsideRootfs(rootPath, candidate.toPath()) ?: return@firstNotNullOfOrNull null
+                val executable = resolved.toFile()
+                if (executable.isFile && executable.canExecute()) {
+                    LinuxTool(name, executable.absolutePath, source)
                 } else null
             }
             if (found != null) discovered[name] = found
@@ -90,5 +95,50 @@ class LinuxToolchainDiscovery {
             tools = discovered,
             missingRecommendedTools = recommended.filterNot(discovered::containsKey)
         )
+    }
+
+    /**
+     * Resolve symlinks as they would be interpreted inside a chroot. Java's
+     * canonicalFile follows absolute symlinks on the Android host, which makes
+     * valid distro links appear to escape (or disappear outside) the rootfs.
+     */
+    private fun resolveInsideRootfs(root: Path, candidate: Path): Path? {
+        var pending = candidate.toAbsolutePath().normalize()
+        if (!pending.startsWith(root)) return null
+
+        var linkCount = 0
+        while (true) {
+            val relative = root.relativize(pending)
+            var current = root
+            var restarted = false
+
+            for (index in 0 until relative.nameCount) {
+                current = current.resolve(relative.getName(index))
+                if (!Files.isSymbolicLink(current)) continue
+
+                if (++linkCount > MAX_SYMLINKS) return null
+                val target = runCatching { Files.readSymbolicLink(current) }.getOrNull() ?: return null
+                val targetInRoot = if (target.isAbsolute) {
+                    root.resolve(target.toString().removePrefix("/"))
+                } else {
+                    current.parent.resolve(target)
+                }
+                val remaining = if (index + 1 < relative.nameCount) {
+                    relative.subpath(index + 1, relative.nameCount)
+                } else {
+                    null
+                }
+                pending = (remaining?.let(targetInRoot::resolve) ?: targetInRoot).normalize()
+                if (!pending.startsWith(root)) return null
+                restarted = true
+                break
+            }
+
+            if (!restarted) return pending
+        }
+    }
+
+    private companion object {
+        const val MAX_SYMLINKS = 40
     }
 }
