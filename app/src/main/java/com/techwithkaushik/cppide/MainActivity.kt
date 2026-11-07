@@ -445,16 +445,22 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     workspaceDirectories.clear()
                     workspaceDirectories.addAll(projectStorage.listDirectories(project.name))
                     fileContents.clear()
-                    diskFiles.forEach { file ->
-                        runCatching { projectStorage.readFile(project.name, file) }
-                            .onSuccess { fileContents[file] = it }
-                    }
                     openFiles.clear()
                     dirtyFiles.clear()
                     activeFile = ""
                     code = ""
-                    if (workspaceFiles.isNotEmpty()) openFile(workspaceFiles.first())
+                    val lastFile = onboardingPreferences.getString("last_opened_file.${project.name}", null)
+                        ?.takeIf { it in diskFiles }
                     screen = IdeScreen.Workspace
+                    if (lastFile != null) {
+                        scope.launch {
+                            val content = withContext(Dispatchers.IO) { runCatching { projectStorage.readFile(project.name, lastFile) }.getOrNull() }
+                            if (selectedProject == project.name && screen == IdeScreen.Workspace && content != null) {
+                                fileContents[lastFile] = content
+                                openFile(lastFile)
+                            }
+                        }
+                    }
                 },
                 onNew = { newProjectDialog = true },
                 onDelete = { pendingDeleteProject = it.name },
@@ -1163,10 +1169,6 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         workspaceDirectories.clear()
                         workspaceDirectories.addAll(projectStorage.listDirectories(name))
                         fileContents.clear()
-                        diskFiles.forEach { file ->
-                            runCatching { projectStorage.readFile(name, file) }
-                                .onSuccess { fileContents[file] = it }
-                        }
                         openFiles.clear()
                         dirtyFiles.clear()
                         activeFile = ""
