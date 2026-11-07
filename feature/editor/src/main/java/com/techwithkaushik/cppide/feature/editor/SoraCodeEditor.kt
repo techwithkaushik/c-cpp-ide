@@ -141,12 +141,15 @@ class SoraEditorController {
     fun cut() { editor?.cutText() }
     fun format() { editor?.formatCodeAsync() }
 
-    fun selectLine(line: Int) {
-        val target = (line - 1).coerceAtLeast(0)
+    fun selectLine(line: Int) = selectPosition(line, 1)
+
+    fun selectPosition(line: Int, column: Int) {
+        val targetLine = (line - 1).coerceAtLeast(0)
+        val targetColumn = (column - 1).coerceAtLeast(0)
         editor?.let { view ->
-            if (target < view.lineCount) {
-                view.setSelection(target, 0)
-                view.ensurePositionVisible(target, 0)
+            if (targetLine < view.lineCount) {
+                view.setSelection(targetLine, targetColumn)
+                view.ensurePositionVisible(targetLine, targetColumn)
                 view.requestFocus()
             }
         }
