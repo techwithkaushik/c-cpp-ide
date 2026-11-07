@@ -8,7 +8,6 @@ import android.widget.PopupMenu
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -257,7 +256,6 @@ fun SoraCodeEditor(
     val currentOnCursorPositionChange = rememberUpdatedState(onCursorPositionChange)
     val suppressProgrammaticChanges = remember { AtomicBoolean(false) }
     val lspEditor = remember(lspSession, fileName) { lspSession?.createEditor(fileName) }
-    val lspAttached = remember(lspEditor) { mutableStateOf(false) }
 
     DisposableEffect(lspEditor) {
         onDispose {
@@ -265,9 +263,16 @@ fun SoraCodeEditor(
         }
     }
 
-    LaunchedEffect(lspSession, lspEditor, lspAttached.value) {
-        if (lspAttached.value && lspSession != null && lspEditor != null) {
-            lspSession.connect(lspEditor)
+    // Connect from the editor/session lifecycle. A snapshot flag written inside
+    // AndroidView.factory is not a reliable signal across Compose versions.
+    LaunchedEffect(lspSession, lspEditor) {
+        val session = lspSession
+        val languageEditor = lspEditor
+        if (session != null && languageEditor != null) {
+            if (languageEditor.editor == null) {
+                throw IllegalStateException("Sora did not attach the C/C++ document before LSP startup.")
+            }
+            session.connect(languageEditor)
         }
     }
 
@@ -291,7 +296,6 @@ fun SoraCodeEditor(
                         "A C/C++ language server cannot be attached to a non-C/C++ document."
                     }
                     languageEditor.editor = this
-                    lspAttached.value = true
                 }
                 controller?.attach(this)
                 currentOnCursorPositionChange.value(cursor.leftLine + 1, cursor.leftColumn + 1)
