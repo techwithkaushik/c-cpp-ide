@@ -126,20 +126,24 @@ kcode/
 
 ### 2.3 Existing-to-target ownership map
 
-| Existing module | Intended ownership |
+| Current module | Intended ownership |
 |---|---|
-| `:app` | `app` |
-| `:core:aidl` | `core:ipc` after a separately tested migration |
-| `:core:jni` | `core:jni` |
-| `:core:lsp` | `lsp` |
-| `:core:designsystem` | `ui:design-system` |
-| `:core:logging` | `core:logging` |
-| `:feature:editor` | `editor` plus UI adapter |
-| `:feature:terminal` | Terminal UI, local PTY and SSH session implementations |
-| `:feature:explorer` | `workspace` plus UI adapter |\n| `:workspace:api` | Workspace repository and project model contracts |\n| `:workspace:impl` | App-private project storage implementation |
-| `:services:daemon` | Runtime/process service boundary |
-| `:integrations:toolchain` | `runtime:toolchains` |
-| `:integrations:linux-runtime` | PRoot, rootfs, runtime validation, and guest compatibility |
+| `:app` | `app` composition root |
+| `:core:contracts` | Shared contracts |
+| `:core:ipc` | Binder/AIDL IPC |
+| `:core:jni` | Native JNI and PTY bridge |
+| `:core:logging` | Logging |
+| `:lsp:api` | Language-server lifecycle API |
+| `:ui:design-system` | UI design system |
+| `:feature:editor` | Editor engine adapter and editor UI |
+| `:feature:terminal` | Terminal emulator, local PTY and SSH sessions |
+| `:integrations:toolchain` | Runtime toolchain discovery |
+| `:integrations:linux-runtime` | PRoot, rootfs and runtime management |
+| `:workspace:api` | Workspace repository contracts |
+| `:workspace:impl` | Workspace storage implementation |
+| `:workspace:ui` | Workspace explorer UI |
+
+The empty legacy `:feature:explorer` and unimplemented `:services:daemon` modules were removed rather than retained as placeholders. The AIDL service contracts remain in `:core:ipc`; a daemon module should return only when a real service implementation and lifecycle tests are ready.
 
 ## 3. Dependency and layering rules
 
