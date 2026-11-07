@@ -280,7 +280,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         projectStorage.listProjects().firstOrNull { it.name == selectedProject }?.directory
     }
     val clangdGuestPath = remember(appContext) {
-        ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd") ?: "/usr/bin/clangd"
+        ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd")
     }
     val clangdSession = remember(workspaceDirectory?.absolutePath, clangdGuestPath) {
         workspaceDirectory?.let { ClangdProjectSession(it, runtimePaths, clangdGuestPath) }
@@ -507,7 +507,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             "New File" -> { newFileName = ""; newFileDialog = true }
                             "Terminal" -> { selectedPanel = ToolPanel.Terminal; showToolPanel = true }
                             "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
-                            "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
+                            "Run", "Output" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                             "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                             "Save" -> runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                             "Undo" -> editorController.undo()

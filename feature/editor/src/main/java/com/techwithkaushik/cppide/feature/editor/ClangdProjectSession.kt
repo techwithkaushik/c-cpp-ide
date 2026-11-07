@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide.feature.editor
 
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
 import io.github.rosemoe.sora.lsp.editor.LspEditor
@@ -41,7 +42,7 @@ data class EditorProblem(
 class ClangdProjectSession(
     workspaceDirectory: File,
     private val runtime: LinuxRuntimePaths,
-    private val clangdGuestPath: String
+    configuredClangdGuestPath: String?
 ) : AutoCloseable {
 
     private val workspace = workspaceDirectory.canonicalFile
@@ -92,13 +93,19 @@ class ClangdProjectSession(
             require(workspace.isDirectory) { "The selected project workspace does not exist." }
             runtime.ensureDirectories()
             require(runtime.ready()) { "Ubuntu rootfs or the bundled PRoot runtime is not ready." }
-            require(clangdGuestPath.startsWith("/") && '\u0000' !in clangdGuestPath) {
+            val root = runtime.ubuntuRoot.canonicalFile
+            val selectedClangdPath = configuredClangdGuestPath ?: LinuxToolchainDiscovery()
+                .discover(root)
+                .find("clangd")
+                ?.executable
+                ?.let { discovered -> "/" + File(discovered).canonicalFile.relativeTo(root).invariantSeparatorsPath }
+                ?: throw IllegalStateException("clangd is not installed in the Ubuntu runtime. Install clangd from C/C++ Language Settings.")
+            require(selectedClangdPath.startsWith("/") && '\u0000' !in selectedClangdPath) {
                 "The configured clangd path must be an absolute Linux guest path."
             }
-            val root = runtime.ubuntuRoot.canonicalFile
-            val clangd = File(root, clangdGuestPath.removePrefix("/")).canonicalFile
+            val clangd = File(root, selectedClangdPath.removePrefix("/")).canonicalFile
             require(clangd.toPath().startsWith(root.toPath()) && clangd.isFile && clangd.canExecute()) {
-                "clangd is missing or not executable at $clangdGuestPath. Install clangd in Ubuntu or correct its Language Settings path."
+                "clangd is missing or not executable at $selectedClangdPath. Install clangd in Ubuntu or correct its Language Settings path."
             }
 
             project.addServerDefinition(
@@ -108,7 +115,7 @@ class ClangdProjectSession(
                         ProotClangdConnectionProvider(
                             runtime = runtime,
                             workspace = workspace,
-                            clangdGuestPath = clangdGuestPath,
+                            clangdGuestPath = selectedClangdPath,
                             onUnexpectedExit = { exitCode, stderr ->
                                 mutableStatus.value = EditorLspStatus(
                                     "clangd stopped",
@@ -131,7 +138,7 @@ class ClangdProjectSession(
             project.eventEmitter.addListener(diagnosticsListener)
             available = true
             mutableStatus.value = EditorLspStatus(
-                "clangd ready",
+                "clangd installed",
                 "Ubuntu runtime and clangd executable validated. The server starts when a C/C++ file opens."
             )
         } catch (error: Exception) {
