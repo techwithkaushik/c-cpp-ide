@@ -236,6 +236,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var newProjectLanguage by rememberSaveable { mutableStateOf("C17") }
     var newProjectError by rememberSaveable { mutableStateOf<String?>(null) }
     var createEmptyProject by rememberSaveable { mutableStateOf(false) }
+    var createReadme by rememberSaveable { mutableStateOf(true) }
+    var initializeGit by rememberSaveable { mutableStateOf(false) }
     var pendingDeleteProject by rememberSaveable { mutableStateOf<String?>(null) }
     var showToolPanel by rememberSaveable { mutableStateOf(false) }
     // Keep the editor usable on narrow phone screens; Explorer opens from the Activity Bar or drawer.
@@ -1076,6 +1078,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 newProjectName = ""
                 newProjectError = null
                 createEmptyProject = false
+                createReadme = true
+                initializeGit = false
             },
             containerColor = IdeSurface,
             title = { Text("Create project", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
@@ -1145,7 +1149,9 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                         }
                     }
-                    Text(if (createEmptyProject) "The workspace will start with no files. Create files later from File Explorer." else "A starter source file and README.md will be created.",
+                    Row(Modifier.fillMaxWidth().clickable { createReadme = !createReadme }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { Text("Create README.md", Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp); Checkbox(checked = createReadme, onCheckedChange = { createReadme = it }) }
+                    Row(Modifier.fillMaxWidth().clickable { initializeGit = !initializeGit }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { Text("Initialize Git repository", Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp); Checkbox(checked = initializeGit, onCheckedChange = { initializeGit = it }) }
+                    Text(if (createEmptyProject) "The workspace will start with no source file. Optional README and Git metadata follow the selections above." else "A starter source file will be created.",
                         color = IdeMuted, fontSize = 11.sp, lineHeight = 15.sp)
                 }
             },
@@ -1158,8 +1164,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     }
                     val entryFile = entryFileForLanguage(newProjectLanguage)
                     runCatching {
-                        if (createEmptyProject) projectStorage.createEmptyProject(name, newProjectLanguage)
-                        else projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile))
+                        if (createEmptyProject) projectStorage.createEmptyProject(name, newProjectLanguage, createReadme, initializeGit)
+                        else projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile), createReadme, initializeGit)
                     }.onSuccess { stored ->
                         projects.add(0, IdeProject(stored.name, stored.language, stored.path, "Just now"))
                         selectedProject = name
@@ -1176,6 +1182,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         if (!createEmptyProject && entryFile in workspaceFiles) openFile(entryFile)
                         newProjectDialog = false
                         createEmptyProject = false
+                        createReadme = true
+                        initializeGit = false
                         newProjectName = ""
                         newProjectError = null
                         screen = IdeScreen.Workspace
