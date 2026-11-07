@@ -16,9 +16,9 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 dependencies {
     implementation(project(":ui:design-system"))
     implementation(project(":core:logging"))
+    implementation(project(":core:contracts"))
     implementation(project(":core:jni"))
     implementation(project(":core:ipc"))
-    implementation(project(":integrations:linux-runtime"))
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
