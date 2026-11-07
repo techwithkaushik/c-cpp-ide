@@ -39,6 +39,13 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
             }.getOrNull()
     }
 
+    override fun prepareResolver(tempDirectory: File, sessionId: String?): File =
+        HostResolverConfig.prepare(tempDirectory, sessionId)
+
+    override fun ensureGuestCompatibility() {
+        LinuxGuestCompatibility.ensureSupplementaryGroupNames(ubuntuRoot)
+    }
+
     override fun ensureDirectories() {
         migrateLegacyRootfs()
         listOf(base, distro, usrTmp, usrBin, staging).forEach {
