@@ -12,6 +12,7 @@ android {
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
+    api(project(":core:contracts"))
     implementation(project(":core:logging"))
     testImplementation(libs.junit)
 }
