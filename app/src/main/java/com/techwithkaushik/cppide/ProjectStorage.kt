@@ -75,6 +75,18 @@ internal class ProjectStorage(context: Context) {
             .toList()
     }
 
+    fun createDirectory(projectName: String, relativePath: String) {
+        require(relativePath.isNotBlank() && !File(relativePath).isAbsolute) { "Invalid relative directory path" }
+        val project = projectDirectory(projectName)
+        val directory = File(project, relativePath).canonicalFile
+        require(directory.toPath().startsWith(project.toPath()) && directory != project) {
+            "Directory path escapes project"
+        }
+        if (directory.exists()) throw IOException("A file or folder with this name already exists")
+        if (!directory.mkdirs()) throw IOException("Unable to create directory")
+        directory.setLastModified(System.currentTimeMillis())
+    }
+
     fun readFile(projectName: String, relativePath: String): String {
         val file = resolveFile(projectName, relativePath)
         if (!file.isFile) throw IOException("File does not exist: $relativePath")
