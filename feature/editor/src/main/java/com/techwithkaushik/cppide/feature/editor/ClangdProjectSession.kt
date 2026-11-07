@@ -416,7 +416,6 @@ class ClangdProjectSession(
     private fun installEditorEventLogging(editor: LspEditor) {
         if (!eventLoggedEditors.add(editor)) return
         val methods = listOf(
-            "textDocument/didChange",
             "textDocument/completion",
             "textDocument/hover",
             "textDocument/signatureHelp",
