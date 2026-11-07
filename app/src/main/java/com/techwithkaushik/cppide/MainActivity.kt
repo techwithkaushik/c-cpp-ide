@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
@@ -219,6 +220,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     val dirtyFiles = remember { mutableStateListOf<String>() }
     // One source of truth for Explorer, tabs, search, and editor.
     val workspaceFiles = remember { mutableStateListOf("README.md") }
+    val workspaceDirectories = remember { mutableStateListOf<String>() }
     val fileContents = remember {
         mutableStateMapOf("README.md" to code)
     }
@@ -420,6 +422,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     val diskFiles = runCatching { projectStorage.listFiles(project.name) }.getOrDefault(emptyList())
                     workspaceFiles.clear()
                     workspaceFiles.addAll(diskFiles)
+                    workspaceDirectories.clear()
+                    workspaceDirectories.addAll(projectStorage.listDirectories(project.name))
                     fileContents.clear()
                     diskFiles.forEach { file ->
                         runCatching { projectStorage.readFile(project.name, file) }
@@ -553,12 +557,18 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                             projectName = selectedProject,
                                             activeFile = activeFile,
                                             files = workspaceFiles.toList(),
+                                            directories = workspaceDirectories.toList(),
                                             onOpenFile = { openFile(it); scope.launch { drawerState.close() } },
-                                            onCreateFile = {
-                                                file -> if (file !in workspaceFiles) workspaceFiles.add(file)
+                                            onCreateFile = { file ->
+                                                if (file !in workspaceFiles) workspaceFiles.add(file)
                                                 if (file !in fileContents) fileContents[file] = sampleCode(file)
                                                 openFile(file)
                                                 scope.launch { drawerState.close() }
+                                            },
+                                            onCreateFolder = { folder ->
+                                                withContext(Dispatchers.IO) { projectStorage.createDirectory(selectedProject, folder) }
+                                                workspaceDirectories.clear()
+                                                workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
                                             },
                                             onClose = { drawerSidebarOpen = false },
                                             sidebarMode = true
@@ -1081,6 +1091,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         val diskFiles = projectStorage.listFiles(name)
                         workspaceFiles.clear()
                         workspaceFiles.addAll(diskFiles)
+                        workspaceDirectories.clear()
+                        workspaceDirectories.addAll(projectStorage.listDirectories(name))
                         fileContents.clear()
                         diskFiles.forEach { file ->
                             runCatching { projectStorage.readFile(name, file) }
@@ -1859,159 +1871,75 @@ private fun IdeMenuBar(
 }
 
 @Composable
-private fun FileExplorerSheet(
-    projectName: String,
-    activeFile: String,
-    files: List<String>,
-    onOpenFile: (String) -> Unit,
-    onCreateFile: (String) -> Unit,
-    onClose: () -> Unit,
-    sidebarMode: Boolean = false
-) {
+private fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit, onClose: () -> Unit, sidebarMode: Boolean = false) {
     var query by rememberSaveable(projectName) { mutableStateOf("") }
-    val sourceFiles = files.map { name ->
-        val ext = name.substringAfterLast(".", "").lowercase()
-        val folder = name.substringBeforeLast('/', "").ifBlank { "." }
-        val description = when (ext) {
-            "c" -> "C source file"
-            "cpp", "cc", "cxx" -> "C++ source file"
-            "h", "hpp", "hh", "hxx" -> "C/C++ header"
-            "md" -> "Markdown document"
-            "json" -> "JSON configuration"
-            "py" -> "Python source file"
-            "rs" -> "Rust source file"
-            "kt", "kts" -> "Kotlin source file"
-            else -> (ext.ifBlank { "plain text" }) + " file"
-        }
-        Triple(name, description, folder)
-    }
     var fileDialog by rememberSaveable(projectName) { mutableStateOf(false) }
     var folderDialog by rememberSaveable(projectName) { mutableStateOf(false) }
     var newEntryName by rememberSaveable(projectName) { mutableStateOf("") }
+    var createTarget by rememberSaveable(projectName) { mutableStateOf(".") }
     var entryMessage by rememberSaveable(projectName) { mutableStateOf<String?>(null) }
-    val visibleFiles = sourceFiles.filter { it.first.contains(query, ignoreCase = true) || it.second.contains(query, ignoreCase = true) }
-    Column(
-        Modifier.fillMaxWidth()
-            .padding(horizontal = if (sidebarMode) 10.dp else 18.dp)
-            .padding(bottom = if (sidebarMode) IdeDesignTokens.Spacing.sm else 28.dp)
-            .then(if (sidebarMode) Modifier.verticalScroll(rememberScrollState()) else Modifier),
-        verticalArrangement = Arrangement.spacedBy(if (sidebarMode) 6.dp else IdeDesignTokens.Spacing.sm)
-    ) {
-        if (!sidebarMode) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("EXPLORER", fontSize = IdeDesignTokens.Typography.caption, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
-                    Text(projectName.uppercase(), color = IdeMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    var expanded by rememberSaveable(projectName) { mutableStateOf(setOf(".")) }
+    val matchingFiles = files.filter { query.isBlank() || it.contains(query, true) }
+    data class Node(val path: String, val folder: Boolean, val depth: Int)
+    val nodes = remember(files, directories, matchingFiles, expanded, query) {
+        val output = mutableListOf<Node>()
+        fun append(parent: String, depth: Int) {
+            val prefix = if (parent == ".") "" else "$parent/"
+            directories.filter { it.startsWith(prefix) && it.removePrefix(prefix).isNotBlank() && !it.removePrefix(prefix).contains("/") }
+                .filter { query.isBlank() || matchingFiles.any { file -> file.startsWith("$it/") } }
+                .sorted().forEach { folder ->
+                    output += Node(folder, true, depth)
+                    if (query.isNotBlank() || folder in expanded) append(folder, depth + 1)
                 }
-                IconButton(onClick = { query = "" }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
-                    IdeIcon("refresh", IdeMuted, IdeDesignTokens.Spacing.lg)
-                }
-                IconButton(onClick = onClose, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
-                    IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg)
-                }
-            }
+            matchingFiles.filter { it.startsWith(prefix) && it.removePrefix(prefix).isNotBlank() && !it.removePrefix(prefix).contains("/") }
+                .sorted().forEach { output += Node(it, false, depth) }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
-            OutlinedButton(onClick = { newEntryName = ""; fileDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.ui.graphics.RectangleShape) {
-                IdeIcon("add", IdeAccent, IdeDesignTokens.Spacing.lg)
-                Spacer(Modifier.width(6.dp))
-                Text("New file", fontSize = IdeDesignTokens.Typography.caption)
-            }
-            OutlinedButton(onClick = { newEntryName = ""; folderDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.ui.graphics.RectangleShape) {
-                IdeIcon("folder", IdeAccent, IdeDesignTokens.Spacing.lg)
-                Spacer(Modifier.width(6.dp))
-                Text("New folder", fontSize = IdeDesignTokens.Typography.caption)
-            }
+        append(".", 0); output
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = if (sidebarMode) 4.dp else 14.dp).then(if (sidebarMode) Modifier.verticalScroll(rememberScrollState()) else Modifier), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        if (!sidebarMode) Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { Text("EXPLORER", color = Color(0xFFCAD4E0), fontSize = 11.sp, fontWeight = FontWeight.Bold); Text(projectName, color = IdeMuted, fontSize = 10.sp) }
+            IconButton(onClick = { query = "" }, modifier = Modifier.size(30.dp)) { IdeIcon("refresh", IdeMuted, 16.dp) }
+            IconButton(onClick = onClose, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, 16.dp) }
         }
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = androidx.compose.ui.graphics.RectangleShape,
-            placeholder = { Text("Find a file", fontSize = 12.sp) },
-            leadingIcon = { IdeIcon("search", IdeAccent, 20.dp) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { IdeIcon("close", IdeMuted, 15.dp) } }
-        )
-        Row(
-            Modifier.fillMaxWidth().background(IdeSurfaceRaised).padding(horizontal = 8.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IdeIcon("chevronDown", IdeMuted, 14.dp, Modifier.padding(end = IdeDesignTokens.Spacing.xs))
-            IdeIcon("folder", Color(0xFFE4BE79), 18.dp, Modifier.padding(end = IdeDesignTokens.Spacing.sm))
-            Column(Modifier.weight(1f)) {
-                Text(projectName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = IdeDesignTokens.Typography.caption)
-                Text("${visibleFiles.size} files", color = IdeMuted, fontSize = 10.sp)
-            }
-            Text("⋯", color = IdeMuted, fontSize = 19.sp)
+        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp), singleLine = true, shape = androidx.compose.ui.graphics.RectangleShape, placeholder = { Text("Search files", fontSize = 12.sp) }, leadingIcon = { IdeIcon("search", IdeAccent, 17.dp) })
+        ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
+        if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
+            if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
+            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, (node.depth + 1) * 14.dp) { onOpenFile(node.path) }
         }
-        visibleFiles.forEach { file ->
-            ExplorerFileRow(
-                file.first,
-                file.second,
-                activeFile == file.first,
-                28.dp
-            ) { onOpenFile(file.first) }
-        }
+        if (nodes.isEmpty()) Text(if (query.isBlank()) "This folder is empty" else "No matching files", Modifier.fillMaxWidth().padding(18.dp), color = IdeMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
         if (fileDialog || folderDialog) {
-            val creatingFolder = folderDialog
-            AlertDialog(
-                onDismissRequest = { fileDialog = false; folderDialog = false },
-                containerColor = IdeSurface,
-                title = { Text(if (creatingFolder) "New folder" else "New file", color = Color(0xFFE8EDF5)) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
-                        OutlinedTextField(
-                            value = newEntryName,
-                            onValueChange = { newEntryName = it },
-                            singleLine = true,
-                            label = { Text(if (creatingFolder) "Folder name" else "File name") },
-                            placeholder = { Text(if (creatingFolder) "e.g. tests" else "e.g. helper.c") }
-                        )
-                        Text(if (creatingFolder) "Folder name relative to the project root." else "File path relative to the project root.", color = IdeMuted, fontSize = 11.sp)
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val name = newEntryName.trim().replace('\\', '/').trim('/')
-                        if (name.isBlank()) {
-                            entryMessage = "Enter a name first."
-                        } else if (name.split('/').any { it.isBlank() || it == "." || it == ".." }) {
-                            entryMessage = "Enter a valid project-relative path."
-                        } else if (name in sourceFiles.map { it.first }) {
-                            entryMessage = "'$name' already exists."
-                        } else if (creatingFolder) {
-                            entryMessage = "Folder creation is not available from this action yet."
-                        } else {
-                            onCreateFile(name)
-                            entryMessage = "Created '$name' in the project."
-                        }
-                        fileDialog = false
-                        folderDialog = false
-                    }) { Text("Create", color = IdeAccent) }
-                },
-                dismissButton = { TextButton(onClick = { fileDialog = false; folderDialog = false }) { Text("Cancel", color = IdeMuted) } }
-            )
+            val folder = folderDialog
+            val prefix = if (createTarget == ".") "" else "$createTarget/"
+            AlertDialog(onDismissRequest = { fileDialog = false; folderDialog = false }, containerColor = IdeSurface, title = { Text(if (folder) "New Folder" else "New File", color = Color(0xFFE8EDF5)) },
+                text = { Column { Text("In " + if (createTarget == ".") projectName else createTarget, color = IdeMuted, fontSize = 10.sp); OutlinedTextField(value = newEntryName, onValueChange = { newEntryName = it }, singleLine = true, label = { Text(if (folder) "Folder name" else "File name") }) } },
+                confirmButton = { TextButton(onClick = {
+                    val name = newEntryName.trim(); val target = prefix + name
+                    when {
+                        name.isBlank() || name.contains("/") || name.contains("\\") || name == "." || name == ".." -> entryMessage = "Enter a valid name without path separators."
+                        target in files || target in directories -> entryMessage = "An item with this name already exists."
+                        folder -> runCatching { onCreateFolder(target) }.onSuccess { expanded = expanded + createTarget + target; entryMessage = "Folder created." }.onFailure { entryMessage = it.message ?: "Unable to create folder." }
+                        else -> { onCreateFile(target); entryMessage = "File created." }
+                    }; fileDialog = false; folderDialog = false
+                }) { Text("Create", color = IdeAccent) } },
+                dismissButton = { TextButton(onClick = { fileDialog = false; folderDialog = false }) { Text("Cancel", color = IdeMuted) } })
         }
-        entryMessage?.let { message ->
-            AlertDialog(
-                onDismissRequest = { entryMessage = null },
-                containerColor = IdeSurface,
-                title = { Text("Explorer", color = Color(0xFFE8EDF5)) },
-                text = { Text(message, color = IdeMuted) },
-                confirmButton = { TextButton(onClick = { entryMessage = null }) { Text("OK", color = IdeAccent) } }
-            )
+        entryMessage?.let { AlertDialog(onDismissRequest = { entryMessage = null }, containerColor = IdeSurface, title = { Text("Explorer") }, text = { Text(it) }, confirmButton = { TextButton(onClick = { entryMessage = null }) { Text("OK") } }) }
+    }
+}
+
+@Composable
+private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: Boolean, expanded: Boolean, onClick: () -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit) {
+    var menu by remember(path) { mutableStateOf(false) }
+    Box {
+        Row(Modifier.fillMaxWidth().padding(start = depth * 14.dp).background(if (root) IdeSurfaceRaised else Color.Transparent).combinedClickable(onClick = onClick, onLongClick = { menu = true }).height(28.dp).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            IdeIcon(if (expanded) "chevronDown" else "chevronRight", IdeMuted, 13.dp); Spacer(Modifier.width(3.dp)); IdeIcon("folder", Color(0xFFE4BE79), 16.dp); Spacer(Modifier.width(7.dp))
+            Text(label, Modifier.weight(1f), color = if (root) Color(0xFFE8EDF5) else Color(0xFFDCE3EC), fontSize = 11.sp, fontWeight = if (root) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (visibleFiles.isEmpty()) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("No matching files", color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold)
-                Text("Try a different file name.", color = IdeMuted, fontSize = IdeDesignTokens.Typography.caption)
-            }
-        }
-        HorizontalDivider(color = IdeSurfaceRaised)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Workspace files", color = IdeMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-            Text("Linux runtime inactive", color = Color(0xFFE5B978), fontSize = 10.sp)
+        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            androidx.compose.material3.DropdownMenuItem(text = { Text("New File") }, leadingIcon = { IdeIcon("add", IdeAccent, 16.dp) }, onClick = { menu = false; onCreateFile(path) })
+            androidx.compose.material3.DropdownMenuItem(text = { Text("New Folder") }, leadingIcon = { IdeIcon("folder", IdeAccent, 16.dp) }, onClick = { menu = false; onCreateFolder(path) })
         }
     }
 }
