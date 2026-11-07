@@ -282,8 +282,14 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     val clangdGuestPath = remember(appContext) {
         ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd")
     }
-    val clangdSession = remember(workspaceDirectory?.absolutePath, clangdGuestPath) {
-        workspaceDirectory?.let { ClangdProjectSession(it, runtimePaths, clangdGuestPath) }
+    var clangdSession by remember { mutableStateOf<ClangdProjectSession?>(null) }
+    LaunchedEffect(workspaceDirectory?.absolutePath, clangdGuestPath, screen) {
+        clangdSession = null
+        if (screen == IdeScreen.Workspace && workspaceDirectory != null) {
+            clangdSession = withContext(Dispatchers.IO) {
+                ClangdProjectSession(workspaceDirectory, runtimePaths, clangdGuestPath)
+            }
+        }
     }
     DisposableEffect(clangdSession) {
         onDispose { runCatching { clangdSession?.close() } }
