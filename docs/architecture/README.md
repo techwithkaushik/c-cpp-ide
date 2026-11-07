@@ -251,3 +251,14 @@ The local PTY session and SSH shell/session implementation now belong to `:featu
 - [ ] Validate the workspace UI extraction, AIDL generation, and complete ARM32 release in CI.
 - [ ] Move remaining workspace screen/navigation orchestration out of `:app` after its state and lifecycle contracts are explicit.
 - [ ] Replace terminal screens' direct runtime installer calls with the runtime operations API.
+
+
+## 17. Terminal/runtime boundary completion — 2026-11-07
+
+- [x] Added `:core:contracts` runtime operations, environment, rootfs inspection/install, PRoot validation, download, and smoke-test contracts.
+- [x] Implemented the concrete runtime adapter in `:integrations:linux-runtime`.
+- [x] Updated app composition to create the runtime adapter and inject it into terminal UI.
+- [x] Updated active and retained terminal/runtime setup panels to call the runtime operations contract rather than instantiate rootfs installers or PRoot validators.
+- [x] Moved resolver preparation and guest compatibility behind the runtime environment contract.
+- [x] Removed `:integrations:linux-runtime` from `:feature:terminal` Gradle dependencies; terminal now depends on `:core:contracts` and its own terminal/native APIs.
+- [ ] Verify terminal/runtime boundary changes in the ARM32 release workflow and fix any compile/test regressions before continuing.
