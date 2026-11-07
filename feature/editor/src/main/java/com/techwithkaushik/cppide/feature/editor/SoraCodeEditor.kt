@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
-import io.github.rosemoe.sora.event.PublishDiagnosticsEvent
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
@@ -338,14 +337,6 @@ fun SoraCodeEditor(
                 subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
                     currentOnCursorPositionChange.value(event.left.line + 1, event.left.column + 1)
                     DeveloperLog.debug("SoraEditor", "cursor_selection_changed; file=$fileName; line=${event.left.line + 1}; column=${event.left.column + 1}")
-                }
-                subscribeEvent(PublishDiagnosticsEvent::class.java) { event, _ ->
-                    DeveloperLog.event("SoraEditor", "editor_diagnostics_rendered", mapOf(
-                        "file" to fileName,
-                        "previousCount" to event.oldDiagnostics.size,
-                        "currentCount" to event.newDiagnosticsEvent.size,
-                        "lspConnected" to (lspEditor?.isConnected == true)
-                    ))
                 }
             }
         },
