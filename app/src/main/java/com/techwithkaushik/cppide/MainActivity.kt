@@ -253,6 +253,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         code = fileContents[file] ?: sampleCode(file).also { fileContents[file] = it }
         recentFiles.remove(file)
         recentFiles.add(0, file)
+        onboardingPreferences.edit().putString("last_opened_file.$selectedProject", file).apply()
         DeveloperLog.event(appContext, "Workspace", "file_opened", mapOf("project" to selectedProject, "file" to file, "characters" to code.length, "openTabCount" to openFiles.size))
     }
     fun closeFile(file: String) {
