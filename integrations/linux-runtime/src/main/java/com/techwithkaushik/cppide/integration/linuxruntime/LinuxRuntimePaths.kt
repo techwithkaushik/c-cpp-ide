@@ -117,7 +117,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
             "rootfsValid=${versionSupported && structural}; marker=${markerLines.joinToString("|")}"
     }
 
-    fun hasRootfs(): Boolean {
+    override fun hasRootfs(): Boolean {
         val markerLines = runCatching { marker.takeIf(File::isFile)?.readLines()?.take(8).orEmpty() }
             .getOrDefault(emptyList())
         val installerVersion = markerLines.firstOrNull { it.startsWith("installerVersion=") }
