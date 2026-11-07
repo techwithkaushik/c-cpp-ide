@@ -30,12 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
-import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
-import com.techwithkaushik.cppide.integration.linuxruntime.RootfsArchitectureInspector
-import com.techwithkaushik.cppide.integration.linuxruntime.RootfsInstaller
-import com.techwithkaushik.cppide.integration.linuxruntime.UbuntuBaseDownloader
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeOperations
+import com.techwithkaushik.cppide.core.contracts.runtime.RootfsArchitectureReport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,15 +39,15 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 @Composable
-fun RuntimeSetupPanel(onRuntimeReady: () -> Unit, modifier: Modifier = Modifier) {
+fun RuntimeSetupPanel(runtime: LinuxRuntimeOperations, onRuntimeReady: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current.applicationContext
-    val paths = remember(context) { LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir) }
+    val paths = runtime.environment
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Choose an Ubuntu installation method.") }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var selectedName by remember { mutableStateOf("") }
-    var report by remember { mutableStateOf<RootfsArchitectureInspector.Report?>(null) }
+    var report by remember { mutableStateOf<RootfsArchitectureReport?>(null) }
     var showOverride by remember { mutableStateOf(false) }
 
     fun displayName(uri: Uri): String = runCatching {
@@ -65,11 +61,11 @@ fun RuntimeSetupPanel(onRuntimeReady: () -> Unit, modifier: Modifier = Modifier)
         DeveloperLog.event("UbuntuSetup", "runtime_validation_started", mapOf("rootfs" to paths.ubuntuRoot.absolutePath, "rootfsExists" to paths.hasRootfs(), "prootExists" to paths.hasProot()))
         val validation = withContext(Dispatchers.IO) {
             runCatching {
-                val proot = ProotDownloader(paths).downloadAndInstall()
+                val proot = runtime.validateProot()
                 DeveloperLog.event("UbuntuSetup", "proot_validation_passed", mapOf("bytes" to proot.bytes, "release" to proot.release))
                 if (!paths.hasRootfs()) throw IOException("Ubuntu rootfs is missing or incomplete.")
                 DeveloperLog.event("UbuntuSetup", "rootfs_validation_passed", mapOf("rootfs" to paths.ubuntuRoot.absolutePath))
-                val smoke = LinuxRuntimeSmokeTest(paths).run()
+                val smoke = runtime.runSmokeTest()
                 DeveloperLog.event("UbuntuSetup", "shell_smoke_test_completed", mapOf("success" to smoke.success, "exitCode" to smoke.exitCode, "stdoutCharacters" to smoke.output.length, "error" to smoke.error?.take(800)))
                 if (!smoke.success) throw IOException(smoke.error ?: smoke.output.ifBlank { "Ubuntu shell smoke test failed." })
             }
@@ -100,7 +96,7 @@ fun RuntimeSetupPanel(onRuntimeReady: () -> Unit, modifier: Modifier = Modifier)
                 try {
                     DeveloperLog.event("UbuntuSetup", "rootfs_inspection_started", mapOf("fileName" to selectedName))
                     val inspected = withContext(Dispatchers.IO) {
-                        RootfsArchitectureInspector.inspect({
+                        runtime.inspectRootfs({
                             context.contentResolver.openInputStream(uri)
                                 ?: throw IOException("Android could not reopen the selected archive.")
                         }, selectedName)
@@ -139,7 +135,7 @@ fun RuntimeSetupPanel(onRuntimeReady: () -> Unit, modifier: Modifier = Modifier)
             DeveloperLog.event("UbuntuSetup", "local_rootfs_install_started", mapOf("fileName" to selectedName, "architecture" to inspected.architecture, "allowMismatch" to allowMismatch))
             try {
                 withContext(Dispatchers.IO) {
-                    RootfsInstaller(paths).install({
+                    runtime.installRootfs({
                         context.contentResolver.openInputStream(uri)
                             ?: throw IOException("Android could not reopen the selected archive.")
                     }, selectedName)
@@ -174,7 +170,7 @@ fun RuntimeSetupPanel(onRuntimeReady: () -> Unit, modifier: Modifier = Modifier)
             status = "Downloading Ubuntu Base 24.04.5…"
             scope.launch {
                 try {
-                    val downloaded = withContext(Dispatchers.IO) { UbuntuBaseDownloader(paths).downloadAndInstall() }
+                    val downloaded = withContext(Dispatchers.IO) { runtime.downloadAndInstallUbuntu() }
                     DeveloperLog.event("UbuntuSetup", "online_rootfs_download_completed", mapOf("archiveBytes" to downloaded.bytes, "entries" to downloaded.rootfs.entries, "expandedBytes" to downloaded.rootfs.expandedBytes, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
                     validateRuntime()
                 } catch (cancelled: CancellationException) {
