@@ -1018,6 +1018,45 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         )
     }
 
+    pendingDeleteProject?.let { projectNameToDelete ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDeleteProject = null },
+            containerColor = IdeSurface,
+            title = { Text("Delete project?", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
+            text = { Text("Delete '$projectNameToDelete' and all its files permanently? This cannot be undone.", color = IdeMuted) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        runCatching { projectStorage.deleteProject(projectNameToDelete) }
+                            .onSuccess {
+                                projects.removeAll { it.name == projectNameToDelete }
+                                if (selectedProject == projectNameToDelete) {
+                                    selectedProject = "Welcome Workspace"
+                                    activeFile = ""
+                                    code = ""
+                                    openFiles.clear()
+                                    dirtyFiles.clear()
+                                    fileContents.clear()
+                                    workspaceFiles.clear()
+                                    workspaceDirectories.clear()
+                                    screen = IdeScreen.Projects
+                                }
+                                pendingDeleteProject = null
+                            }
+                            .onFailure { error ->
+                                pendingDeleteProject = null
+                                DeveloperLog.failure(appContext, "ProjectStorage", "project_delete_failed", error, mapOf("project" to projectNameToDelete))
+                            }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB93838))
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteProject = null }) { Text("Cancel", color = IdeMuted) }
+            }
+        )
+    }
+
     if (newProjectDialog) {
         val normalizedProjectName = newProjectName.trim()
         val projectNameExists = projects.any { it.name.equals(normalizedProjectName, ignoreCase = true) }
@@ -1752,7 +1791,7 @@ private fun WorkspaceScreen(
                 }
                 Text(
                     "＋",
-                    Modifier.clickable { onFile("") }
+                    Modifier.clickable { onAction("New File") }
                         .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = IdeDesignTokens.Spacing.sm),
                     color = IdeAccent, fontSize = 20.sp
                 )
