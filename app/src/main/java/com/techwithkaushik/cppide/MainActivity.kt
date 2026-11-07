@@ -281,7 +281,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     val workspaceDirectory = remember(selectedProject) {
         projectStorage.listProjects().firstOrNull { it.name == selectedProject }?.directory
     }
-    val clangdGuestPath = remember(appContext) {
+    val clangdGuestPath = remember(appContext, screen) {
         ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd")
     }
     var clangdSession by remember { mutableStateOf<ClangdProjectSession?>(null) }
@@ -588,6 +588,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                             "Output", "Run" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                                             "Find" -> { searchInProject = false; searchQuery = ""; showSearch = true }
                                             "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
+                                            "Format Document" -> editorController.format()
                                             "Select All" -> editorController.selectAll()
                                             "Undo" -> editorController.undo()
                                             "Redo" -> editorController.redo()

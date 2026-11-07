@@ -325,8 +325,10 @@ fun SoraCodeEditor(
                     suppressProgrammaticChanges.set(false)
                 }
             }
+            currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
         onRelease = { editor ->
+            if (lspEditor?.editor === editor) runCatching { lspEditor.dispose() }
             controller?.detach(editor)
             CppTextMateSupport.detach(editor)
             editor.release()
