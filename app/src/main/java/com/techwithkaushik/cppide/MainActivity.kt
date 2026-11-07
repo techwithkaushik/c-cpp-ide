@@ -595,6 +595,29 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                                 workspaceDirectories.clear()
                                                 workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
                                             },
+                                            onRenameEntry = { oldPath, newName ->
+                                                scope.launch {
+                                                    runCatching { withContext(Dispatchers.IO) { projectStorage.renameEntry(selectedProject, oldPath, newName) } }
+                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { projectStorage.listFiles(selectedProject) })
+                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                }
+                                            },
+                                            onDeleteEntry = { path ->
+                                                scope.launch {
+                                                    runCatching { withContext(Dispatchers.IO) { projectStorage.deleteEntry(selectedProject, path) } }
+                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { projectStorage.listFiles(selectedProject) })
+                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                    openFiles.remove(path); fileContents.remove(path); dirtyFiles.remove(path)
+                                                    if (activeFile == path) { activeFile = ""; code = "" }
+                                                }
+                                            },
+                                            onMoveEntry = { path, target ->
+                                                scope.launch {
+                                                    runCatching { withContext(Dispatchers.IO) { projectStorage.moveEntry(selectedProject, path, target) } }
+                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { projectStorage.listFiles(selectedProject) })
+                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                }
+                                            },
                                             onClose = { drawerSidebarOpen = false },
                                             sidebarMode = true
                                         )
@@ -1966,7 +1989,7 @@ private fun IdeMenuBar(
 }
 
 @Composable
-private fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: suspend (String) -> Unit, onClose: () -> Unit, sidebarMode: Boolean = false) {
+private fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: suspend (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit, onClose: () -> Unit, sidebarMode: Boolean = false) {
     val scope = rememberCoroutineScope()
     var query by rememberSaveable(projectName) { mutableStateOf("") }
     var fileDialog by rememberSaveable(projectName) { mutableStateOf(false) }
@@ -2002,7 +2025,7 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
         ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
             if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
-            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp) { onOpenFile(node.path) }
+            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp, { onOpenFile(node.path) }, onRenameEntry, onDeleteEntry, onMoveEntry)
         }
         if (nodes.isEmpty()) Text(if (query.isBlank()) "This folder is empty" else "No matching files", Modifier.fillMaxWidth().padding(18.dp), color = IdeMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
         if (fileDialog || folderDialog) {
@@ -2083,13 +2106,22 @@ private fun ExplorerFileRow(
     description: String,
     selected: Boolean,
     indent: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRenameEntry: (String, String) -> Unit,
+    onDeleteEntry: (String) -> Unit,
+    onMoveEntry: (String, String) -> Unit
 ) {
+    var menu by remember(description) { mutableStateOf(false) }
+    var renameDialog by remember(description) { mutableStateOf(false) }
+    var renameValue by remember(description) { mutableStateOf(name) }
+    var moveDialog by remember(description) { mutableStateOf(false) }
+    var targetDirectory by remember(description) { mutableStateOf(".") }
+    Box {
     Row(
         Modifier.fillMaxWidth()
             .padding(start = indent)
             .background(if (selected) Color(0xFF1D3047) else Color.Transparent)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = { menu = true })
             .height(28.dp)
             .padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -2097,6 +2129,14 @@ private fun ExplorerFileRow(
         FileTypeIcon(name, 15.dp, Modifier.width(22.dp))
         Text(name, Modifier.weight(1f), color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (selected) Text("●", color = IdeAccent, fontSize = 8.sp)
+    }
+    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+        DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renameDialog = true })
+        DropdownMenuItem(text = { Text("Move to folder") }, onClick = { menu = false; moveDialog = true })
+        DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDeleteEntry(description) })
+    }
+    if (renameDialog) AlertDialog(onDismissRequest = { renameDialog = false }, title = { Text("Rename file") }, text = { OutlinedTextField(value = renameValue, onValueChange = { renameValue = it }, singleLine = true) }, confirmButton = { TextButton(onClick = { renameDialog = false; onRenameEntry(description, renameValue.trim()) }) { Text("Rename") } }, dismissButton = { TextButton(onClick = { renameDialog = false }) { Text("Cancel") } })
+    if (moveDialog) AlertDialog(onDismissRequest = { moveDialog = false }, title = { Text("Move file") }, text = { Column { Text("Destination folder", color = IdeMuted); OutlinedTextField(value = targetDirectory, onValueChange = { targetDirectory = it }, singleLine = true, placeholder = { Text(". or src/include") }) } }, confirmButton = { TextButton(onClick = { moveDialog = false; onMoveEntry(description, targetDirectory.trim()) }) { Text("Move") } }, dismissButton = { TextButton(onClick = { moveDialog = false }) { Text("Cancel") } })
     }
 }
 
