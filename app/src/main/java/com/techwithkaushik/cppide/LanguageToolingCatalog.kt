@@ -1,6 +1,7 @@
 package com.techwithkaushik.cppide
 
 import android.content.Context
+import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import java.io.File
 
 /**
@@ -182,9 +183,7 @@ internal class ToolPathPreferences(context: Context) {
     ): ResolvedToolPath? {
         val configured = get(languageId, role) ?: return null
         if (rootfs != null && configured.startsWith("/")) {
-            val canonicalRoot = rootfs.canonicalFile
-            val guestFile = File(canonicalRoot, configured.removePrefix("/")).canonicalFile
-            if (guestFile.toPath().startsWith(canonicalRoot.toPath()) && guestFile.isFile && guestFile.canExecute()) {
+            if (LinuxToolchainDiscovery().resolveExecutable(rootfs, configured) != null) {
                 return ResolvedToolPath(configuredPath = configured, guestPath = configured)
             }
         }
