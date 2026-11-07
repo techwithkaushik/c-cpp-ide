@@ -4,6 +4,8 @@ import com.techwithkaushik.cppide.core.contracts.editor.EditorDiagnostics
 import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
 import com.techwithkaushik.cppide.core.contracts.runtime.LinuxToolchainAccess
 import com.techwithkaushik.cppide.core.contracts.workspace.WorkspaceIdentity
+import com.techwithkaushik.cppide.lsp.api.LanguageServiceStatus
+import com.techwithkaushik.cppide.lsp.api.LanguageServerSession
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
@@ -40,12 +42,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
-data class EditorLspStatus(
-    val label: String,
-    val detail: String,
-    val connected: Boolean = false,
-    val error: Boolean = false
-)
+/** Backward-compatible alias; language service status belongs to :lsp:api. */
+typealias EditorLspStatus = LanguageServiceStatus
 
 /** Backward-compatible package alias; the model is owned by :core:contracts. */
 typealias EditorProblem = com.techwithkaushik.cppide.core.contracts.editor.EditorProblem
@@ -60,7 +58,7 @@ class ClangdProjectSession(
     private val runtime: LinuxRuntimeEnvironment,
     private val toolchains: LinuxToolchainAccess,
     configuredClangdGuestPath: String?
-) : EditorDiagnostics, AutoCloseable {
+) : EditorDiagnostics, LanguageServerSession {
 
     private val workspace = workspaceIdentity.root.canonicalFile
     private val project = LspProject(GUEST_WORKSPACE)
@@ -75,7 +73,7 @@ class ClangdProjectSession(
     )
     private val mutableProblems = MutableStateFlow<List<EditorProblem>>(emptyList())
 
-    val status: StateFlow<EditorLspStatus> = mutableStatus.asStateFlow()
+    override val status: StateFlow<LanguageServiceStatus> = mutableStatus.asStateFlow()
     override val problems: StateFlow<List<EditorProblem>> = mutableProblems.asStateFlow()
 
     private val diagnosticsListener = object : EventListener {
