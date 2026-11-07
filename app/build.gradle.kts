@@ -100,6 +100,7 @@ dependencies {
     implementation(project(":core:ipc"))
     implementation(project(":ui:design-system"))
     implementation(project(":core:logging"))
+    implementation(project(":core:contracts"))
     implementation(project(":editor"))
     implementation(project(":terminal"))
     implementation(project(":workspace:impl"))
