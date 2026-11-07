@@ -13,7 +13,7 @@ The application is the composition root. Features communicate through stable con
 | Current Gradle module | Current responsibility | Target ownership |
 |---|---|---|
 | `:app` | Android app, Compose shell, startup and dependency composition | `app` |
-| `:core:contracts` | Shared editor diagnostics contract and editor problem model | `core:contracts` |
+| `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, and workspace identity contracts | `core:contracts` |
 | `:core:aidl` | AIDL contracts for process/service communication | `core:ipc` (after migration) |
 | `:core:jni` | Native C/C++ and PTY bridge | `core:jni` |
 | `:core:lsp` | Existing language-server integration | `lsp` |
@@ -184,3 +184,20 @@ The current project has meaningful differences between Android application, Comp
 - [ ] Verify Gradle configuration, editor compilation, and ARM32 release CI before migrating additional contracts.
 
 This is the first live contract migration. Do not move terminal, workspace, or runtime implementations until their public call sites and dependency graph have been inspected.
+
+
+## 11. Runtime, toolchain, and workspace boundary migration — 2026-11-07
+
+- [x] Added `LinuxRuntimeEnvironment` and `LinuxToolchainAccess` contracts under `:core:contracts`.
+- [x] Made the Linux runtime paths and toolchain discovery implementations implement those contracts.
+- [x] Removed concrete Linux runtime and toolchain dependencies from `:feature:editor`; the app composition root now supplies the implementations.
+- [x] Added `:workspace:api` with `WorkspaceRepository` and `WorkspaceProject`.
+- [x] Added `:workspace:impl` and moved project storage out of `:app`.
+- [x] Updated the app to consume the workspace repository interface while keeping the existing app-private storage layout and metadata format.
+- [ ] Validate all new module and dependency changes with the ARM32 release workflow.
+- [ ] Move terminal runtime installation/session orchestration behind runtime-owned interfaces; current terminal screens still call runtime integration classes directly.
+- [ ] Move remaining app-owned workspace orchestration and navigation state behind workspace-facing contracts.
+
+### Current dependency boundary
+
+The editor no longer imports `:integrations:linux-runtime` or `:integrations:toolchain`; those concrete modules are wired by `:app`. Workspace persistence now lives in `:workspace:impl` and is accessed through `:workspace:api`. Terminal/runtime separation is not yet complete and remains an explicit migration item.
