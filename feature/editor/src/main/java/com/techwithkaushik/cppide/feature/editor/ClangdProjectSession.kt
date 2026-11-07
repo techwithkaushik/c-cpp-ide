@@ -375,7 +375,7 @@ private class ProotClangdConnectionProvider(
         }
         val command = listOf(
             runtime.proot.absolutePath,
-            "-0", "-v", "0",
+            "-0", "-v", "0", "--link2symlink",
             "-r", runtime.ubuntuRoot.absolutePath,
             "-w", "/workspace",
             "-b", "${workspace.absolutePath}:/workspace",
@@ -389,13 +389,14 @@ private class ProotClangdConnectionProvider(
             "--compile-commands-dir=/workspace"
         )
         val child = ProcessBuilder(command).directory(workspace).apply {
-            // Preserve Android linker/runtime variables required by the APK-bundled PRoot ELF.
-            val inheritedLibraryPath = environment()["LD_LIBRARY_PATH"].orEmpty()
-            runtime.nativeLibraryDir?.absolutePath?.let { nativeDir ->
-                environment()["LD_LIBRARY_PATH"] = listOf(nativeDir, inheritedLibraryPath)
-                    .filter(String::isNotBlank)
-                    .joinToString(File.pathSeparator)
-            }
+            // Keep Android host linker variables out of the Ubuntu guest. PRoot's
+            // loader is selected explicitly; leaking the APK nativeLibraryDir into
+            // guest LD_LIBRARY_PATH can make clangd load Android .so files instead
+            // of Ubuntu's glibc libraries.
+            environment().remove("LD_LIBRARY_PATH")
+            environment().remove("LD_PRELOAD")
+            environment().remove("PREFIX")
+            environment().remove("BOOTSTRAP_ROOT")
             environment()["HOME"] = "/root"
             environment()["USER"] = "root"
             environment()["LOGNAME"] = "root"
