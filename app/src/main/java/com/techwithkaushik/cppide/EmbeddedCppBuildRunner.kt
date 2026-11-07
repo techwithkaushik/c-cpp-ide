@@ -64,6 +64,18 @@ internal class EmbeddedCppBuildRunner(context: Context) {
             else -> return failure(source.absolutePath, "Only C and C++ source files can be built.")
         }
         runtime.ensureDirectories()
+        val guestTmp = File(runtime.ubuntuRoot, "tmp")
+        if (!guestTmp.exists() && !guestTmp.mkdirs()) {
+            return failure(source.absolutePath, "Unable to create Ubuntu /tmp directory.")
+        }
+        if (!guestTmp.setReadable(true, false) || !guestTmp.setWritable(true, false) || !guestTmp.setExecutable(true, false)) {
+            return failure(source.absolutePath, "Ubuntu /tmp is not writable.")
+        }
+        runCatching {
+            Class.forName("android.system.Os")
+                .getMethod("chmod", String::class.java, Int::class.javaPrimitiveType!!)
+                .invoke(null, guestTmp.absolutePath, 0x1ff or 0x200)
+        }
         if (!runtime.ready()) return failure(source.absolutePath, "Ubuntu rootfs or PRoot is not installed.")
 
         val compilerName = if (language == CppBuildPreferences.SourceLanguage.C) "clang" else "clang++"
@@ -148,8 +160,8 @@ internal class EmbeddedCppBuildRunner(context: Context) {
                 environment()["LOGNAME"] = "root"
                 environment()["SHELL"] = "/bin/bash"
                 environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-                environment()["TMPDIR"] = runtime.usrTmp.absolutePath
-                environment()["TMP"] = runtime.usrTmp.absolutePath
+                environment()["TMPDIR"] = "/tmp"
+                environment()["TMP"] = "/tmp"
                 environment()["PROOT_TMP_DIR"] = runtime.usrTmp.absolutePath
                 environment()["PROOT_NO_SECCOMP"] = "1"
                 environment()["PROOT_LOADER"] = runtime.prootLoader.absolutePath
