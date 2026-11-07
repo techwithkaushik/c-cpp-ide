@@ -1,6 +1,7 @@
 [versions]
 agp="9.3.1"
 kotlin="2.4.21"
+ksp="2.3.13"
 composeBom="2025.09.00"
 soraEditor="0.24.4"
 activityCompose="1.11.0"
