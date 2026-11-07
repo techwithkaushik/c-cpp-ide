@@ -1992,6 +1992,7 @@ private fun IdeMenuBar(
 private fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: suspend (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit, onClose: () -> Unit, sidebarMode: Boolean = false) {
     val scope = rememberCoroutineScope()
     var query by rememberSaveable(projectName) { mutableStateOf("") }
+    var searchExpanded by rememberSaveable(projectName) { mutableStateOf(false) }
     var fileDialog by rememberSaveable(projectName) { mutableStateOf(false) }
     var folderDialog by rememberSaveable(projectName) { mutableStateOf(false) }
     var newEntryName by rememberSaveable(projectName) { mutableStateOf("") }
@@ -2021,7 +2022,10 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
             IconButton(onClick = { query = "" }, modifier = Modifier.size(30.dp)) { IdeIcon("refresh", IdeMuted, 16.dp) }
             IconButton(onClick = onClose, modifier = Modifier.size(30.dp)) { IdeIcon("close", IdeMuted, 16.dp) }
         }
-        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp), singleLine = true, shape = androidx.compose.ui.graphics.RectangleShape, placeholder = { Text("Search files", fontSize = 12.sp) }, leadingIcon = { IdeIcon("search", IdeAccent, 17.dp) })
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { searchExpanded = !searchExpanded; if (!searchExpanded) query = "" }, modifier = Modifier.size(32.dp)) { IdeIcon(if (searchExpanded) "close" else "search", IdeAccent, 18.dp) }
+            if (searchExpanded) OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f).heightIn(min = 40.dp), singleLine = true, shape = androidx.compose.ui.graphics.RectangleShape, placeholder = { Text("Search files", fontSize = 12.sp) })
+        }
         ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
             if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
