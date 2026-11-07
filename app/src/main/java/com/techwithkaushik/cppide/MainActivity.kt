@@ -1045,7 +1045,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                             .onFailure { error ->
                                 pendingDeleteProject = null
-                                DeveloperLog.failure(appContext, "ProjectStorage", "project_delete_failed", error, mapOf("project" to projectNameToDelete))
+                                DeveloperLog.failure("ProjectStorage", "project_delete_failed", error, mapOf("project" to projectNameToDelete))
                             }
                     },
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFB93838))
