@@ -16,11 +16,11 @@ The application is the composition root. Features communicate through stable con
 | `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, and workspace identity contracts | `core:contracts` |\n| `:lsp:api` | Protocol-agnostic language-server lifecycle status and session contract | `lsp/api` |
 | `:core:aidl` | AIDL contracts for process/service communication | `core:ipc` (after migration) |
 | `:core:jni` | Native C/C++ and PTY bridge | `core:jni` |
-| `:core:lsp` | Existing language-server integration | `lsp` |
+| `:lsp:api` | Protocol-agnostic language service lifecycle contract | `lsp` |
 | `:ui:design-system` | Shared Compose design system and design tokens | `ui/design-system` |
 | `:core:logging` | Shared logging | `core:logging` |
 | `:feature:editor` | Sora editor integration and editor UI | `editor` plus UI adapter |
-| `:feature:terminal` | Terminal UI and terminal sessions | `terminal` plus UI adapter |
+| `:feature:terminal` | Terminal UI, local PTY session, and SSH shell session | `terminal` plus UI adapter |
 | `:feature:explorer` | File/project explorer | `workspace` plus UI adapter |
 | `:services:daemon` | Isolated compiler daemon | `runtime` / process service boundary |
 | `:integrations:toolchain` | Toolchain discovery | `runtime:toolchains` |
@@ -223,3 +223,8 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 - [ ] Verify terminal session relocation and ABI-specific release packaging with CI.
 - [ ] Replace terminal screens' direct construction of rootfs installers, PRoot validators, and runtime smoke tests with an app-provided runtime operations interface.
 - [ ] Move terminal UI and runtime setup UI into separate feature surfaces without changing current workflows.
+
+
+## 14. Terminal/runtime ownership map correction
+
+The local PTY session and SSH shell/session implementation now belong to `:feature:terminal`. PRoot, rootfs acquisition/extraction, executable validation, runtime smoke tests, and guest compatibility remain in `:integrations:linux-runtime`. The remaining direct calls from terminal UI into runtime installers are an adapter boundary still to be completed; this migration does not claim that separation is finished.
