@@ -320,7 +320,10 @@ class ClangdProjectSession(
             }
             installEditorEventLogging(editor)
             editor.isEnableInlayHint = true
-            val capabilities = editor.languageServerWrapper.getCachedServerCapabilities()
+            // Sora Editor LSP 0.24.4 exposes getServerCapabilities(); there is no
+            // getCachedServerCapabilities() API. connect() has completed the initialize
+            // handshake above, so this returns the negotiated/effective capabilities.
+            val capabilities = editor.languageServerWrapper.getServerCapabilities()
             val advertisedFeatures = buildList {
                 if (capabilities?.completionProvider != null) add("completion")
                 if (capabilities?.hoverProvider != null) add("hover")
