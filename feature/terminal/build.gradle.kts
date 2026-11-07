@@ -17,7 +17,7 @@ dependencies {
     implementation(project(":ui:design-system"))
     implementation(project(":core:logging"))
     implementation(project(":core:jni"))
-    implementation(project(":core:aidl"))
+    implementation(project(":core:ipc"))
     implementation(project(":integrations:linux-runtime"))
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
