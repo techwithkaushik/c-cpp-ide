@@ -9,7 +9,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     val base = filesDir
     val distro = File(filesDir, "ubuntu")
     private val legacyDistro = File(filesDir, "rootfs")
-    val ubuntuArchitecture: String = if (System.getProperty("os.arch")?.contains("64") == true) "arm64" else "armhf"
+    override val ubuntuArchitecture: String = if (System.getProperty("os.arch")?.contains("64") == true) "arm64" else "armhf"
     override val ubuntuRoot: File get() = distro
     val usr = File(filesDir, "usr")
     override val usrTmp = File(usr, "tmp")
@@ -100,7 +100,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
      * older successfully installed rootfs trees remain usable when their required
      * Ubuntu files are present.
      */
-    fun rootfsDiagnostic(): String {
+    override fun rootfsDiagnostic(): String {
         val markerLines = runCatching { marker.takeIf(File::isFile)?.readLines()?.take(8).orEmpty() }
             .getOrDefault(emptyList())
         val installerVersion = markerLines.firstOrNull { it.startsWith("installerVersion=") }
@@ -127,7 +127,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
         return installerVersion != null && installerVersion in 1..CURRENT_INSTALLER_VERSION && structural
     }
 
-    fun hasProot(): Boolean = proot.isFile && prootLoader.isFile
+    override fun hasProot(): Boolean = proot.isFile && prootLoader.isFile
     override fun ready(): Boolean = hasRootfs() && hasProot()
 
     companion object {
