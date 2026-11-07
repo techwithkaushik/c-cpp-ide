@@ -140,7 +140,7 @@ kcode/
 | `:integrations:toolchain` | Runtime toolchain discovery |
 | `:integrations:linux-runtime` | PRoot, rootfs and runtime management |
 | `:workspace:api` | Workspace repository contracts |
-| `:workspace:impl` | Workspace storage implementation |
+| `:workspace:impl` | Workspace storage implementation |\n| `:workspace:ui` | Workspace explorer UI adapter |
 | `:workspace:ui` | Workspace explorer UI |
 
 The empty legacy `:feature:explorer` and unimplemented `:services:daemon` modules were removed rather than retained as placeholders. The AIDL service contracts remain in `:core:ipc`; a daemon module should return only when a real service implementation and lifecycle tests are ready.
