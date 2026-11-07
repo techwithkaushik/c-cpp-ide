@@ -141,20 +141,15 @@ class ClangdProjectSession(
             // Sora 0.24.4 keys server definitions by every declared extension.
             // Keep one definition per language family and map all C++ extensions to
             // the same clangd wrapper so opening .cc/.hpp files does not spawn new daemons.
-            project.addServerDefinition(
-                CustomLanguageServerDefinition(
-                    ext = "c",
-                    serverConnectProvider = clangdConnectionProvider,
-                    name = "clangd-c",
-                    extensionsOverride = listOf("c")
-                )
-            )
+            // clangd handles both C and C++. Register one definition for every
+            // supported extension so Sora reuses one workspace-scoped process
+            // instead of launching separate daemons for .c and .cpp documents.
             project.addServerDefinition(
                 CustomLanguageServerDefinition(
                     ext = "cpp",
                     serverConnectProvider = clangdConnectionProvider,
-                    name = "clangd-cpp",
-                    extensionsOverride = CPP_EXTENSIONS.toList()
+                    name = "clangd",
+                    extensionsOverride = (listOf("c") + CPP_EXTENSIONS).distinct()
                 )
             )
             project.init()
