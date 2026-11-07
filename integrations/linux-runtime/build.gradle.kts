@@ -16,6 +16,5 @@ dependencies {
     implementation(project(":core:logging"))
     implementation(libs.commons.compress)
     implementation(libs.xz)
-    implementation(libs.jsch)
     testImplementation(libs.junit)
 }
