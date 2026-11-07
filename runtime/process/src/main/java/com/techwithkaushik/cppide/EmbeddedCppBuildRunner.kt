@@ -1,7 +1,8 @@
 package com.techwithkaushik.cppide
 
 import android.content.Context
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
+import com.techwithkaushik.cppide.workspace.api.WorkspaceRepository
 import com.techwithkaushik.cppide.integration.toolchain.CppBuildPreferences
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -14,12 +15,13 @@ import java.util.concurrent.TimeUnit
  * quoted before they reach the shell, and the compiler settings model returns argv tokens rather
  * than evaluating shell syntax.
  */
-internal class EmbeddedCppBuildRunner(context: Context) {
-    private val appContext = context.applicationContext
-    private val runtime = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
-    private val inspector = CcppToolchainInspector(appContext)
-    private val storage = ProjectStorage(appContext)
-    private val preferences = appContext.getSharedPreferences("language_settings_c_cpp", Context.MODE_PRIVATE)
+class EmbeddedCppBuildRunner(
+    context: Context,
+    private val runtime: LinuxRuntimeEnvironment,
+    private val workspaceRepository: WorkspaceRepository,
+    private val inspector: CcppToolchainInspector
+) {
+    private val preferences = context.applicationContext.getSharedPreferences("language_settings_c_cpp", Context.MODE_PRIVATE)
 
     data class Result(
         val sourcePath: String,
@@ -38,7 +40,7 @@ internal class EmbeddedCppBuildRunner(context: Context) {
     /** Build the workspace using its declared CMake or Make build system. */
     fun buildProject(projectName: String, timeoutSeconds: Long = 120): Result {
         require(timeoutSeconds in 1..300) { "Project build timeout must be between 1 and 300 seconds." }
-        val project = storage.listProjects().firstOrNull { it.name == projectName }
+        val project = workspaceRepository.listProjects().firstOrNull { it.name == projectName }
             ?: return failure(projectName, "Project not found.")
         val workspace = project.directory.canonicalFile
         runtime.ensureDirectories()
@@ -99,7 +101,7 @@ internal class EmbeddedCppBuildRunner(context: Context) {
             "Total program arguments must not exceed 64 KiB."
         }
 
-        val project = storage.listProjects().firstOrNull { it.name == projectName }
+        val project = workspaceRepository.listProjects().firstOrNull { it.name == projectName }
             ?: return failure(relativeSourcePath, "Project not found.")
         val workspace = project.directory.canonicalFile
         val source = File(workspace, relativeSourcePath).canonicalFile

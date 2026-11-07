@@ -107,6 +107,7 @@ dependencies {
     implementation(project(":workspace:ui"))
     implementation(project(":runtime:toolchains"))
     implementation(project(":runtime:linux"))
+    implementation(project(":runtime:process"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.concurrent.futures)

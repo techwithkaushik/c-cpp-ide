@@ -1868,6 +1868,7 @@ private fun WorkspaceScreen(
             ToolPanelContent(
                 selected = selectedPanel,
                 runtimeOperations = runtimeOperations,
+                workspaceRepository = workspaceRepository,
                 projectName = projectName,
                 activeFile = activeFile,
                 code = code,
@@ -2015,6 +2016,7 @@ private val CompilerDiagnosticPattern =
 private fun ToolPanelContent(
     selected: ToolPanel,
     runtimeOperations: LinuxRuntimeOperations,
+    workspaceRepository: WorkspaceRepository,
     projectName: String,
     activeFile: String,
     code: String,
@@ -2027,7 +2029,7 @@ private fun ToolPanelContent(
 ) {
     val context = LocalContext.current.applicationContext
     val buildScope = rememberCoroutineScope()
-    val buildRunner = remember(context) { EmbeddedCppBuildRunner(context) }
+    val buildRunner = remember(context, runtimeOperations, workspaceRepository) { EmbeddedCppBuildRunner(context, runtimeOperations.environment, workspaceRepository, CcppToolchainInspector(context)) }
     var building by remember(projectName, activeFile) { mutableStateOf(false) }
     var buildResult by remember(projectName, activeFile) { mutableStateOf<EmbeddedCppBuildRunner.Result?>(null) }
     var buildError by remember(projectName, activeFile) { mutableStateOf<String?>(null) }

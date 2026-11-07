@@ -1,6 +1,6 @@
 package com.techwithkaushik.cppide
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
-import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxToolchainAccess
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-internal class UbuntuClangFormatRunner(private val runtime: LinuxRuntimePaths, private val workspace: File) {
+class UbuntuClangFormatRunner(private val runtime: LinuxRuntimeEnvironment, private val workspace: File, private val toolchains: LinuxToolchainAccess) {
     fun format(relativeFilePath: String, sourceText: String, timeoutSeconds: Long = 20L): String {
         require(timeoutSeconds in 1L..60L && sourceText.length <= 2 * 1024 * 1024 && '\u0000' !in sourceText)
         require(runtime.ready()) { "Ubuntu runtime is not ready." }
@@ -19,8 +19,7 @@ internal class UbuntuClangFormatRunner(private val runtime: LinuxRuntimePaths, p
         val file = File(base, relative).canonicalFile
         require(file.toPath().startsWith(base.toPath()) && file != base && !file.isDirectory)
         val root = runtime.ubuntuRoot.canonicalFile
-        val raw = LinuxToolchainDiscovery().discover(root).find("clang-format")?.executable ?: throw IOException("clang-format is not installed in Ubuntu.")
-        val formatter = File(raw).canonicalFile
+        val formatter = toolchains.findExecutable(root, "clang-format")?.canonicalFile ?: throw IOException("clang-format is not installed in Ubuntu.")
         require(formatter.toPath().startsWith(root.toPath()) && formatter.isFile && formatter.canExecute())
         val guestFormatter = "/" + formatter.relativeTo(root).invariantSeparatorsPath
         val guestFile = "/workspace/" + file.relativeTo(base).invariantSeparatorsPath
