@@ -129,24 +129,27 @@ class ClangdProjectSession(
                 )
             }
 
-            // Sora 0.24.4 resolves definitions by exact extension or languageId.
-            // Its published dependency constructor has no languageId argument, so register
-            // one definition per extension. The editor itself supplies the LSP languageId.
-            val extensionGroups = mapOf(
-                "c" to listOf("c"),
-                "cpp" to listOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
+            // Use one server definition per LSP language, not one process per extension.
+            // clangd expects "c" or "cpp" as textDocument/didOpen.languageId; extensions
+            // such as .cc, .cxx and .hpp are not valid language IDs.
+            project.addServerDefinition(
+                CustomLanguageServerDefinition(
+                    ext = "c",
+                    serverConnectProvider = clangdConnectionProvider,
+                    name = "clangd-c",
+                    extensionsOverride = listOf("c"),
+                    languageId = "c"
+                )
             )
-            extensionGroups.forEach { (languageId, extensions) ->
-                extensions.forEach { extension ->
-                    project.addServerDefinition(
-                        CustomLanguageServerDefinition(
-                            extension,
-                            clangdConnectionProvider,
-                            "clangd-$languageId-$extension"
-                        )
-                    )
-                }
-            }
+            project.addServerDefinition(
+                CustomLanguageServerDefinition(
+                    ext = "cpp",
+                    serverConnectProvider = clangdConnectionProvider,
+                    name = "clangd-cpp",
+                    extensionsOverride = CPP_EXTENSIONS.toList(),
+                    languageId = "cpp"
+                )
+            )
             project.init()
             project.eventEmitter.addListener(diagnosticsListener)
             available = true
@@ -173,7 +176,8 @@ class ClangdProjectSession(
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
         // Pass a filesystem path, not an already-encoded URI: FileUri.toUri() encodes it once.
         val guestPath = "$GUEST_WORKSPACE/$relative"
-        return (project.getEditor(guestPath) ?: project.createEditor(guestPath)).apply {
+        val languageId = if (extension == "c") "c" else "cpp"
+        return (project.getEditor(guestPath) ?: project.createEditor(guestPath, languageId)).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
@@ -212,7 +216,8 @@ class ClangdProjectSession(
 
     private companion object {
         const val GUEST_WORKSPACE = "/workspace"
-        val SUPPORTED_EXTENSIONS = setOf("c", "cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
+        val CPP_EXTENSIONS = setOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
+        val SUPPORTED_EXTENSIONS = CPP_EXTENSIONS + "c"
     }
 }
 
