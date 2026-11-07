@@ -104,17 +104,17 @@ class ClangdProjectSession(
             require(runtime.ready()) { "Ubuntu rootfs or the bundled PRoot runtime is not ready." }
             val root = runtime.ubuntuRoot.canonicalFile
             ensureFallbackCompilationDatabase(root)
-            val selectedClangdPath = configuredClangdGuestPath ?: LinuxToolchainDiscovery()
-                .discover(root)
+            val toolchainDiscovery = LinuxToolchainDiscovery()
+            val selectedClangdPath = configuredClangdGuestPath?.also { configured ->
+                require(toolchainDiscovery.resolveExecutable(root, configured) != null) {
+                    "Configured clangd path '$configured' does not resolve to an executable inside Ubuntu. Clear the override or select a valid guest path in C/C++ Language Settings."
+                }
+            } ?: toolchainDiscovery.discover(root)
                 .find("clangd")
                 ?.executable
-                ?.let { discovered -> "/" + File(discovered).canonicalFile.relativeTo(root).invariantSeparatorsPath }
+                ?.let { discovered -> toolchainDiscovery.toGuestPath(root, File(discovered)) }
                 ?: throw IllegalStateException("clangd is not installed in the Ubuntu runtime. Install clangd from C/C++ Language Settings.")
-            require(selectedClangdPath.startsWith("/") && '\u0000' !in selectedClangdPath) {
-                "The configured clangd path must be an absolute Linux guest path."
-            }
-            val clangd = File(root, selectedClangdPath.removePrefix("/")).canonicalFile
-            require(clangd.toPath().startsWith(root.toPath()) && clangd.isFile && clangd.canExecute()) {
+            val clangd = requireNotNull(toolchainDiscovery.resolveExecutable(root, selectedClangdPath)) {
                 "clangd is missing or not executable at $selectedClangdPath. Install clangd in Ubuntu or correct its Language Settings path."
             }
 
