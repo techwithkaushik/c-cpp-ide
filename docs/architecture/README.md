@@ -156,3 +156,17 @@ Repository and product branding can change independently of Android application 
 3. Add build conventions without changing toolchain versions.
 4. Define editor/LSP contracts around the existing Sora implementation.
 5. Add integration tests for document synchronization and editor diagnostics.
+
+## 9. Gradle plugin audit — 2026-11-07
+
+- [x] Reviewed the root plugin declarations and all existing Android module build scripts.
+- [x] Moved the existing KSP plugin version (`2.3.13`) into `gradle/libs.versions.toml`.
+- [x] Registered KSP in the root plugin block with `apply false` and applied it in `:app` through the Version Catalog alias.
+- [x] Preserved the existing AGP, Kotlin, KSP, Gradle, SDK, and NDK versions.
+- [ ] Verify the KSP catalog migration and ARM32 release build in GitHub Actions. The GitHub commit-status endpoint currently reports no status entries, so this change is not yet marked CI-verified.
+- [ ] Audit source-level dependency directions before extracting new API modules.
+- [ ] Introduce `build-logic` only after the dependency and plugin audit identifies conventions that can be shared safely.
+
+### Audit observations
+
+The current project has meaningful differences between Android application, Compose library, native JNI, AIDL, and plain Android library modules. A single broad convention plugin would risk hiding those differences. Keep the existing build scripts explicit for now; first establish dependency direction and test coverage, then extract only proven shared conventions.
