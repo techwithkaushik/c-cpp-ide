@@ -63,9 +63,14 @@ class LinuxToolchainDiscoveryTest {
             return
         }
 
-        val inventory = LinuxToolchainDiscovery().discover(root, "/usr/bin")
+        val discovery = LinuxToolchainDiscovery()
+        val inventory = discovery.discover(root, "/usr/bin")
 
         assertEquals(target.absolutePath, inventory.find("clangd")?.executable)
+        // User-saved /usr/bin/clangd overrides must resolve the same absolute
+        // symlink inside Ubuntu instead of following it on the Android host.
+        assertEquals(target.absolutePath, discovery.resolveExecutable(root, "/usr/bin/clangd")?.absolutePath)
+        assertEquals("/usr/lib/llvm-19/bin/clangd", discovery.toGuestPath(root, target))
     }
 
     @Test
