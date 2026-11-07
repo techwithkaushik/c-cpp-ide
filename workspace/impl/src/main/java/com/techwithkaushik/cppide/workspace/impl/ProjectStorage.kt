@@ -45,11 +45,11 @@ class ProjectStorage(context: Context) : WorkspaceRepository {
     }
 
     @Synchronized
-    override fun createEmptyProject(name: String, language: String, includeReadme: Boolean = false, initializeGit: Boolean = false): WorkspaceProject =
+    override fun createEmptyProject(name: String, language: String, includeReadme: Boolean, initializeGit: Boolean): WorkspaceProject =
         createProjectInternal(name, language, null, "", includeReadme, initializeGit)
 
     @Synchronized
-    override fun createProject(name: String, language: String, starterName: String, starterContent: String, includeReadme: Boolean = true, initializeGit: Boolean = false): WorkspaceProject =
+    override fun createProject(name: String, language: String, starterName: String, starterContent: String, includeReadme: Boolean, initializeGit: Boolean): WorkspaceProject =
         createProjectInternal(name, language, starterName, starterContent, includeReadme, initializeGit)
 
     private fun createProjectInternal(name: String, language: String, starterName: String?, starterContent: String, includeReadme: Boolean, initializeGit: Boolean): WorkspaceProject {
