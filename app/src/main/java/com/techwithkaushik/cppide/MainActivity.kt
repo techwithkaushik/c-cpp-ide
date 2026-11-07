@@ -1595,6 +1595,17 @@ private fun WorkspaceScreen(
                 Text("Ln " + cursorLine + ", Col " + cursorColumn, color = Color.White, fontSize = 10.sp)
                 Spacer(Modifier.width(10.dp))
                 Text(lspStatus.label, color = if (lspStatus.error) Color(0xFFFF8A80) else if (lspStatus.connected) Color(0xFFB7F0C0) else Color.White, fontSize = 9.sp, maxLines = 1)
+                val errorCount = editorProblems.count { it.severity == "Error" }
+                val warningCount = editorProblems.count { it.severity == "Warning" }
+                if (errorCount > 0 || warningCount > 0) {
+                    Text(
+                        (if (errorCount > 0) "×" + errorCount else "") +
+                            (if (warningCount > 0) "  !" + warningCount else ""),
+                        Modifier.clickable { onPanel(ToolPanel.Problems) },
+                        color = if (errorCount > 0) Color(0xFFFF8A80) else Color(0xFFE5B978),
+                        fontSize = 10.sp
+                    )
+                }
                 Spacer(Modifier.width(10.dp))
                 Text(when (activeFile.substringAfterLast(".", "").lowercase()) { "cpp", "cc", "cxx", "hpp", "h" -> "C++"; "c" -> "C"; "py" -> "Python"; "js", "mjs" -> "JavaScript"; "ts", "tsx" -> "TypeScript"; "html", "htm" -> "HTML"; "css" -> "CSS"; "json" -> "JSON"; "md" -> "Markdown"; "sh", "bash" -> "Shell"; "rs" -> "Rust"; else -> "Plain Text" } + "  •  UTF-8", color = Color.White, fontSize = 10.sp)
             }
@@ -2131,11 +2142,46 @@ private fun ToolPanelContent(
                 }
             }
             ToolPanel.Output -> {
-                ToolStatusCard("PROGRAM OUTPUT", "No output yet", "Run output will appear here after execution support is connected.", "Execution target: Linux environment", IdeAccent)
-                Box(
-                    Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF0B0F14), RoundedCornerShape(10.dp)).padding(IdeDesignTokens.Spacing.md)
-                ) {
-                    Text("Waiting for program execution…", color = IdeMuted, fontFamily = FontFamily.Monospace, fontSize = IdeDesignTokens.Typography.caption)
+                val result = buildResult
+                ToolStatusCard(
+                    "RUN OUTPUT",
+                    when {
+                        building -> "Build and run in progress…"
+                        result == null -> "No execution yet"
+                        result.runSucceeded -> "Program completed successfully"
+                        result.timedOut -> "Program timed out"
+                        result.error != null -> "Execution failed"
+                        result.compileExitCode != 0 -> "Compilation failed"
+                        else -> "Program exited with code " + (result.runExitCode ?: "unknown")
+                    },
+                    result?.error ?: "Output from the latest Build & Run operation.",
+                    if (result == null) "Run target: Ubuntu / PRoot" else
+                        "Compile exit: " + (result.compileExitCode ?: "—") + "  ·  Program exit: " + (result.runExitCode ?: "—"),
+                    if (result?.runSucceeded == true) IdeGreen else if (result?.error != null || result?.timedOut == true) Color(0xFFFF8A80) else IdeAccent
+                )
+                if (result == null) {
+                    Text("Open Build and run a C/C++ source file. The latest compiler messages and program output will appear here.", color = IdeMuted, fontSize = 11.sp)
+                } else {
+                    if (result.compilerOutput.isNotBlank()) {
+                        Text("COMPILER MESSAGES", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            result.compilerOutput,
+                            Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState())
+                                .background(Color(0xFF0B0F14), RoundedCornerShape(8.dp)).padding(8.dp),
+                            color = Color(0xFFD5DCE5),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Text("PROGRAM OUTPUT", color = IdeMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        result.programOutput.ifBlank { "(no program output)" },
+                        Modifier.fillMaxWidth().heightIn(max = 160.dp).verticalScroll(rememberScrollState())
+                            .background(Color(0xFF0B0F14), RoundedCornerShape(8.dp)).padding(8.dp),
+                        color = Color(0xFFD5DCE5),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp
+                    )
                 }
             }
         }
