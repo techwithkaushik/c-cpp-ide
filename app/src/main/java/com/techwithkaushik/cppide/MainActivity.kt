@@ -1970,6 +1970,9 @@ private fun BottomToolButton(label: String, icon: String, selected: Boolean, onC
     }
 }
 
+private val CompilerDiagnosticPattern =
+    Regex("""^(.+?):(\d+):(\d+):\s*(fatal error|error|warning|note):\s*(.*)$""")
+
 @Composable
 private fun ToolPanelContent(
     selected: ToolPanel,
@@ -1989,6 +1992,28 @@ private fun ToolPanelContent(
     var building by remember(projectName, activeFile) { mutableStateOf(false) }
     var buildResult by remember(projectName, activeFile) { mutableStateOf<EmbeddedCppBuildRunner.Result?>(null) }
     var buildError by remember(projectName, activeFile) { mutableStateOf<String?>(null) }
+    val compilerProblems = remember(buildResult, activeFile) {
+        buildResult?.compilerOutput.orEmpty().lineSequence().mapNotNull { outputLine ->
+            val match = CompilerDiagnosticPattern.find(outputLine) ?: return@mapNotNull null
+            val reportedPath = match.groupValues[1].substringAfter("/workspace/", match.groupValues[1])
+            EditorProblem(
+                filePath = if (reportedPath.startsWith("/")) activeFile else reportedPath.removePrefix("./"),
+                line = match.groupValues[2].toIntOrNull() ?: return@mapNotNull null,
+                column = match.groupValues[3].toIntOrNull() ?: 1,
+                severity = when (match.groupValues[4]) {
+                    "fatal error", "error" -> "Error"
+                    "warning" -> "Warning"
+                    else -> "Information"
+                },
+                message = match.groupValues[5]
+            )
+        }.toList()
+    }
+    val visibleProblems = remember(problems, compilerProblems) {
+        (problems + compilerProblems).distinctBy {
+            listOf(it.filePath, it.line.toString(), it.column.toString(), it.severity, it.message).joinToString("|")
+        }.sortedWith(compareBy<EditorProblem>({ it.filePath }, { it.line }, { it.column }))
+    }
 
     // The terminal view can hold focus and consume Android Back as Escape.
     // Give the open tool panel an explicit Back handler so it always dismisses.
@@ -2086,18 +2111,18 @@ private fun ToolPanelContent(
                 }
             }
             ToolPanel.Problems -> {
-                val errors = problems.count { it.severity == "Error" }
-                val warnings = problems.count { it.severity == "Warning" }
+                val errors = visibleProblems.count { it.severity == "Error" }
+                val warnings = visibleProblems.count { it.severity == "Warning" }
                 ToolStatusCard(
                     "DIAGNOSTICS",
                     when {
                         lspStatus.error -> "Language server unavailable"
-                        problems.isEmpty() && lspStatus.connected -> "No problems"
-                        problems.isEmpty() -> "Waiting for diagnostics"
-                        else -> problems.size.toString() + " problem(s)"
+                        visibleProblems.isEmpty() && lspStatus.connected -> "No problems"
+                        visibleProblems.isEmpty() -> "Waiting for diagnostics"
+                        else -> visibleProblems.size.toString() + " problem(s)"
                     },
                     lspStatus.detail,
-                    errors.toString() + " errors  ·  " + warnings + " warnings  ·  " + problems.size + " total",
+                    errors.toString() + " errors  ·  " + warnings + " warnings  ·  " + visibleProblems.size + " total",
                     when {
                         errors > 0 -> Color(0xFFFF8A80)
                         warnings > 0 -> Color(0xFFE5B978)
@@ -2105,7 +2130,7 @@ private fun ToolPanelContent(
                         else -> IdeAccent
                     }
                 )
-                if (problems.isEmpty()) {
+                if (visibleProblems.isEmpty()) {
                     Text(
                         if (lspStatus.error) lspStatus.detail else "clangd diagnostics will appear here as you edit C/C++ files.",
                         color = IdeMuted,
@@ -2113,7 +2138,7 @@ private fun ToolPanelContent(
                     )
                 } else {
                     LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-                        items(problems) { problem ->
+                        items(visibleProblems) { problem ->
                             Row(
                                 Modifier.fillMaxWidth()
                                     .clickable { onProblemSelected(problem) }
