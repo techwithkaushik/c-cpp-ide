@@ -1,20 +1,21 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
 import java.io.File
 import java.nio.file.Files
 
 /** Simple app-private paths for the extracted distro and bundled Android PRoot. */
-class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) {
+class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null) : LinuxRuntimeEnvironment {
     val base = filesDir
     val distro = File(filesDir, "ubuntu")
     private val legacyDistro = File(filesDir, "rootfs")
     val ubuntuArchitecture: String = if (System.getProperty("os.arch")?.contains("64") == true) "arm64" else "armhf"
-    val ubuntuRoot: File get() = distro
+    override val ubuntuRoot: File get() = distro
     val usr = File(filesDir, "usr")
-    val usrTmp = File(usr, "tmp")
+    override val usrTmp = File(usr, "tmp")
     val usrBin = File(usr, "bin")
-    val proot = File(usrBin, "proot")
-    val prootLoader = File(usrBin, "libproot-loader.so")
+    override val proot = File(usrBin, "proot")
+    override val prootLoader = File(usrBin, "libproot-loader.so")
     val marker = File(base, "runtime.properties")
     val staging = File(base, "staging")
 
@@ -26,7 +27,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     }
 
     /** Android-native executables must resolve to the APK's executable nativeLibraryDir. */
-    val nativeLibraryDir: File? by lazy {
+    override val nativeLibraryDir: File? by lazy {
         bundledNativeLibraryDir?.takeIf { it.isNotBlank() }?.let(::File)
             ?: runCatching {
                 File("/proc/self/maps").useLines { lines ->
@@ -38,7 +39,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
             }.getOrNull()
     }
 
-    fun ensureDirectories() {
+    override fun ensureDirectories() {
         migrateLegacyRootfs()
         listOf(base, distro, usrTmp, usrBin, staging).forEach {
             if (!it.exists() && !it.mkdirs()) throw IllegalStateException("Cannot create runtime directory: $it")
@@ -127,7 +128,7 @@ class LinuxRuntimePaths(filesDir: File, bundledNativeLibraryDir: String? = null)
     }
 
     fun hasProot(): Boolean = proot.isFile && prootLoader.isFile
-    fun ready(): Boolean = hasRootfs() && hasProot()
+    override fun ready(): Boolean = hasRootfs() && hasProot()
 
     companion object {
         private const val CURRENT_INSTALLER_VERSION = 5
