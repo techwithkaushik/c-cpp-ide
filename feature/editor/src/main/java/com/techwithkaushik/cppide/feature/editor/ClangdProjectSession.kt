@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -256,6 +257,24 @@ class ClangdProjectSession(
                 "file" to editor.uri.path,
                 "attached" to (editor.editor != null)
             ))
+        }
+    }
+
+    /** Notify clangd after the corresponding workspace file has been written successfully. */
+    fun saveDocument(relativeFilePath: String) {
+        val safeFile = File(workspace, relativeFilePath).canonicalFile
+        if (!safeFile.toPath().startsWith(workspace.toPath())) return
+        val guestPath = "$GUEST_WORKSPACE/${safeFile.relativeTo(workspace).invariantSeparatorsPath}"
+        val editor = project.getEditor(guestPath) ?: return
+        if (!editor.isConnected) return
+        editor.coroutineScope.launch {
+            runCatching { editor.saveDocument() }
+                .onSuccess {
+                    DeveloperLog.event("ClangdLsp", "document_saved", mapOf("file" to relativeFilePath))
+                }
+                .onFailure { error ->
+                    DeveloperLog.failure("ClangdLsp", "document_save_notification_failed", error, mapOf("file" to relativeFilePath))
+                }
         }
     }
 
