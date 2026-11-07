@@ -2231,6 +2231,7 @@ private fun ToolPanelContent(
                     when {
                         building -> "Building and running…"
                         buildResult?.runSucceeded == true -> "Build and run succeeded"
+                        buildResult?.compileSucceeded == true && buildResult.runExitCode == null -> "Project build succeeded"
                         buildResult?.compileSucceeded == true -> "Compiled; program returned a non-zero exit code"
                         buildResult?.timedOut == true -> "Command timed out"
                         buildResult?.error != null -> "Build failed"
@@ -2241,6 +2242,34 @@ private fun ToolPanelContent(
                     if (supportedSource) "$projectName / $activeFile" else "Open a .c, .cc, .cpp or .cxx source file",
                     if (buildResult?.runSucceeded == true) IdeGreen else IdeAccent
                 )
+                OutlinedButton(
+                    enabled = !building,
+                    onClick = {
+                        building = true
+                        buildResult = null
+                        buildError = null
+                        buildScope.launch {
+                            try {
+                                buildResult = withContext(Dispatchers.IO) {
+                                    if (activeFile.isNotBlank()) {
+                                        ProjectStorage(context).writeFile(projectName, activeFile, code)
+                                    }
+                                    buildRunner.buildProject(projectName)
+                                }
+                            } catch (error: Exception) {
+                                buildError = error.message ?: error.javaClass.simpleName
+                            } finally {
+                                building = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (building) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else IdeIcon("hammer", IdeAccent, 16.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (building) "Building…" else "Build Project")
+                }
                 Button(
                     enabled = supportedSource && !building,
                     onClick = {
