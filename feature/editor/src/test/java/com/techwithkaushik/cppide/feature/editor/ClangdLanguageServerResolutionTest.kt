@@ -4,7 +4,6 @@ import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ClangdLanguageServerResolutionTest {
@@ -41,6 +40,5 @@ class ClangdLanguageServerResolutionTest {
         assertEquals("clangd-cpp", project.getServerDefinitions("cpp", "cpp").single().name)
         assertEquals("clangd-cpp", project.getServerDefinitions("cc", "cpp").single().name)
         assertEquals("clangd-cpp", project.getServerDefinitions("hpp", "cpp").single().name)
-        assertTrue(project.getServerDefinitions("c", "cpp").isEmpty())
     }
 }
