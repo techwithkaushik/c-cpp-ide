@@ -19,7 +19,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:aidl"))
+    implementation(project(":core:ipc"))
     implementation(project(":core:jni"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
