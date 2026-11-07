@@ -19,6 +19,7 @@ kotlin {
 }
 
 dependencies {
+    api(project(":workspace:api"))
     implementation(project(":core:logging"))
     testImplementation(libs.junit)
 }
