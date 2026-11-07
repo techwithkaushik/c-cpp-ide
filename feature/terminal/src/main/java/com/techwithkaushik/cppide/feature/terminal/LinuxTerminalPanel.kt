@@ -83,9 +83,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
-import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeOperations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -324,15 +322,13 @@ private object LinuxTerminalSessions {
 
 @Composable
 fun LinuxTerminalPanel(
+    runtime: LinuxRuntimeOperations,
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit = {},
     onCloseTerminal: () -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
-    val paths = remember(context) {
-        // Use the same authoritative APK native-library path as Runtime Settings.
-        LinuxRuntimePaths(context.filesDir, context.applicationInfo.nativeLibraryDir)
-    }
+    val paths = runtime.environment
     val terminalPreferences = remember(context) { context.getSharedPreferences(IdeDesignTokens.Preference.FILE, Context.MODE_PRIVATE) }
     var terminalFontSize by remember { mutableIntStateOf(terminalPreferences.getInt(IdeDesignTokens.Preference.TERMINAL_FONT_SIZE, IdeDesignTokens.Metrics.DEFAULT_TERMINAL_FONT_SIZE).coerceIn(10, 28)) }
     var scrollbackLines by remember { mutableIntStateOf(terminalPreferences.getInt("terminal_scrollback_lines", 5_000).coerceIn(1_000, 10_000)) }
@@ -473,8 +469,8 @@ fun LinuxTerminalPanel(
                         val validationMessage = when {
                             !paths.hasRootfs() -> "Ubuntu rootfs is not installed or incomplete."
                             else -> {
-                                ProotDownloader(paths).downloadAndInstall()
-                                val smoke = LinuxRuntimeSmokeTest(paths).run()
+                                runtime.validateProot()
+                                val smoke = runtime.runSmokeTest()
                                 if (!smoke.success) {
                                     DeveloperLog.error(
                                         context,
@@ -498,7 +494,7 @@ fun LinuxTerminalPanel(
                     } else {
                         // Re-check the APK-owned executables and rootfs markers even when
                         // reusing a recent successful shell smoke test.
-                        ProotDownloader(paths).downloadAndInstall()
+                        runtime.validateProot()
                         check(paths.hasRootfs() && paths.hasProot()) {
                             "Ubuntu runtime files changed after the last successful validation. Reopen Runtime & Bootstrap. ${paths.rootfsDiagnostic()}"
                         }
