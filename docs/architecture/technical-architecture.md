@@ -30,7 +30,7 @@ The current implementation is organized in these modules:
 | Gradle path | Current responsibility |
 |---|---|
 | `:app` | Android application, Compose shell, startup, dependency composition |
-| `:core:contracts` | Editor diagnostics, runtime/toolchain access, and workspace identity contracts |\n| `:core:aidl` | AIDL contracts for service/process communication |
+| `:core:contracts` | Editor diagnostics, Linux runtime/toolchain access, and workspace identity contracts |\n| `:lsp:api` | Language service status and session lifecycle contract |\n| `:core:aidl` | AIDL contracts for service/process communication |
 | `:core:jni` | Native C/C++ and PTY bridge |
 | `:core:lsp` | Existing language-server integration |
 | `:core:designsystem` | Shared Compose design system |
