@@ -35,6 +35,56 @@ internal class EmbeddedCppBuildRunner(context: Context) {
         val runSucceeded: Boolean get() = compileSucceeded && runExitCode == 0 && !timedOut
     }
 
+    /** Build the workspace using its declared CMake or Make build system. */
+    fun buildProject(projectName: String, timeoutSeconds: Long = 120): Result {
+        require(timeoutSeconds in 1..300) { "Project build timeout must be between 1 and 300 seconds." }
+        val project = storage.listProjects().firstOrNull { it.name == projectName }
+            ?: return failure(projectName, "Project not found.")
+        val workspace = project.directory.canonicalFile
+        runtime.ensureDirectories()
+        if (!runtime.ready()) return failure(projectName, "Ubuntu rootfs or PRoot is not installed.")
+        val buildDirectory = File(workspace, ".cppide-build")
+        if (!buildDirectory.exists() && !buildDirectory.mkdirs()) {
+            return failure(projectName, "Unable to create the project build directory.")
+        }
+        val cmakeFile = File(workspace, "CMakeLists.txt")
+        val makeFile = listOf(File(workspace, "Makefile"), File(workspace, "makefile"))
+            .firstOrNull(File::isFile)
+        val output = StringBuilder()
+        var finalCommand: CommandResult
+        if (cmakeFile.isFile) {
+            val configure = execute(
+                listOf("cmake", "-S", "/workspace", "-B", "/workspace/.cppide-build/cmake"),
+                workspace,
+                timeoutSeconds
+            )
+            if (configure.output.isNotBlank()) output.append(configure.output)
+            if (configure.exitCode != 0 || configure.timedOut || configure.error != null) {
+                return Result(cmakeFile.absolutePath, "", configure.exitCode, null, output.toString(), "", configure.timedOut, configure.error)
+            }
+            finalCommand = execute(
+                listOf("cmake", "--build", "/workspace/.cppide-build/cmake", "--parallel", "2"),
+                workspace,
+                timeoutSeconds
+            )
+        } else if (makeFile != null) {
+            finalCommand = execute(listOf("make", "--jobs=2"), workspace, timeoutSeconds)
+        } else {
+            return failure(projectName, "No CMakeLists.txt or Makefile was found. Add a build script to build the whole project.")
+        }
+        if (finalCommand.output.isNotBlank()) output.append(finalCommand.output)
+        return Result(
+            sourcePath = projectName,
+            executablePath = buildDirectory.absolutePath,
+            compileExitCode = finalCommand.exitCode,
+            runExitCode = null,
+            compilerOutput = output.toString(),
+            programOutput = "",
+            timedOut = finalCommand.timedOut,
+            error = finalCommand.error
+        )
+    }
+
     fun buildAndRun(
         projectName: String,
         relativeSourcePath: String,
