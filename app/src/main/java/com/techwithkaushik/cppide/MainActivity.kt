@@ -18,6 +18,7 @@ import com.techwithkaushik.cppide.feature.editor.SoraCodeEditor
 import com.techwithkaushik.cppide.feature.editor.SoraEditorController
 import com.techwithkaushik.cppide.feature.editor.ClangdProjectSession
 import com.techwithkaushik.cppide.workspace.impl.ProjectStorage
+import com.techwithkaushik.cppide.workspace.api.WorkspaceRepository
 import com.techwithkaushik.cppide.core.contracts.workspace.WorkspaceIdentity
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import com.techwithkaushik.cppide.feature.editor.EditorLspStatus
@@ -171,7 +172,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> Unit) {
     val appContext = LocalContext.current.applicationContext
-    val projectStorage = remember(appContext) { ProjectStorage(appContext) }
+    val workspaceRepository: WorkspaceRepository = remember(appContext) { ProjectStorage(appContext) }
     var runtimeValidationComplete by remember { mutableStateOf(false) }
 
     // Validate the app-owned Ubuntu runtime once on every cold app launch.
@@ -288,7 +289,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     var drawerSidebarOpen by rememberSaveable { mutableStateOf(false) }
     val projects = remember(projectStorage) {
         mutableStateListOf<IdeProject>().apply {
-            projectStorage.listProjects().forEach { project ->
+            workspaceRepository.listProjects().forEach { project ->
                 add(IdeProject(project.name, project.language, project.path, "Saved"))
             }
         }
@@ -298,7 +299,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
     }
     val workspaceDirectory = remember(selectedProject) {
-        projectStorage.listProjects().firstOrNull { it.name == selectedProject }?.directory
+        workspaceRepository.listProjects().firstOrNull { it.name == selectedProject }?.directory
     }
     val clangdGuestPath = remember(appContext, screen) {
         ToolPathPreferences(appContext).getExecutable("c-cpp", "clangd")
@@ -345,7 +346,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 val formatted = withContext(Dispatchers.IO) {
                     UbuntuClangFormatRunner(runtimePaths, workspace).format(activeFile, code)
                 }
-                withContext(Dispatchers.IO) { projectStorage.writeFile(selectedProject, activeFile, formatted) }
+                withContext(Dispatchers.IO) { workspaceRepository.writeFile(selectedProject, activeFile, formatted) }
                 code = formatted; fileContents[activeFile] = formatted; dirtyFiles.remove(activeFile)
                 clangdSession?.saveDocument(activeFile)
                 DeveloperLog.info(appContext, "ClangFormat", "Formatted and saved $activeFile")
@@ -394,7 +395,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     if (fileToClose == activeFile) fileContents[fileToClose] = code
                     val contents = fileContents[fileToClose].orEmpty()
                     pendingCloseError = null
-                    runCatching { projectStorage.writeFile(selectedProject, fileToClose, contents) }
+                    runCatching { workspaceRepository.writeFile(selectedProject, fileToClose, contents) }
                         .onSuccess {
                             dirtyFiles.remove(fileToClose)
                             pendingCloseFile = null
@@ -447,11 +448,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 projects = projects,
                 onOpen = { project ->
                     selectedProject = project.name
-                    val diskFiles = runCatching { projectStorage.listFiles(project.name) }.getOrDefault(emptyList())
+                    val diskFiles = runCatching { workspaceRepository.listFiles(project.name) }.getOrDefault(emptyList())
                     workspaceFiles.clear()
                     workspaceFiles.addAll(diskFiles)
                     workspaceDirectories.clear()
-                    workspaceDirectories.addAll(projectStorage.listDirectories(project.name))
+                    workspaceDirectories.addAll(workspaceRepository.listDirectories(project.name))
                     fileContents.clear()
                     openFiles.clear()
                     dirtyFiles.clear()
@@ -462,7 +463,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     screen = IdeScreen.Workspace
                     if (lastFile != null) {
                         scope.launch {
-                            val content = withContext(Dispatchers.IO) { runCatching { projectStorage.readFile(project.name, lastFile) }.getOrNull() }
+                            val content = withContext(Dispatchers.IO) { runCatching { workspaceRepository.readFile(project.name, lastFile) }.getOrNull() }
                             if (selectedProject == project.name && screen == IdeScreen.Workspace && content != null) {
                                 fileContents[lastFile] = content
                                 openFile(lastFile)
@@ -597,31 +598,31 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                                 scope.launch { drawerState.close() }
                                             },
                                             onCreateFolder = { folder ->
-                                                withContext(Dispatchers.IO) { projectStorage.createDirectory(selectedProject, folder) }
+                                                withContext(Dispatchers.IO) { workspaceRepository.createDirectory(selectedProject, folder) }
                                                 workspaceDirectories.clear()
-                                                workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                workspaceDirectories.addAll(withContext(Dispatchers.IO) { workspaceRepository.listDirectories(selectedProject) })
                                             },
                                             onRenameEntry = { oldPath, newName ->
                                                 scope.launch {
-                                                    runCatching { withContext(Dispatchers.IO) { projectStorage.renameEntry(selectedProject, oldPath, newName) } }
-                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { projectStorage.listFiles(selectedProject) })
-                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                    runCatching { withContext(Dispatchers.IO) { workspaceRepository.renameEntry(selectedProject, oldPath, newName) } }
+                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { workspaceRepository.listFiles(selectedProject) })
+                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { workspaceRepository.listDirectories(selectedProject) })
                                                 }
                                             },
                                             onDeleteEntry = { path ->
                                                 scope.launch {
-                                                    runCatching { withContext(Dispatchers.IO) { projectStorage.deleteEntry(selectedProject, path) } }
-                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { projectStorage.listFiles(selectedProject) })
-                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                    runCatching { withContext(Dispatchers.IO) { workspaceRepository.deleteEntry(selectedProject, path) } }
+                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { workspaceRepository.listFiles(selectedProject) })
+                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { workspaceRepository.listDirectories(selectedProject) })
                                                     openFiles.remove(path); fileContents.remove(path); dirtyFiles.remove(path)
                                                     if (activeFile == path) { activeFile = ""; code = "" }
                                                 }
                                             },
                                             onMoveEntry = { path, target ->
                                                 scope.launch {
-                                                    runCatching { withContext(Dispatchers.IO) { projectStorage.moveEntry(selectedProject, path, target) } }
-                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { projectStorage.listFiles(selectedProject) })
-                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { projectStorage.listDirectories(selectedProject) })
+                                                    runCatching { withContext(Dispatchers.IO) { workspaceRepository.moveEntry(selectedProject, path, target) } }
+                                                    workspaceFiles.clear(); workspaceFiles.addAll(withContext(Dispatchers.IO) { workspaceRepository.listFiles(selectedProject) })
+                                                    workspaceDirectories.clear(); workspaceDirectories.addAll(withContext(Dispatchers.IO) { workspaceRepository.listDirectories(selectedProject) })
                                                 }
                                             },
                                             onClose = { drawerSidebarOpen = false },
@@ -660,7 +661,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                                     var saveFailed = false
                                                     dirtyFiles.toList().forEach { file ->
                                                         val contents = if (file == activeFile) code else fileContents[file].orEmpty()
-                                                        runCatching { projectStorage.writeFile(selectedProject, file, contents) }
+                                                        runCatching { workspaceRepository.writeFile(selectedProject, file, contents) }
                                                             .onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }
                                                             .onFailure { saveFailed = true }
                                                     }
@@ -718,7 +719,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                             "Run", "Output" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                             "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                            "Save" -> runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code; clangdSession?.saveDocument(activeFile) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                            "Save" -> runCatching { workspaceRepository.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code; clangdSession?.saveDocument(activeFile) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                             "Format Document" -> editorController.format()
                             "Undo" -> editorController.undo()
                             "Redo" -> editorController.redo()
@@ -731,7 +732,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
                             "Save All" -> {
                                 fileContents[activeFile] = code
-                                dirtyFiles.toList().forEach { file -> runCatching { projectStorage.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
+                                dirtyFiles.toList().forEach { file -> runCatching { workspaceRepository.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
                             }
                             "Settings" -> { settingsReturnScreen = screen; screen = IdeScreen.Settings }
                             "File Explorer" -> { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } }
@@ -799,7 +800,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                             "Toggle Word Wrap" -> editorWordWrap = !editorWordWrap
                                             "Save" -> {
                                                 fileContents[activeFile] = code
-                                                runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }
+                                                runCatching { workspaceRepository.writeFile(selectedProject, activeFile, code) }
                                                     .onSuccess { dirtyFiles.remove(activeFile); clangdSession?.saveDocument(activeFile) }
                                                     .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                                             }
@@ -807,7 +808,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                                 fileContents[activeFile] = code
                                                 dirtyFiles.toList().forEach { file ->
                                                     val content = fileContents[file] ?: ""
-                                                    runCatching { projectStorage.writeFile(selectedProject, file, content) }
+                                                    runCatching { workspaceRepository.writeFile(selectedProject, file, content) }
                                                         .onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }
                                                         .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                                                 }
@@ -1038,7 +1039,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         safeName.none { it == 92.toChar() || it.isISOControl() }
                     if (validName && safeName !in workspaceFiles) {
                         val starter = sampleCode(safeName)
-                        runCatching { projectStorage.writeFile(selectedProject, safeName, starter) }
+                        runCatching { workspaceRepository.writeFile(selectedProject, safeName, starter) }
                             .onSuccess {
                                 workspaceFiles.add(safeName)
                                 fileContents[safeName] = starter
@@ -1064,7 +1065,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             confirmButton = {
                 Button(
                     onClick = {
-                        runCatching { projectStorage.deleteProject(projectNameToDelete) }
+                        runCatching { workspaceRepository.deleteProject(projectNameToDelete) }
                             .onSuccess {
                                 projects.removeAll { it.name == projectNameToDelete }
                                 if (selectedProject == projectNameToDelete) {
@@ -1193,16 +1194,16 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     }
                     val entryFile = entryFileForLanguage(newProjectLanguage)
                     runCatching {
-                        if (createEmptyProject) projectStorage.createEmptyProject(name, newProjectLanguage, includeReadme = false, initializeGit = initializeGit)
-                        else projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile), createReadme, initializeGit)
+                        if (createEmptyProject) workspaceRepository.createEmptyProject(name, newProjectLanguage, includeReadme = false, initializeGit = initializeGit)
+                        else workspaceRepository.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile), createReadme, initializeGit)
                     }.onSuccess { stored ->
                         projects.add(0, IdeProject(stored.name, stored.language, stored.path, "Just now"))
                         selectedProject = name
-                        val diskFiles = projectStorage.listFiles(name)
+                        val diskFiles = workspaceRepository.listFiles(name)
                         workspaceFiles.clear()
                         workspaceFiles.addAll(diskFiles)
                         workspaceDirectories.clear()
-                        workspaceDirectories.addAll(projectStorage.listDirectories(name))
+                        workspaceDirectories.addAll(workspaceRepository.listDirectories(name))
                         fileContents.clear()
                         openFiles.clear()
                         dirtyFiles.clear()
@@ -2256,7 +2257,7 @@ private fun ToolPanelContent(
                             try {
                                 buildResult = withContext(Dispatchers.IO) {
                                     if (activeFile.isNotBlank()) {
-                                        ProjectStorage(context).writeFile(projectName, activeFile, code)
+                                        workspaceRepository.writeFile(projectName, activeFile, code)
                                     }
                                     buildRunner.buildProject(projectName)
                                 }
@@ -2283,7 +2284,7 @@ private fun ToolPanelContent(
                         buildScope.launch {
                             try {
                                 buildResult = withContext(Dispatchers.IO) {
-                                    ProjectStorage(context).writeFile(projectName, activeFile, code)
+                                    workspaceRepository.writeFile(projectName, activeFile, code)
                                     buildRunner.buildAndRun(projectName, activeFile)
                                 }
                             } catch (error: Exception) {
