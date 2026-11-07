@@ -290,7 +290,7 @@ class ClangdProjectSession(
             editor.isEnableInlayHint = true
             mutableStatus.value = EditorLspStatus(
                 "clangd connected",
-                "LSP initialized and the document was opened. Completion, diagnostics, hover and signature help are active.",
+                "LSP initialization completed and the document opened. Individual language features still require runtime verification.",
                 connected = true
             )
             DeveloperLog.event("ClangdLsp", "connect_succeeded", mapOf(
@@ -327,6 +327,10 @@ class ClangdProjectSession(
         val safeFile = File(workspace, relativeFilePath).canonicalFile
         if (!safeFile.toPath().startsWith(workspace.toPath())) return
         val guestPath = "$GUEST_WORKSPACE/${safeFile.relativeTo(workspace).invariantSeparatorsPath}"
+        // New files and renamed source files need fresh compilation commands.
+        // Refresh before didSave so clangd can pick up the updated database.
+        runCatching { ensureFallbackCompilationDatabase(runtime.ubuntuRoot.canonicalFile) }
+            .onFailure { DeveloperLog.failure("ClangdLsp", "compile_commands_refresh_failed", it) }
         val editor = project.getEditor(guestPath) ?: return
         if (!editor.isConnected) return
         editor.coroutineScope.launch {
