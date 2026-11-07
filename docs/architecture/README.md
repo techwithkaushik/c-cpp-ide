@@ -19,8 +19,8 @@ The application is the composition root. Features communicate through stable con
 | `:core:logging` | Shared structured developer logging | `core:logging` |
 | `:lsp:api` | Language service status and session lifecycle contract | `lsp/api` |
 | `:ui:design-system` | Compose design tokens and theme primitives | `ui/design-system` |
-| `:feature:editor` | Sora editor adapter, TextMate grammar and clangd integration | `editor` |
-| `:feature:terminal` | Terminal UI, local PTY session, SSH shell session and terminal components | `terminal` |
+| `:editor` | Sora editor adapter, TextMate grammar and clangd integration | `editor` |
+| `:terminal` | Terminal UI, local PTY session, SSH shell session and terminal components | `terminal` |
 | `:integrations:toolchain` | Linux toolchain discovery and bootstrap artifact handling | `runtime:toolchains` |
 | `:integrations:linux-runtime` | PRoot, rootfs install/validation and guest compatibility | `runtime` |
 | `:workspace:api` | Workspace repository and project model contracts | `workspace/api` |
@@ -193,7 +193,7 @@ This is the first live contract migration. Do not move terminal, workspace, or r
 
 - [x] Added `LinuxRuntimeEnvironment` and `LinuxToolchainAccess` contracts under `:core:contracts`.
 - [x] Made the Linux runtime paths and toolchain discovery implementations implement those contracts.
-- [x] Removed concrete Linux runtime and toolchain dependencies from `:feature:editor`; the app composition root now supplies the implementations.
+- [x] Removed concrete Linux runtime and toolchain dependencies from `:editor`; the app composition root now supplies the implementations.
 - [x] Added `:workspace:api` with `WorkspaceRepository` and `WorkspaceProject`.
 - [x] Added `:workspace:impl` and moved project storage out of `:app`.
 - [x] Updated the app to consume the workspace repository interface while keeping the existing app-private storage layout and metadata format.
@@ -219,8 +219,8 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 
 ## 13. Terminal session ownership migration — 2026-11-07
 
-- [x] Moved the real local PTY session implementation from `:integrations:linux-runtime` into `:feature:terminal`.
-- [x] Moved SSH host configuration, host-key pinning, and SSH shell session implementation into `:feature:terminal`.
+- [x] Moved the real local PTY session implementation from `:integrations:linux-runtime` into `:terminal`.
+- [x] Moved SSH host configuration, host-key pinning, and SSH shell session implementation into `:terminal`.
 - [x] Kept Android supplementary-group compatibility repair in the Linux runtime module and made terminal PTY startup consume that runtime-owned helper.
 - [x] Removed the JSch dependency from `:integrations:linux-runtime`; SSH dependency remains with the terminal module.
 - [ ] Verify terminal session relocation and ABI-specific release packaging with CI.
@@ -230,7 +230,7 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 
 ## 14. Terminal/runtime ownership map correction
 
-The local PTY session and SSH shell/session implementation now belong to `:feature:terminal`. PRoot, rootfs acquisition/extraction, executable validation, runtime smoke tests, and guest compatibility remain in `:integrations:linux-runtime`. The remaining direct calls from terminal UI into runtime installers are an adapter boundary still to be completed; this migration does not claim that separation is finished.
+The local PTY session and SSH shell/session implementation now belong to `:terminal`. PRoot, rootfs acquisition/extraction, executable validation, runtime smoke tests, and guest compatibility remain in `:integrations:linux-runtime`. The remaining direct calls from terminal UI into runtime installers are an adapter boundary still to be completed; this migration does not claim that separation is finished.
 
 
 ## 15. IPC module ownership migration
@@ -260,5 +260,15 @@ The local PTY session and SSH shell/session implementation now belong to `:featu
 - [x] Updated app composition to create the runtime adapter and inject it into terminal UI.
 - [x] Updated active and retained terminal/runtime setup panels to call the runtime operations contract rather than instantiate rootfs installers or PRoot validators.
 - [x] Moved resolver preparation and guest compatibility behind the runtime environment contract.
-- [x] Removed `:integrations:linux-runtime` from `:feature:terminal` Gradle dependencies; terminal now depends on `:core:contracts` and its own terminal/native APIs.
+- [x] Removed `:integrations:linux-runtime` from `:terminal` Gradle dependencies; terminal now depends on `:core:contracts` and its own terminal/native APIs.
 - [ ] Verify terminal/runtime boundary changes in the ARM32 release workflow and fix any compile/test regressions before continuing.
+
+
+## 18. Top-level editor and terminal module migration
+
+- [x] Promoted the existing editor module from `:feature:editor` to `:editor`.
+- [x] Promoted the existing terminal module from `:feature:terminal` to `:terminal`.
+- [x] Moved all editor and terminal source, test, and TextMate asset files without changing Kotlin package names or user-visible behavior.
+- [x] Updated Gradle settings and app dependencies to the new module paths.
+- [x] Preserved application ID and existing Kotlin packages to avoid app upgrade or source compatibility changes.
+- [ ] Validate the complete top-level module move in ARM32 CI.
