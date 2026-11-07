@@ -1,5 +1,7 @@
 # KCode Architecture and Migration Plan
 
+> **Canonical specification:** [Technical Architecture](technical-architecture.md). This file tracks the current migration baseline and execution status; the specification describes the intended end state.
+
 ## 1. Architecture decision
 
 KCode remains a single Android Gradle monorepo. Existing working modules are the migration baseline. New architectural boundaries will be introduced incrementally, with regression tests and CI validation at each step.
