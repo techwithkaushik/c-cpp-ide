@@ -48,7 +48,7 @@ data class ExplorerPalette(
 )
 
 @Composable
-fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: suspend (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit, onClose: () -> Unit, palette: ExplorerPalette, iconRenderer: @Composable (String, Color, Dp, Modifier) -> Unit, sidebarMode: Boolean = false) {
+fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: suspend (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit, onClose: () -> Unit, palette: ExplorerPalette, iconRenderer: @Composable (String, Color, Dp) -> Unit, sidebarMode: Boolean = false) {
     val scope = rememberCoroutineScope()
     var query by rememberSaveable(projectName) { mutableStateOf("") }
     var searchExpanded by rememberSaveable(projectName) { mutableStateOf(false) }
@@ -87,8 +87,8 @@ fun FileExplorerSheet(projectName: String, activeFile: String, files: List<Strin
         }
         ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry, palette = palette, iconRenderer = iconRenderer)
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
-            if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry, palette, iconRenderer)
-            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp, { onOpenFile(node.path) }, onRenameEntry, onDeleteEntry, onMoveEntry, palette, iconRenderer)
+            if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry, palette = palette, iconRenderer = iconRenderer)
+            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp, { onOpenFile(node.path) }, onRenameEntry, onDeleteEntry, onMoveEntry, palette = palette, iconRenderer = iconRenderer)
         }
         if (nodes.isEmpty()) Text(if (query.isBlank()) "This folder is empty" else "No matching files", Modifier.fillMaxWidth().padding(18.dp), color = palette.muted, fontSize = 11.sp, textAlign = TextAlign.Center)
         if (fileDialog || folderDialog) {
@@ -112,7 +112,7 @@ fun FileExplorerSheet(projectName: String, activeFile: String, files: List<Strin
 }
 
 @Composable
-private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: Boolean, expanded: Boolean, onClick: () -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit, palette: ExplorerPalette, iconRenderer: @Composable (String, Color, Dp, Modifier) -> Unit) {
+private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: Boolean, expanded: Boolean, onClick: () -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit, palette: ExplorerPalette, iconRenderer: @Composable (String, Color, Dp) -> Unit) {
     var menu by remember(path) { mutableStateOf(false) }
     var renameDialog by remember(path) { mutableStateOf(false) }
     var renameValue by remember(path) { mutableStateOf(label) }
@@ -185,7 +185,7 @@ private fun ExplorerFileRow(
     onDeleteEntry: (String) -> Unit,
     onMoveEntry: (String, String) -> Unit,
     palette: ExplorerPalette,
-    iconRenderer: @Composable (String, Color, Dp, Modifier) -> Unit
+    iconRenderer: @Composable (String, Color, Dp) -> Unit
 ) {
     var menu by remember(description) { mutableStateOf(false) }
     var renameDialog by remember(description) { mutableStateOf(false) }
