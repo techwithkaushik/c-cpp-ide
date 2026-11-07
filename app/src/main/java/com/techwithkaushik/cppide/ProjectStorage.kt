@@ -100,7 +100,7 @@ internal class ProjectStorage(context: Context) {
         val startedAt = System.nanoTime()
         val project = projectDirectory(projectName)
         return project.walkTopDown()
-            .filter { it.isFile && it.name != ".cppide-project" }
+            .filter { file -> file.isFile && file.name != ".cppide-project" && !file.relativeTo(project).invariantSeparatorsPath.startsWith(".cppide-build/") && !file.relativeTo(project).invariantSeparatorsPath.startsWith(".clangd/index/") && isTextFile(file) }
             .map { it.relativeTo(project).invariantSeparatorsPath }
             .sorted()
             .toList()
@@ -111,7 +111,7 @@ internal class ProjectStorage(context: Context) {
         val startedAt = System.nanoTime()
         val project = projectDirectory(projectName)
         return project.walkTopDown()
-            .filter { it.isDirectory && it != project }
+            .filter { directory -> directory.isDirectory && directory != project && directory.relativeTo(project).invariantSeparatorsPath !in setOf(".cppide-build", ".clangd/index") && !directory.relativeTo(project).invariantSeparatorsPath.startsWith(".cppide-build/") && !directory.relativeTo(project).invariantSeparatorsPath.startsWith(".clangd/index/") }
             .map { it.relativeTo(project).invariantSeparatorsPath }
             .sorted()
             .toList()
@@ -175,6 +175,48 @@ internal class ProjectStorage(context: Context) {
         }
         file.setLastModified(System.currentTimeMillis())
         DeveloperLog.event("ProjectStorage", "file_write_completed", mapOf("project" to projectName, "path" to relativePath, "bytes" to file.length(), "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+    }
+
+    @Synchronized
+    fun renameEntry(projectName: String, relativePath: String, newName: String) {
+        require(newName.isNotBlank() && newName == File(newName).name && newName !in setOf(".", "..")) { "Invalid name." }
+        val source = resolveEntry(projectName, relativePath)
+        val destination = File(source.parentFile, newName).canonicalFile
+        val root = projectDirectory(projectName)
+        require(destination.toPath().startsWith(root.toPath()) && destination != root) { "Destination escapes project." }
+        if (destination.exists()) throw IOException("An item with this name already exists.")
+        if (!source.renameTo(destination)) throw IOException("Unable to rename item.")
+    }
+
+    @Synchronized
+    fun deleteEntry(projectName: String, relativePath: String) {
+        val entry = resolveEntry(projectName, relativePath)
+        if (!entry.deleteRecursively()) throw IOException("Unable to delete item.")
+    }
+
+    @Synchronized
+    fun moveEntry(projectName: String, relativePath: String, targetDirectory: String) {
+        val root = projectDirectory(projectName)
+        val source = resolveEntry(projectName, relativePath)
+        val target = if (targetDirectory.isBlank() || targetDirectory == ".") root else File(root, targetDirectory).canonicalFile
+        require(target.isDirectory && target.toPath().startsWith(root.toPath())) { "Invalid destination folder." }
+        val destination = File(target, source.name).canonicalFile
+        require(destination.toPath().startsWith(root.toPath()) && !destination.toPath().startsWith(source.canonicalFile.toPath())) { "Cannot move an item into itself." }
+        if (destination.exists()) throw IOException("An item with this name already exists.")
+        if (!source.renameTo(destination)) throw IOException("Unable to move item.")
+    }
+
+    private fun resolveEntry(projectName: String, relativePath: String): File {
+        require(relativePath.isNotBlank() && relativePath != ".") { "Invalid project item." }
+        val root = projectDirectory(projectName)
+        val entry = File(root, relativePath).canonicalFile
+        require(entry.toPath().startsWith(root.toPath()) && entry != root && entry.name != ".cppide-project" && entry.exists()) { "Project item not found." }
+        return entry
+    }
+
+    private fun isTextFile(file: File): Boolean {
+        if (file.length() > 2L * 1024 * 1024) return false
+        return runCatching { file.inputStream().use { input -> val bytes = ByteArray(8192); val count = input.read(bytes); count <= 0 || (0 until count).none { bytes[it] == 0.toByte() } } }.getOrDefault(false)
     }
 
     private fun projectDirectory(name: String): File {
