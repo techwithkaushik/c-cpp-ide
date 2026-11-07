@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.feature.editor
 
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
@@ -154,6 +155,13 @@ class ClangdProjectSession(
             project.init()
             project.eventEmitter.addListener(diagnosticsListener)
             available = true
+            DeveloperLog.event("ClangdLsp", "session_ready", mapOf(
+                "workspace" to workspace.absolutePath,
+                "guestWorkspace" to GUEST_WORKSPACE,
+                "clangdPath" to selectedClangdPath,
+                "prootExists" to runtime.proot.isFile,
+                "loaderExists" to runtime.prootLoader.isFile
+            ))
             mutableStatus.value = EditorLspStatus(
                 "clangd installed",
                 "Ubuntu runtime and clangd executable validated. The server starts when a C/C++ file opens."
@@ -177,13 +185,20 @@ class ClangdProjectSession(
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
         // Pass a filesystem path, not an already-encoded URI: FileUri.toUri() encodes it once.
         val guestPath = "$GUEST_WORKSPACE/$relative"
-        return (project.getEditor(guestPath) ?: project.createEditor(guestPath)).apply {
+        val editor = (project.getEditor(guestPath) ?: project.createEditor(guestPath)).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
             isEnableHover = true
             isEnableSignatureHelp = true
         }
+        DeveloperLog.event("ClangdLsp", "document_editor_created", mapOf(
+            "file" to relative,
+            "extension" to extension,
+            "uri" to editor.uri.toUri().toASCIIString(),
+            "attached" to (editor.editor != null)
+        ))
+        return editor
     }
 
     suspend fun connect(editor: LspEditor) {
@@ -197,6 +212,11 @@ class ClangdProjectSession(
             )
             return
         }
+        DeveloperLog.event("ClangdLsp", "connect_requested", mapOf(
+            "file" to editor.uri.path,
+            "attached" to (editor.editor != null),
+            "alreadyConnected" to editor.isConnected
+        ))
         mutableStatus.value = EditorLspStatus(
             "Starting clangd…",
             "Launching clangd through Ubuntu/PRoot and waiting for the LSP initialize handshake."
@@ -213,6 +233,11 @@ class ClangdProjectSession(
                 "LSP initialized and the document was opened. Completion, diagnostics, hover and signature help are active.",
                 connected = true
             )
+            DeveloperLog.event("ClangdLsp", "connect_succeeded", mapOf(
+                "file" to editor.uri.path,
+                "connected" to editor.isConnected,
+                "requestManagers" to editor.requestManagers.size
+            ))
         } catch (error: CancellationException) {
             connectionAttempts.remove(editor)
             throw error
@@ -227,6 +252,10 @@ class ClangdProjectSession(
                 reason,
                 error = true
             )
+            DeveloperLog.failure("ClangdLsp", "connect_failed", error, mapOf(
+                "file" to editor.uri.path,
+                "attached" to (editor.editor != null)
+            ))
         }
     }
 
@@ -287,7 +316,13 @@ private class ProotClangdConnectionProvider(
             "--completion-style=detailed"
         )
         val child = ProcessBuilder(command).directory(workspace).apply {
-            environment().clear()
+            // Preserve Android linker/runtime variables required by the APK-bundled PRoot ELF.
+            val inheritedLibraryPath = environment()["LD_LIBRARY_PATH"].orEmpty()
+            runtime.nativeLibraryDir?.absolutePath?.let { nativeDir ->
+                environment()["LD_LIBRARY_PATH"] = listOf(nativeDir, inheritedLibraryPath)
+                    .filter(String::isNotBlank)
+                    .joinToString(File.pathSeparator)
+            }
             environment()["HOME"] = "/root"
             environment()["USER"] = "root"
             environment()["LOGNAME"] = "root"
@@ -301,6 +336,13 @@ private class ProotClangdConnectionProvider(
             environment()["LANG"] = "C.UTF-8"
         }.start()
         process = child
+        DeveloperLog.event("ClangdLsp", "proot_process_started", mapOf(
+            "pid" to runCatching { child.pid() }.getOrNull(),
+            "proot" to runtime.proot.absolutePath,
+            "nativeLibraryDir" to runtime.nativeLibraryDir?.absolutePath,
+            "clangd" to clangdGuestPath,
+            "workspace" to workspace.absolutePath
+        ))
 
         Thread({
             runCatching {
@@ -319,6 +361,10 @@ private class ProotClangdConnectionProvider(
             val exitCode = runCatching { child.waitFor() }.getOrDefault(-1)
             if (!closed.get()) {
                 val errorText = synchronized(stderr) { stderr.toString().trim() }
+                DeveloperLog.event("ClangdLsp", "proot_process_exited", mapOf(
+                    "exitCode" to exitCode,
+                    "stderr" to errorText.takeLast(1200)
+                ))
                 onUnexpectedExit(exitCode, errorText)
             }
         }, "clangd-exit").apply { isDaemon = true; start() }
