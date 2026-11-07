@@ -32,9 +32,9 @@ class ClangdLanguageServerResolutionTest {
             )
         )
 
-        assertEquals("clangd-c", project.getServerDefinitions("c").single().name)
+        assertEquals("clangd", project.getServerDefinitions("c").single().name)
         cppExtensions.forEach { extension ->
-            assertEquals("clangd-cpp", project.getServerDefinitions(extension).single().name)
+            assertEquals("clangd", project.getServerDefinitions(extension).single().name)
         }
 
         // Exercise the same LspEditor construction path used by the Android editor.
