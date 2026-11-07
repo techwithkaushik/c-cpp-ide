@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
+import io.github.rosemoe.sora.event.PublishDiagnosticsEvent
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
@@ -280,6 +281,8 @@ fun SoraCodeEditor(
     AndroidView(
         modifier = modifier,
         factory = { context ->
+            val factoryStartedAt = System.nanoTime()
+            DeveloperLog.event("SoraEditor", "android_editor_view_creation_started", mapOf("file" to fileName, "initialCharacters" to code.length, "fontSize" to fontSize, "wordWrap" to wordWrap, "hasLspEditor" to (lspEditor != null)))
             CodeEditor(context).apply {
                 setText(code)
                 setTextSize(fontSize)
@@ -290,8 +293,11 @@ fun SoraCodeEditor(
                 setTabWidth(4)
                 setScrollBarEnabled(true)
                 setHorizontalScrollBarEnabled(true)
-                val textMateLanguage = CppTextMateSupport.apply(this, fileName, themeName)
+                val textMateLanguage = runCatching { CppTextMateSupport.apply(this, fileName, themeName) }
+                    .onFailure { DeveloperLog.failure("SoraEditor", "textmate_language_setup_failed", it, mapOf("file" to fileName, "theme" to themeName)) }
+                    .getOrNull()
                 configureEditorTheme(this, themeName)
+                DeveloperLog.event("SoraEditor", "android_editor_view_created", mapOf("file" to fileName, "language" to (editorLanguage?.javaClass?.simpleName ?: "none"), "textMateScope" to (textMateLanguage?.scopeName ?: "none"), "durationMs" to (System.nanoTime() - factoryStartedAt) / 1_000_000))
                 lspEditor?.let { languageEditor ->
                     languageEditor.wrapperLanguage = requireNotNull(textMateLanguage) {
                         "A C/C++ language server cannot be attached to a non-C/C++ document."
@@ -303,7 +309,11 @@ fun SoraCodeEditor(
                         "language" to (editorLanguage?.javaClass?.simpleName ?: "none")
                     ))
                     lspSession?.let { session ->
-                        languageEditor.coroutineScope.launch { session.connect(languageEditor) }
+                        languageEditor.coroutineScope.launch {
+                            DeveloperLog.event("SoraEditor", "lsp_connect_coroutine_started", mapOf("file" to fileName, "attached" to (languageEditor.editor === this@apply)))
+                            runCatching { session.connect(languageEditor) }
+                                .onFailure { DeveloperLog.failure("SoraEditor", "lsp_connect_coroutine_failed", it, mapOf("file" to fileName)) }
+                        }
                     }
                 }
                 controller?.attach(this)
@@ -327,13 +337,24 @@ fun SoraCodeEditor(
                 }
                 subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
                     currentOnCursorPositionChange.value(event.left.line + 1, event.left.column + 1)
+                    DeveloperLog.debug("SoraEditor", "cursor_selection_changed; file=$fileName; line=${event.left.line + 1}; column=${event.left.column + 1}")
+                }
+                subscribeEvent(PublishDiagnosticsEvent::class.java) { event, _ ->
+                    DeveloperLog.event("SoraEditor", "editor_diagnostics_rendered", mapOf(
+                        "file" to fileName,
+                        "previousCount" to event.oldDiagnostics.size,
+                        "currentCount" to event.newDiagnosticsEvent.size,
+                        "lspConnected" to (lspEditor?.isConnected == true)
+                    ))
                 }
             }
         },
         update = { editor ->
             editor.setTextSize(fontSize)
             editor.setTypefaceText(Typeface.MONOSPACE)
-            val textMateLanguage = CppTextMateSupport.apply(editor, fileName, themeName)
+            val textMateLanguage = runCatching { CppTextMateSupport.apply(editor, fileName, themeName) }
+                .onFailure { DeveloperLog.failure("SoraEditor", "textmate_language_update_failed", it, mapOf("file" to fileName, "theme" to themeName)) }
+                .getOrNull()
             configureEditorTheme(editor, themeName)
             editor.isWordwrap = wordWrap
             editor.setLineNumberEnabled(true)
@@ -352,19 +373,25 @@ fun SoraCodeEditor(
                         "language" to (editor.editorLanguage?.javaClass?.simpleName ?: "none")
                     ))
                     lspSession?.let { session ->
-                        lspEditor.coroutineScope.launch { session.connect(lspEditor) }
+                        lspEditor.coroutineScope.launch {
+                            DeveloperLog.event("SoraEditor", "lsp_reconnect_coroutine_started", mapOf("file" to fileName, "attached" to (lspEditor.editor === editor)))
+                            runCatching { session.connect(lspEditor) }
+                                .onFailure { DeveloperLog.failure("SoraEditor", "lsp_reconnect_coroutine_failed", it, mapOf("file" to fileName)) }
+                        }
                     }
                 } else {
                     activeLspLanguage.wrapperLanguage = textMateLanguage
                 }
             }
             if (editor.text.toString() != code) {
+                DeveloperLog.event("SoraEditor", "compose_document_sync_started", mapOf("file" to fileName, "editorCharacters" to editor.text.length, "composeCharacters" to code.length, "lspConnected" to (lspEditor?.isConnected == true)))
                 suppressProgrammaticChanges.set(true)
                 try {
                     editor.setText(code)
                 } finally {
                     suppressProgrammaticChanges.set(false)
                 }
+                DeveloperLog.event("SoraEditor", "compose_document_sync_completed", mapOf("file" to fileName, "characters" to editor.text.length))
             }
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
