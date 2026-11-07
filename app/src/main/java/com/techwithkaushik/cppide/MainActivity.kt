@@ -183,7 +183,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 // Also validates ELF format and device ABI, not just file presence.
                 ProotDownloader(paths).downloadAndInstall()
             }
-            prootCheck.onSuccess { DeveloperLog.event("Application", "bundled_proot_validated", mapOf("abi" to it.abi, "bytes" to it.bytes, "release" to it.release)) }
+            prootCheck.onSuccess { DeveloperLog.event("Application", "bundled_proot_validated", mapOf("bytes" to it.bytes, "release" to it.release)) }
                 .onFailure { DeveloperLog.failure("Application", "bundled_proot_validation_failed", it, mapOf("proot" to paths.proot.absolutePath, "loader" to paths.prootLoader.absolutePath)) }
             DeveloperLog.event("Application", "rootfs_validation_result", mapOf("rootfsExists" to paths.hasRootfs(), "rootfsDiagnostic" to paths.rootfsDiagnostic()))
             when {
