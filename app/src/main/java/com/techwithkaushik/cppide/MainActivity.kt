@@ -890,7 +890,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                     Spacer(Modifier.width(10.dp))
                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         Text(name, color = Color(0xFFE8EDF5), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                        Text(description, color = IdeMuted, fontSize = 10.sp)
+                                        Text(description, color = IdeMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(tags, color = IdeAccent, fontSize = 10.sp)
                                     }
                                     Text("Planned", color = IdeMuted, fontSize = 10.sp)
@@ -1897,25 +1897,27 @@ private fun FileExplorerSheet(
             .then(if (sidebarMode) Modifier.verticalScroll(rememberScrollState()) else Modifier),
         verticalArrangement = Arrangement.spacedBy(if (sidebarMode) 6.dp else IdeDesignTokens.Spacing.sm)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("EXPLORER", fontSize = IdeDesignTokens.Typography.caption, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
-                Text(projectName.uppercase(), color = IdeMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = { query = "" }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
-                IdeIcon("refresh", IdeMuted, IdeDesignTokens.Spacing.lg)
-            }
-            IconButton(onClick = onClose, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
-                IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg)
+        if (!sidebarMode) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("EXPLORER", fontSize = IdeDesignTokens.Typography.caption, letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCAD4E0))
+                    Text(projectName.uppercase(), color = IdeMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = { query = "" }, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
+                    IdeIcon("refresh", IdeMuted, IdeDesignTokens.Spacing.lg)
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(IdeDesignTokens.Spacing.xxl)) {
+                    IdeIcon("close", IdeMuted, IdeDesignTokens.Spacing.lg)
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
-            OutlinedButton(onClick = { newEntryName = ""; fileDialog = true }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { newEntryName = ""; fileDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.ui.graphics.RectangleShape) {
                 IdeIcon("add", IdeAccent, IdeDesignTokens.Spacing.lg)
                 Spacer(Modifier.width(6.dp))
                 Text("New file", fontSize = IdeDesignTokens.Typography.caption)
             }
-            OutlinedButton(onClick = { newEntryName = ""; folderDialog = true }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { newEntryName = ""; folderDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.ui.graphics.RectangleShape) {
                 IdeIcon("folder", IdeAccent, IdeDesignTokens.Spacing.lg)
                 Spacer(Modifier.width(6.dp))
                 Text("New folder", fontSize = IdeDesignTokens.Typography.caption)
@@ -1926,12 +1928,13 @@ private fun FileExplorerSheet(
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("Find a file") },
+            shape = androidx.compose.ui.graphics.RectangleShape,
+            placeholder = { Text("Find a file", fontSize = 12.sp) },
             leadingIcon = { IdeIcon("search", IdeAccent, 20.dp) },
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { IdeIcon("close", IdeMuted, 15.dp) } }
         )
         Row(
-            Modifier.fillMaxWidth().background(IdeSurfaceRaised, RoundedCornerShape(IdeDesignTokens.Spacing.xs)).padding(horizontal = 9.dp, vertical = 9.dp),
+            Modifier.fillMaxWidth().background(IdeSurfaceRaised).padding(horizontal = 8.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IdeIcon("chevronDown", IdeMuted, 14.dp, Modifier.padding(end = IdeDesignTokens.Spacing.xs))
@@ -2061,14 +2064,14 @@ private fun ExplorerFileRow(
     Row(
         Modifier.fillMaxWidth()
             .padding(start = indent)
-            .background(if (selected) Color(0xFF1D3047) else Color.Transparent, RoundedCornerShape(9.dp))
+            .background(if (selected) Color(0xFF1D3047) else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         FileTypeIcon(name, 20.dp, Modifier.width(30.dp))
         Column(Modifier.weight(1f)) {
-            Text(name, color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 13.sp)
+            Text(name, color = if (selected) IdeAccent else Color(0xFFE8EDF5), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(description, color = IdeMuted, fontSize = 10.sp)
         }
         if (selected) Text("●", color = IdeAccent, fontSize = 10.sp)
