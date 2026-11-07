@@ -329,14 +329,11 @@ fun SoraCodeEditor(
                 }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     if (!suppressProgrammaticChanges.get()) {
-                        val currentTextLength = text.length
-                        DeveloperLog.debug("SoraEditor", "document_content_changed; file=$fileName; characters=$currentTextLength; lspEditorPresent=${lspEditor != null}; lspConnected=${lspEditor?.isConnected == true}")
                         currentOnCodeChange.value(text.toString())
                     }
                 }
                 subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
                     currentOnCursorPositionChange.value(event.left.line + 1, event.left.column + 1)
-                    DeveloperLog.debug("SoraEditor", "cursor_selection_changed; file=$fileName; line=${event.left.line + 1}; column=${event.left.column + 1}")
                 }
             }
         },
@@ -375,14 +372,12 @@ fun SoraCodeEditor(
                 }
             }
             if (editor.text.toString() != code) {
-                DeveloperLog.event("SoraEditor", "compose_document_sync_started", mapOf("file" to fileName, "editorCharacters" to editor.text.length, "composeCharacters" to code.length, "lspConnected" to (lspEditor?.isConnected == true)))
                 suppressProgrammaticChanges.set(true)
                 try {
                     editor.setText(code)
                 } finally {
                     suppressProgrammaticChanges.set(false)
                 }
-                DeveloperLog.event("SoraEditor", "compose_document_sync_completed", mapOf("file" to fileName, "characters" to editor.text.length))
             }
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
