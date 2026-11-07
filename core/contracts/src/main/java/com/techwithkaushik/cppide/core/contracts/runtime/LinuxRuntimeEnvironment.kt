@@ -20,6 +20,8 @@ interface LinuxRuntimeEnvironment {
     fun hasRootfs(): Boolean
     fun hasProot(): Boolean
     fun rootfsDiagnostic(): String
+    fun prepareResolver(tempDirectory: File, sessionId: String? = null): File
+    fun ensureGuestCompatibility()
     fun ready(): Boolean
 }
 
