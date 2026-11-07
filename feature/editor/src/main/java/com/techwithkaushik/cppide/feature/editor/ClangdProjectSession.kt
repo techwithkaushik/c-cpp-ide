@@ -13,6 +13,8 @@ import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 import java.io.File
 import java.io.IOException
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -101,6 +103,7 @@ class ClangdProjectSession(
             runtime.ensureDirectories()
             require(runtime.ready()) { "Ubuntu rootfs or the bundled PRoot runtime is not ready." }
             val root = runtime.ubuntuRoot.canonicalFile
+            ensureFallbackCompilationDatabase(root)
             val selectedClangdPath = configuredClangdGuestPath ?: LinuxToolchainDiscovery()
                 .discover(root)
                 .find("clangd")
@@ -174,6 +177,51 @@ class ClangdProjectSession(
                 error = true
             )
         }
+    }
+
+
+    private fun ensureFallbackCompilationDatabase(root: File) {
+        val database = File(workspace, "compile_commands.json")
+        val marker = File(workspace, ".cppide-compile-commands.generated")
+        if (database.exists() && !marker.exists()) return
+        val discovery = LinuxToolchainDiscovery().discover(root)
+        fun guestCompiler(name: String): String? {
+            val raw = discovery.find(name)?.executable ?: return null
+            val executable = File(raw).canonicalFile
+            if (!executable.toPath().startsWith(root.toPath()) || !executable.isFile || !executable.canExecute()) return null
+            return "/" + executable.relativeTo(root).invariantSeparatorsPath
+        }
+        val cc = guestCompiler("clang") ?: guestCompiler("gcc")
+            ?: throw IllegalStateException("Install clang or gcc in Ubuntu to enable C/C++ language services.")
+        val cxx = guestCompiler("clang++") ?: guestCompiler("g++") ?: cc
+        val entries = JSONArray()
+        workspace.walkTopDown()
+            .onEnter { it == workspace || it.name !in EXCLUDED_SOURCE_DIRECTORIES }
+            .filter { it.isFile && it.extension.lowercase() in SOURCE_EXTENSIONS }
+            .forEach { file ->
+                val guestFile = "$GUEST_WORKSPACE/" + file.relativeTo(workspace).invariantSeparatorsPath
+                val isC = file.extension.equals("c", true)
+                entries.put(JSONObject().apply {
+                    put("directory", GUEST_WORKSPACE)
+                    put("file", guestFile)
+                    put("arguments", JSONArray().apply {
+                        put(if (isC) cc else cxx)
+                        put(if (isC) "-std=c17" else "-std=c++20")
+                        put("-I$GUEST_WORKSPACE"); put("-I/usr/local/include"); put("-I/usr/include")
+                        put("-c"); put(guestFile)
+                    })
+                })
+            }
+        val temp = File(workspace, "compile_commands.json.tmp")
+        try {
+            temp.writeText(entries.toString(2), Charsets.UTF_8)
+            if (database.exists() && !marker.exists()) return
+            if (!temp.renameTo(database)) {
+                database.writeText(temp.readText(Charsets.UTF_8), Charsets.UTF_8); temp.delete()
+            }
+            marker.writeText("cppide-fallback-v1\n", Charsets.UTF_8)
+            DeveloperLog.event("ClangdLsp", "fallback_compile_commands_written", mapOf("entries" to entries.length()))
+        } finally { if (temp.exists()) temp.delete() }
     }
 
     /** Returns null for unsupported files or when the real runtime/tool is unavailable. */
@@ -293,6 +341,8 @@ class ClangdProjectSession(
     private companion object {
         const val LSP_CONNECT_TIMEOUT_MS = 45_000L
         const val GUEST_WORKSPACE = "/workspace"
+        val SOURCE_EXTENSIONS = setOf("c", "cc", "cpp", "cxx")
+        val EXCLUDED_SOURCE_DIRECTORIES = setOf(".git", ".cppide-build", "build", "out", ".gradle")
         val CPP_EXTENSIONS = setOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
         val SUPPORTED_EXTENSIONS = CPP_EXTENSIONS + "c"
     }
@@ -335,7 +385,8 @@ private class ProotClangdConnectionProvider(
             clangdGuestPath,
             "--background-index",
             "--clang-tidy",
-            "--completion-style=detailed"
+            "--completion-style=detailed",
+            "--compile-commands-dir=/workspace"
         )
         val child = ProcessBuilder(command).directory(workspace).apply {
             // Preserve Android linker/runtime variables required by the APK-bundled PRoot ELF.

@@ -90,6 +90,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -298,6 +299,35 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
     }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    val currentFormatAction = rememberUpdatedState<() -> Unit>({
+        scope.launch {
+            val workspace = workspaceDirectory
+            if (workspace == null || File(activeFile).extension.lowercase() !in
+                setOf("c", "cc", "cpp", "cxx", "h", "hh", "hpp", "hxx")
+            ) {
+                selectedPanel = ToolPanel.Problems
+                showToolPanel = true
+                return@launch
+            }
+            try {
+                val formatted = withContext(Dispatchers.IO) {
+                    UbuntuClangFormatRunner(runtimePaths, workspace).format(activeFile, code)
+                }
+                withContext(Dispatchers.IO) { projectStorage.writeFile(selectedProject, activeFile, formatted) }
+                code = formatted; fileContents[activeFile] = formatted; dirtyFiles.remove(activeFile)
+                clangdSession?.saveDocument(activeFile)
+                DeveloperLog.info(appContext, "ClangFormat", "Formatted and saved $activeFile")
+            } catch (error: Exception) {
+                selectedPanel = ToolPanel.Problems; showToolPanel = true
+                DeveloperLog.failure("ClangFormat", "format_document_failed", error, mapOf("file" to activeFile))
+            }
+        }
+    })
+    DisposableEffect(editorController) {
+        editorController.setFormatAction { currentFormatAction.value.invoke() }
+        onDispose { editorController.setFormatAction(null) }
+    }
 
     // Linux runtime readiness is owned by the app's Ubuntu runtime integration.
     BackHandler(enabled = screen != IdeScreen.Welcome) {

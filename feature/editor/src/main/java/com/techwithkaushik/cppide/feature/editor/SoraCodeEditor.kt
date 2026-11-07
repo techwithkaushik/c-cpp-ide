@@ -132,6 +132,7 @@ private object CppTextMateSupport {
 /** Imperative command bridge for the Sora editor hosted by Compose. */
 class SoraEditorController {
     private var editor: CodeEditor? = null
+    private var formatAction: (() -> Unit)? = null
 
     fun undo() { editor?.undo() }
     fun redo() { editor?.redo() }
@@ -139,7 +140,8 @@ class SoraEditorController {
     fun copy() { editor?.copyText() }
     fun paste() { editor?.pasteText() }
     fun cut() { editor?.cutText() }
-    fun format() { editor?.formatCodeAsync() }
+    fun format() { formatAction?.invoke() ?: editor?.formatCodeAsync() }
+    internal fun setFormatAction(action: (() -> Unit)?) { formatAction = action }
 
     fun selectLine(line: Int) = selectPosition(line, 1)
 
@@ -159,7 +161,7 @@ class SoraEditorController {
     internal fun detach(editor: CodeEditor) { if (this.editor === editor) this.editor = null }
 }
 
-private fun showEditorContextMenu(anchor: View, lspEditor: LspEditor?) {
+private fun showEditorContextMenu(anchor: View, lspEditor: LspEditor?, controller: SoraEditorController?) {
     val editor = anchor as? CodeEditor ?: return
     PopupMenu(anchor.context, anchor).apply {
         menu.add(0, 1, 0, "Undo")
@@ -188,7 +190,7 @@ private fun showEditorContextMenu(anchor: View, lspEditor: LspEditor?) {
                         }
                     }
                 }
-                8 -> editor.formatCodeAsync()
+                8 -> controller?.format() ?: editor.formatCodeAsync()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -299,12 +301,12 @@ fun SoraCodeEditor(
                 controller?.attach(this)
                 currentOnCursorPositionChange.value(cursor.leftLine + 1, cursor.leftColumn + 1)
                 setOnLongClickListener { view ->
-                    showEditorContextMenu(view, lspEditor)
+                    showEditorContextMenu(view, lspEditor, controller)
                     true
                 }
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                     setOnContextClickListener { view ->
-                        showEditorContextMenu(view, lspEditor)
+                        showEditorContextMenu(view, lspEditor, controller)
                         true
                     }
                 }
