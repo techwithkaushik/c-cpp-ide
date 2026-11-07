@@ -117,13 +117,9 @@ internal class CcppToolchainInspector(context: Context) {
     }
 
     private fun resolveGuestPath(configured: String): String? {
-        if (!configured.startsWith("/") || configured.contains("\u0000")) return null
-        // Tool overrides are Linux guest paths (for example /usr/bin/clang),
-        // not paths relative to the Android app's files directory.
-        val root = runtime.ubuntuRoot.canonicalFile
-        val candidate = File(root, configured.removePrefix("/")).canonicalFile
-        if (!candidate.toPath().startsWith(root.toPath()) || !candidate.isFile || !candidate.canExecute()) return null
-        return configured
+        // Tool overrides are Linux guest paths. Resolve absolute distro symlinks
+        // using Linux rootfs semantics rather than Android's host filesystem.
+        return discovery.resolveExecutable(runtime.ubuntuRoot, configured)?.let { configured }
     }
 
     private fun probe(executable: String): Triple<Boolean, String?, String?> {
