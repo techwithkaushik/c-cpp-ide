@@ -9,15 +9,23 @@ import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import io.github.rosemoe.sora.lsp.events.EventContext
 import io.github.rosemoe.sora.lsp.events.EventListener
+import io.github.rosemoe.sora.lsp.events.AsyncEventListener
+import io.github.rosemoe.sora.lsp.events.EventType
+import io.github.rosemoe.sora.lsp.events.document.DocumentOpenEvent
+import io.github.rosemoe.sora.lsp.utils.toFileUri
 import io.github.rosemoe.sora.text.CharPosition
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
+import org.eclipse.lsp4j.DidOpenTextDocumentParams
+import org.eclipse.lsp4j.TextDocumentItem
 import java.io.File
 import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CompletableFuture
+import kotlinx.coroutines.future.await
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -153,6 +161,10 @@ class ClangdProjectSession(
                 )
             )
             project.init()
+            // Sora 0.24.4 sends the file extension as textDocument.languageId.
+            // clangd expects protocol language IDs ("c" or "cpp"), not "hpp"/"cc".
+            project.eventEmitter.removeListener(DocumentOpenEvent::class.java)
+            project.eventEmitter.addListener(ClangdDocumentOpenEvent())
             project.eventEmitter.addListener(diagnosticsListener)
             available = true
             DeveloperLog.event("ClangdLsp", "session_ready", mapOf(
@@ -396,10 +408,40 @@ class ClangdProjectSession(
         const val GUEST_WORKSPACE = "/workspace"
         val SOURCE_EXTENSIONS = setOf("c", "cc", "cpp", "cxx")
         val EXCLUDED_SOURCE_DIRECTORIES = setOf(".git", ".cppide-build", "build", "out", ".gradle")
-        val CPP_EXTENSIONS = setOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
+        val CPP_EXTENSIONS = CPP_DOCUMENT_EXTENSIONS
         val SUPPORTED_EXTENSIONS = CPP_EXTENSIONS + "c"
     }
 }
+
+
+private class ClangdDocumentOpenEvent : AsyncEventListener() {
+    override val eventName: String = "textDocument/didOpen"
+
+    override suspend fun handleAsync(context: EventContext) {
+        val editor = context.get<LspEditor>("lsp-editor")
+        val languageId = clangdLanguageIdForExtension(editor.fileExt)
+            ?: throw IllegalArgumentException("Unsupported clangd document extension: ${editor.fileExt}")
+        val params = DidOpenTextDocumentParams().apply {
+            // Start at version zero; Sora's incremental-change version counter
+            // starts at one for this URI on the first didChange notification.
+            textDocument = TextDocumentItem(
+                editor.uri.toFileUri(),
+                languageId,
+                0,
+                editor.editorContent
+            )
+        }
+        CompletableFuture.runAsync { editor.requestManager.didOpen(params) }.await()
+    }
+}
+
+internal fun clangdLanguageIdForExtension(extension: String): String? = when (extension.lowercase()) {
+    "c" -> "c"
+    in CPP_DOCUMENT_EXTENSIONS -> "cpp"
+    else -> null
+}
+
+private val CPP_DOCUMENT_EXTENSIONS = setOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
 
 private class ProotClangdConnectionProvider(
     private val runtime: LinuxRuntimePaths,
