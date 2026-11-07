@@ -5,7 +5,7 @@ import com.techwithkaushik.cppide.feature.terminal.IdeMasterShellUi
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimeSmokeTest
 import com.techwithkaushik.cppide.integration.linuxruntime.ProotDownloader
-import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
+import com.techwithkaushik.cppide.ui.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 
 import android.os.Bundle
