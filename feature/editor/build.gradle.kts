@@ -22,6 +22,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:contracts"))
     implementation(platform(libs.sora.editor.bom))
     implementation(libs.sora.editor)
     implementation(libs.sora.language.textmate)
