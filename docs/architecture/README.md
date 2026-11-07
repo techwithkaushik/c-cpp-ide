@@ -239,3 +239,15 @@ The local PTY session and SSH shell/session implementation now belong to `:featu
 - [x] Preserved the generated AIDL package `com.techwithkaushik.cppide.ipc` so Binder interface names remain compatible.
 - [x] Updated app, daemon, and settings Gradle references to `:core:ipc`.
 - [ ] Verify AIDL generation and ARM32 release build in CI.
+
+
+## 16. Workspace UI and module hygiene migration
+
+- [x] Moved the existing file explorer screen components into `:workspace:ui`.
+- [x] Kept project file operations behind `:workspace:api`; the explorer UI receives file/directory snapshots and typed callbacks.
+- [x] App supplies the existing palette and icon renderer, preserving the current visual behavior.
+- [x] Removed the empty `:feature:explorer` module and the daemon module whose manifest declared a missing service implementation.
+- [x] Moved AIDL contracts to `:core:ipc` while preserving their Binder package names.
+- [ ] Validate the workspace UI extraction, AIDL generation, and complete ARM32 release in CI.
+- [ ] Move remaining workspace screen/navigation orchestration out of `:app` after its state and lifecycle contracts are explicit.
+- [ ] Replace terminal screens' direct runtime installer calls with the runtime operations API.
