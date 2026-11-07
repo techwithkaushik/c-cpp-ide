@@ -18,7 +18,6 @@ internal class EmbeddedCppBuildRunner(context: Context) {
     private val appContext = context.applicationContext
     private val runtime = LinuxRuntimePaths(appContext.filesDir, appContext.applicationInfo.nativeLibraryDir)
     private val inspector = CcppToolchainInspector(appContext)
-    private val toolPaths = ToolPathPreferences(appContext)
     private val storage = ProjectStorage(appContext)
     private val preferences = appContext.getSharedPreferences("language_settings_c_cpp", Context.MODE_PRIVATE)
 
@@ -93,9 +92,11 @@ internal class EmbeddedCppBuildRunner(context: Context) {
             includeDirectories = preferences.getString("include_paths", "") ?: "",
             definitions = preferences.getString("defines", "") ?: ""
         )
-        val compiler = toolPaths.getExecutable("c-cpp", compilerName)?.takeIf { it.isNotBlank() }
-            ?: compilerStatus.path
-            ?: "/usr/bin/$compilerName"
+        // Use the guest path that the inspector actually executed successfully.
+        // A saved override can be an Android-host path; passing that raw path to
+        // PRoot would make the Ubuntu guest try to execute a nonexistent host path.
+        val compiler = compilerStatus.path
+            ?: return failure(source.absolutePath, "$compilerName has no validated Ubuntu executable path.")
         val sourceGuestPath = "/workspace/" + source.relativeTo(workspace).invariantSeparatorsPath
         val executableGuestPath = "/workspace/.cppide-build/" + executable.name
         val compileArguments = try {
