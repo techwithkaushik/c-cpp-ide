@@ -129,30 +129,24 @@ class ClangdProjectSession(
                 )
             }
 
-            // Sora 0.24.4 resolves a server by definition.ext OR languageId;
-            // extensionsOverride alone does not participate in LspEditorDelegate.refreshSessions().
-            // Register the C and C++ language IDs explicitly so .c and C++/header files
-            // all resolve to the real clangd process with the correct LSP languageId.
-            project.addServerDefinition(
-                CustomLanguageServerDefinition(
-                    "c",
-                    clangdConnectionProvider,
-                    "clangd-c",
-                    null,
-                    listOf("c"),
-                    "c"
-                )
+            // Sora 0.24.4 resolves definitions by exact extension or languageId.
+            // Its published dependency constructor has no languageId argument, so register
+            // one definition per extension. The editor itself supplies the LSP languageId.
+            val extensionGroups = mapOf(
+                "c" to listOf("c"),
+                "cpp" to listOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
             )
-            project.addServerDefinition(
-                CustomLanguageServerDefinition(
-                    "cpp",
-                    clangdConnectionProvider,
-                    "clangd-cpp",
-                    null,
-                    listOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx"),
-                    "cpp"
-                )
-            )
+            extensionGroups.forEach { (languageId, extensions) ->
+                extensions.forEach { extension ->
+                    project.addServerDefinition(
+                        CustomLanguageServerDefinition(
+                            extension,
+                            clangdConnectionProvider,
+                            "clangd-$languageId-$extension"
+                        )
+                    )
+                }
+            }
             project.init()
             project.eventEmitter.addListener(diagnosticsListener)
             available = true
