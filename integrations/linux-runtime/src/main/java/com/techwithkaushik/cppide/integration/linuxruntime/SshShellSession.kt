@@ -33,9 +33,17 @@ class HostKeyConfirmationRequired(val fingerprint: String) : SecurityException("
 class SshShellSession private constructor(private val session: Session, private val channel: ChannelShell) : AutoCloseable {
     val input: OutputStream = channel.outputStream
     private val closed = AtomicBoolean(false)
-    fun resize(columns: Int, rows: Int) = channel.setPtySize(columns.coerceIn(20,300), rows.coerceIn(5,120), columns * 8, rows * 16)
+    fun resize(columns: Int, rows: Int) {
+        val safeColumns = columns.coerceIn(20, 300)
+        val safeRows = rows.coerceIn(5, 120)
+        runCatching { channel.setPtySize(safeColumns, safeRows, safeColumns * 8, safeRows * 16) }
+            .onSuccess { DeveloperLog.event("SSH", "pty_resize_completed", mapOf("columns" to safeColumns, "rows" to safeRows)) }
+            .onFailure { DeveloperLog.failure("SSH", "pty_resize_failed", it, mapOf("columns" to safeColumns, "rows" to safeRows)) }
+            .getOrThrow()
+    }
 
     fun readOutput(onChunk: (String) -> Unit, onExit: (Int) -> Unit) {
+        DeveloperLog.event("SSH", "output_reader_started", mapOf("connected" to channel.isConnected))
         Thread({
             val reader = Thread {
                 try {
@@ -48,26 +56,33 @@ class SshShellSession private constructor(private val session: Session, private 
                         }
                     }
                 } catch (error: Exception) {
-                    DeveloperLog.warn("SSH", "SSH output reader stopped", error)
+                    DeveloperLog.failure("SSH", "output_reader_failed", error, mapOf("channelConnected" to channel.isConnected, "channelClosed" to channel.isClosed))
                 }
             }.apply { isDaemon = true; start() }
             while (channel.isConnected && !channel.isClosed) Thread.sleep(150)
             reader.join(500)
-            DeveloperLog.info("SSH", "SSH shell channel exited; code=${channel.exitStatus}")
+            DeveloperLog.event("SSH", "shell_channel_exited", mapOf("exitCode" to channel.exitStatus, "connected" to channel.isConnected, "closed" to channel.isClosed))
             onExit(channel.exitStatus)
         }, "ssh-shell-exit").apply { isDaemon = true; start() }
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        try { input.write("exit\n".toByteArray()); input.flush() } catch (_: Exception) {}
+        DeveloperLog.event("SSH", "session_close_started", mapOf("channelConnected" to channel.isConnected, "sessionConnected" to session.isConnected))
+        try { input.write("exit\n".toByteArray()); input.flush() }
+        catch (error: Exception) { DeveloperLog.warn("SSH", "exit_command_write_failed", error) }
         try { channel.disconnect() } finally { session.disconnect() }
+        DeveloperLog.event("SSH", "session_closed", mapOf("channelConnected" to channel.isConnected, "sessionConnected" to session.isConnected))
     }
 
     companion object {
         fun connect(host: SshHost): SshShellSession {
-            DeveloperLog.info("SSH", "Opening SSH connection; port=${host.port}")
-            host.validate()
+            val startedAt = System.nanoTime()
+            DeveloperLog.event("SSH", "connection_started", mapOf("host" to host.host, "port" to host.port, "authentication" to if (host.privateKey != null) "private_key" else "password", "fingerprintPinConfigured" to (host.expectedSha256Fingerprint != null)))
+            try { host.validate() } catch (error: Exception) {
+                DeveloperLog.failure("SSH", "connection_configuration_invalid", error, mapOf("host" to host.host, "port" to host.port))
+                throw error
+            }
             val jsch = JSch()
             val repository = PinningHostKeyRepository(host.expectedSha256Fingerprint)
             jsch.hostKeyRepository = repository
@@ -81,7 +96,9 @@ class SshShellSession private constructor(private val session: Session, private 
                 setProperty("ServerAliveCountMax", "3")
             })
             try {
+                DeveloperLog.event("SSH", "transport_connect_started", mapOf("host" to host.host, "port" to host.port, "timeoutMs" to 15_000))
                 session.connect(15_000)
+                DeveloperLog.event("SSH", "transport_connected", mapOf("host" to host.host, "port" to host.port, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000, "fingerprint" to repository.presentedFingerprint))
             } catch (error: Exception) {
                 DeveloperLog.warn("SSH", "SSH transport or authentication failed", error)
                 session.disconnect()
@@ -93,11 +110,18 @@ class SshShellSession private constructor(private val session: Session, private 
                 }
                 throw error
             }
-            val channel = session.openChannel("shell") as ChannelShell
-            channel.setPtyType("xterm-256color", 100, 30, 800, 600)
-            channel.connect(10_000)
-            DeveloperLog.info("SSH", "SSH shell channel connected")
-            return SshShellSession(session, channel)
+            try {
+                DeveloperLog.event("SSH", "shell_channel_open_started", mapOf("host" to host.host, "timeoutMs" to 10_000))
+                val channel = session.openChannel("shell") as ChannelShell
+                channel.setPtyType("xterm-256color", 100, 30, 800, 600)
+                channel.connect(10_000)
+                DeveloperLog.event("SSH", "connection_completed", mapOf("host" to host.host, "port" to host.port, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000, "fingerprint" to repository.presentedFingerprint))
+                return SshShellSession(session, channel)
+            } catch (error: Exception) {
+                DeveloperLog.failure("SSH", "shell_channel_open_failed", error, mapOf("host" to host.host, "port" to host.port, "transportConnected" to session.isConnected, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+                session.disconnect()
+                throw error
+            }
         }
     }
 }
