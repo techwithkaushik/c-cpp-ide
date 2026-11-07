@@ -135,11 +135,11 @@ kcode/
 | `:core:designsystem` | `ui:design-system` |
 | `:core:logging` | `core:logging` |
 | `:feature:editor` | `editor` plus UI adapter |
-| `:feature:terminal` | `terminal` plus UI adapter |
+| `:feature:terminal` | Terminal UI, local PTY and SSH session implementations |
 | `:feature:explorer` | `workspace` plus UI adapter |\n| `:workspace:api` | Workspace repository and project model contracts |\n| `:workspace:impl` | App-private project storage implementation |
 | `:services:daemon` | Runtime/process service boundary |
 | `:integrations:toolchain` | `runtime:toolchains` |
-| `:integrations:linux-runtime` | `runtime` |
+| `:integrations:linux-runtime` | PRoot, rootfs, runtime validation, and guest compatibility |
 
 ## 3. Dependency and layering rules
 
