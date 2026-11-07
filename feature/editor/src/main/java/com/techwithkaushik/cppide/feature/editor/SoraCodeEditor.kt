@@ -9,6 +9,7 @@ import android.widget.PopupMenu
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -269,6 +270,10 @@ fun SoraCodeEditor(
         }
     }
 
+    // A CodeEditor is bound to one LSP document. Recreate the Android view when
+    // the document or workspace changes: AndroidView's factory is not re-run by
+    // Compose update, so otherwise callbacks and the LspLanguage retain the old file.
+    key(lspSession, fileName) {
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -362,4 +367,5 @@ fun SoraCodeEditor(
             editor.release()
         }
     )
+    }
 }
