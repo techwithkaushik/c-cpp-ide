@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techwithkaushik.cppide.ui.designsystem.IdeDesignTokens
+import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeOperations
 import com.techwithkaushik.cppide.feature.terminal.RuntimeSetupPanel
 import com.techwithkaushik.cppide.feature.terminal.TerminalConnectionConfig
 
@@ -64,6 +65,7 @@ internal fun IdeSettingsScreen(
     editorTheme: String,
     onEditorThemeChange: (String) -> Unit,
     projectName: String,
+    runtime: LinuxRuntimeOperations,
     uiFontScale: Float,
     onUiFontScaleChange: (Float) -> Unit,
     onBack: () -> Unit,
@@ -160,6 +162,7 @@ internal fun IdeSettingsScreen(
                     "Runtime & Bootstrap" -> {
                         SettingsHeading("RUNTIME & BOOTSTRAP")
                         RuntimeSetupPanel(
+                            runtime = runtime,
                             onRuntimeReady = onRuntimeReady,
                             modifier = Modifier.fillMaxWidth()
                         )
