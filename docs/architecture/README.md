@@ -212,3 +212,14 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 - [x] Updated app, editor, terminal, and explorer Gradle dependencies to the new design-system ownership.
 - [ ] Verify the LSP API and design-system module migration with the ARM32 release workflow.
 - [ ] Extract terminal/runtime orchestration behind `:core:contracts` APIs before removing terminal's direct runtime integration dependency.
+
+
+## 13. Terminal session ownership migration — 2026-11-07
+
+- [x] Moved the real local PTY session implementation from `:integrations:linux-runtime` into `:feature:terminal`.
+- [x] Moved SSH host configuration, host-key pinning, and SSH shell session implementation into `:feature:terminal`.
+- [x] Kept Android supplementary-group compatibility repair in the Linux runtime module and made terminal PTY startup consume that runtime-owned helper.
+- [x] Removed the JSch dependency from `:integrations:linux-runtime`; SSH dependency remains with the terminal module.
+- [ ] Verify terminal session relocation and ABI-specific release packaging with CI.
+- [ ] Replace terminal screens' direct construction of rootfs installers, PRoot validators, and runtime smoke tests with an app-provided runtime operations interface.
+- [ ] Move terminal UI and runtime setup UI into separate feature surfaces without changing current workflows.
