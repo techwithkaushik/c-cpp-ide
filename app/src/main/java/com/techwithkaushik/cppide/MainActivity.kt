@@ -439,6 +439,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 editorTheme = editorTheme,
                 onEditorThemeChange = { editorTheme = it },
                 projectName = selectedProject,
+                runtime = runtimeOperations,
                 uiFontScale = uiFontScale,
                 onUiFontScaleChange = onUiFontScaleChange,
                 onBack = { screen = settingsReturnScreen },
