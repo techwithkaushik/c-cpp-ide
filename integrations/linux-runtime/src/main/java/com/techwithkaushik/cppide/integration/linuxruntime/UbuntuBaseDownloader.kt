@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.integration.linuxruntime
 
+import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -11,6 +12,8 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
     data class Result(val rootfs: RootfsInstaller.Result, val sha256: String, val bytes: Long)
 
     fun downloadAndInstall(onProgress: (Long, Long) -> Unit = { _, _ -> }): Result {
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("UbuntuDownload", "download_install_started", mapOf("baseDirectory" to paths.base.absolutePath, "architecture" to paths.ubuntuArchitecture, "rootfsPresent" to paths.hasRootfs()))
         paths.ensureDirectories()
         val arch = paths.ubuntuArchitecture
         val fileName = "ubuntu-base-24.04.5-base-$arch.tar.gz"
@@ -19,6 +22,7 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
         val archive = File(paths.base, fileName)
         try {
             download(URL(baseUrl + "SHA256SUMS"), sumsFile, MAX_SUMS_BYTES, null)
+            DeveloperLog.event("UbuntuDownload", "checksum_manifest_downloaded", mapOf("bytes" to sumsFile.length()))
             val expected = sumsFile.useLines { lines ->
                 lines.mapNotNull { line ->
                     val parts = line.trim().split(Regex("\\s+"), limit = 2)
@@ -27,20 +31,31 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
             } ?: throw IllegalStateException("Ubuntu SHA256SUMS does not list $fileName.")
             if (!expected.matches(Regex("[a-fA-F0-9]{64}"))) throw IllegalStateException("Ubuntu SHA256SUMS contains an invalid digest.")
             download(URL(baseUrl + fileName), archive, MAX_ROOTFS_ARCHIVE_BYTES, onProgress)
+            DeveloperLog.event("UbuntuDownload", "rootfs_archive_downloaded", mapOf("file" to fileName, "bytes" to archive.length()))
+            val hashStartedAt = System.nanoTime()
             val actual = sha256(archive)
+            DeveloperLog.event("UbuntuDownload", "rootfs_checksum_calculated", mapOf("sha256" to actual, "durationMs" to (System.nanoTime() - hashStartedAt) / 1_000_000, "matchesOfficial" to actual.equals(expected, ignoreCase = true)))
             if (!actual.equals(expected, ignoreCase = true)) throw SecurityException("Ubuntu rootfs checksum verification failed.")
             val byteCount = archive.length()
+            DeveloperLog.event("UbuntuDownload", "rootfs_install_started", mapOf("archiveBytes" to byteCount))
             val installed = RootfsInstaller(paths).install(archive, expected)
+            DeveloperLog.event("UbuntuDownload", "download_install_completed", mapOf("archiveBytes" to byteCount, "entries" to installed.entries, "expandedBytes" to installed.expandedBytes, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
             return Result(installed, actual, byteCount)
+        } catch (error: Exception) {
+            DeveloperLog.failure("UbuntuDownload", "download_install_failed", error, mapOf("architecture" to paths.ubuntuArchitecture, "archive" to archive.absolutePath, "archiveExists" to archive.isFile, "archiveBytes" to archive.length(), "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+            throw error
         } finally {
             // The extracted rootfs is the installed runtime; keeping the compressed
             // archive would waste hundreds of MiB in the app-private data directory.
             archive.delete()
             sumsFile.delete()
+            DeveloperLog.debug("UbuntuDownload", "temporary_download_files_cleaned")
         }
     }
 
     private fun download(url: URL, destination: File, maxBytes: Long, progress: ((Long, Long) -> Unit)?) {
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("UbuntuDownload", "http_download_started", mapOf("host" to url.host, "file" to destination.name, "maxBytes" to maxBytes))
         val allowedHosts = setOf("cdimage.ubuntu.com", "releases.cdimage.ubuntu.com")
         var current = url
         var redirects = 0
@@ -56,6 +71,7 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
                 requestMethod = "GET"
             }
             val code = connection.responseCode
+            DeveloperLog.event("UbuntuDownload", "http_response_received", mapOf("host" to current.host, "file" to destination.name, "status" to code, "contentLength" to connection.contentLengthLong, "redirect" to (code in 300..399)))
             if (code in 300..399) {
                 val location = connection.getHeaderField("Location")
                 connection.disconnect()
@@ -86,8 +102,12 @@ class UbuntuBaseDownloader(private val paths: LinuxRuntimePaths) {
                         progress?.invoke(total, length)
                     }
                     if (length >= 0 && total != length) throw IllegalStateException("Ubuntu download was truncated.")
+                    DeveloperLog.event("UbuntuDownload", "http_download_completed", mapOf("file" to destination.name, "bytes" to total, "expectedBytes" to length, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
                 }
             }
+        } catch (error: Exception) {
+            DeveloperLog.failure("UbuntuDownload", "http_download_failed", error, mapOf("host" to current.host, "file" to destination.name, "partialBytes" to destination.length(), "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
+            throw error
         } finally { connection.disconnect() }
     }
 
