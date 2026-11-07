@@ -51,14 +51,14 @@ internal class ProjectStorage(context: Context) {
     }
 
     @Synchronized
-    fun createEmptyProject(name: String, language: String): Project =
-        createProjectInternal(name, language, null, "")
+    fun createEmptyProject(name: String, language: String, includeReadme: Boolean = false, initializeGit: Boolean = false): Project =
+        createProjectInternal(name, language, null, "", includeReadme, initializeGit)
 
     @Synchronized
-    fun createProject(name: String, language: String, starterName: String, starterContent: String): Project =
-        createProjectInternal(name, language, starterName, starterContent)
+    fun createProject(name: String, language: String, starterName: String, starterContent: String, includeReadme: Boolean = true, initializeGit: Boolean = false): Project =
+        createProjectInternal(name, language, starterName, starterContent, includeReadme, initializeGit)
 
-    private fun createProjectInternal(name: String, language: String, starterName: String?, starterContent: String): Project {
+    private fun createProjectInternal(name: String, language: String, starterName: String?, starterContent: String, includeReadme: Boolean, initializeGit: Boolean): Project {
         val startedAt = System.nanoTime()
         DeveloperLog.event("ProjectStorage", "project_create_started", mapOf("name" to name, "language" to language, "starterFile" to starterName, "starterBytes" to starterContent.toByteArray().size))
         validateName(name)
@@ -76,7 +76,15 @@ internal class ProjectStorage(context: Context) {
             File(staging, ".cppide-project").writeText("$language\n")
             if (starterName != null) {
                 File(staging, starterName).writeText(starterContent)
-                File(staging, "README.md").writeText("# $name\n\nCreated with Code Studio.\n")
+            }
+            if (includeReadme) File(staging, "README.md").writeText("# $name\n\nCreated with Code Studio.\n")
+            if (initializeGit) {
+                val git = File(staging, ".git")
+                listOf("objects/info", "objects/pack", "refs/heads", "refs/tags").forEach { File(git, it).mkdirs() }
+                File(git, "HEAD").writeText("ref: refs/heads/main\n")
+                File(git, "config").writeText("[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n")
+                File(git, "description").writeText("Unnamed repository; edit this file to name the repository.\n")
+            }
             }
             if (!staging.renameTo(target)) throw IOException("Unable to finalize project directory")
         } catch (error: Throwable) {
