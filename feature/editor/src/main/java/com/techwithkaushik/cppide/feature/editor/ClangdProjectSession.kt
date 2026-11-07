@@ -172,6 +172,7 @@ class ClangdProjectSession(
         mutableStatus.value = EditorLspStatus("Starting clangd…", "Starting the Ubuntu clangd process and initializing LSP.")
         try {
             editor.connectWithTimeout()
+            editor.isEnableInlayHint = true
             mutableStatus.value = EditorLspStatus(
                 "clangd connected",
                 "Completion, diagnostics, hover, signature help and code actions are available.",

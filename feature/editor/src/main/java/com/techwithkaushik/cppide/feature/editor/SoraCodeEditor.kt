@@ -24,6 +24,10 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.lsp.editor.LspEditor
+import io.github.rosemoe.sora.lsp.events.EventType
+import io.github.rosemoe.sora.lsp.events.code.codeAction
+import io.github.rosemoe.sora.lsp.utils.asLspRange
+import kotlinx.coroutines.launch
 import org.eclipse.tm4e.core.registry.IThemeSource
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -124,6 +128,7 @@ class SoraEditorController {
     fun copy() { editor?.copyText() }
     fun paste() { editor?.pasteText() }
     fun cut() { editor?.cutText() }
+    fun format() { editor?.formatCodeAsync() }
 
     fun selectLine(line: Int) {
         val target = (line - 1).coerceAtLeast(0)
@@ -140,7 +145,7 @@ class SoraEditorController {
     internal fun detach(editor: CodeEditor) { if (this.editor === editor) this.editor = null }
 }
 
-private fun showEditorContextMenu(anchor: View) {
+private fun showEditorContextMenu(anchor: View, lspEditor: LspEditor?) {
     val editor = anchor as? CodeEditor ?: return
     PopupMenu(anchor.context, anchor).apply {
         menu.add(0, 1, 0, "Undo")
@@ -149,6 +154,10 @@ private fun showEditorContextMenu(anchor: View) {
         menu.add(0, 4, 3, "Copy")
         menu.add(0, 5, 4, "Paste")
         menu.add(0, 6, 5, "Select All")
+        if (lspEditor?.isConnected == true) {
+            menu.add(0, 7, 6, "Quick Fix / Code Actions")
+            menu.add(0, 8, 7, "Format Document")
+        }
         setOnMenuItemClickListener { item: MenuItem ->
             when (item.itemId) {
                 1 -> editor.undo()
@@ -157,6 +166,15 @@ private fun showEditorContextMenu(anchor: View) {
                 4 -> editor.copyText()
                 5 -> editor.pasteText()
                 6 -> editor.selectAll()
+                7 -> {
+                    val languageEditor = lspEditor ?: return@setOnMenuItemClickListener false
+                    languageEditor.coroutineScope.launch {
+                        languageEditor.eventManager.emitAsync(EventType.codeAction) {
+                            put(editor.cursor.range.asLspRange())
+                        }
+                    }
+                }
+                8 -> editor.formatCodeAsync()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -265,12 +283,12 @@ fun SoraCodeEditor(
                 controller?.attach(this)
                 currentOnCursorPositionChange.value(cursor.leftLine + 1, cursor.leftColumn + 1)
                 setOnLongClickListener { view ->
-                    showEditorContextMenu(view)
+                    showEditorContextMenu(view, lspEditor)
                     true
                 }
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                     setOnContextClickListener { view ->
-                        showEditorContextMenu(view)
+                        showEditorContextMenu(view, lspEditor)
                         true
                     }
                 }

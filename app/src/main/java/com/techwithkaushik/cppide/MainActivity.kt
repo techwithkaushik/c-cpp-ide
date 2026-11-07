@@ -510,6 +510,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             "Run", "Output" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                             "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                             "Save" -> runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                            "Format Document" -> editorController.format()
                             "Undo" -> editorController.undo()
                             "Redo" -> editorController.redo()
                             "Select All" -> editorController.selectAll()
@@ -539,7 +540,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
         }
         if (showCommandPalette) {
             val commands = listOf(
-                "New File", "Find", "Find in Project", "Select All", "Copy", "Cut", "Paste",
+                "New File", "Find", "Find in Project", "Format Document", "Select All", "Copy", "Cut", "Paste",
                 "Undo", "Redo", "Toggle Word Wrap", "Save", "Save All",
                 "Build", "Run", "Terminal", "Problems", "Output",
                 "File Explorer", "Settings", "Sync Project"
@@ -1654,7 +1655,7 @@ private fun IdeMenuBar(
 ) {
     val menus = listOf(
         "File" to listOf("New File", "Save", "Save All"),
-        "Edit" to listOf("Undo", "Redo", "Cut", "Copy", "Paste", "Select All", "Find", "Find in Project"),
+        "Edit" to listOf("Undo", "Redo", "Cut", "Copy", "Paste", "Select All", "Find", "Find in Project", "Format Document"),
         "Selection" to listOf("Select All"),
         "View" to listOf("Toggle Word Wrap", "Problems", "Output", "Full Screen"),
         "Go" to listOf("Go to Line..."),
