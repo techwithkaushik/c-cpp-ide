@@ -1922,7 +1922,7 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
         ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
             if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
-            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, 14.dp * (node.depth + 1)) { onOpenFile(node.path) }
+            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp) { onOpenFile(node.path) }
         }
         if (nodes.isEmpty()) Text(if (query.isBlank()) "This folder is empty" else "No matching files", Modifier.fillMaxWidth().padding(18.dp), color = IdeMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
         if (fileDialog || folderDialog) {
@@ -1949,7 +1949,7 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
 private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: Boolean, expanded: Boolean, onClick: () -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit) {
     var menu by remember(path) { mutableStateOf(false) }
     Box {
-        Row(Modifier.fillMaxWidth().padding(start = depth * 14.dp).background(if (root) IdeSurfaceRaised else Color.Transparent).combinedClickable(onClick = onClick, onLongClick = { menu = true }).height(28.dp).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = (depth * 14).dp).background(if (root) IdeSurfaceRaised else Color.Transparent).combinedClickable(onClick = onClick, onLongClick = { menu = true }).height(28.dp).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             IdeIcon(if (expanded) "chevronDown" else "chevronRight", IdeMuted, 13.dp); Spacer(Modifier.width(3.dp)); IdeIcon("folder", Color(0xFFE4BE79), 16.dp); Spacer(Modifier.width(7.dp))
             Text(label, Modifier.weight(1f), color = if (root) Color(0xFFE8EDF5) else Color(0xFFDCE3EC), fontSize = 11.sp, fontWeight = if (root) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
