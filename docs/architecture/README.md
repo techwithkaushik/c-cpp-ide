@@ -13,6 +13,7 @@ The application is the composition root. Features communicate through stable con
 | Current Gradle module | Current responsibility | Target ownership |
 |---|---|---|
 | `:app` | Android app, Compose shell, startup and dependency composition | `app` |
+| `:core:contracts` | Shared editor diagnostics contract and editor problem model | `core:contracts` |
 | `:core:aidl` | AIDL contracts for process/service communication | `core:ipc` (after migration) |
 | `:core:jni` | Native C/C++ and PTY bridge | `core:jni` |
 | `:core:lsp` | Existing language-server integration | `lsp` |
@@ -157,7 +158,7 @@ Repository and product branding can change independently of Android application 
 4. Define editor/LSP contracts around the existing Sora implementation.
 5. Add integration tests for document synchronization and editor diagnostics.
 
-## 9. Gradle plugin audit — 2026-11-07
+## 10. Gradle plugin audit — 2026-11-07
 
 - [x] Reviewed the root plugin declarations and all existing Android module build scripts.
 - [x] Moved the existing KSP plugin version (`2.3.13`) into `gradle/libs.versions.toml`.
@@ -170,3 +171,16 @@ Repository and product branding can change independently of Android application 
 ### Audit observations
 
 The current project has meaningful differences between Android application, Compose library, native JNI, AIDL, and plain Android library modules. A single broad convention plugin would risk hiding those differences. Keep the existing build scripts explicit for now; first establish dependency direction and test coverage, then extract only proven shared conventions.
+
+
+## 9. Shared editor contract extraction — 2026-11-07
+
+- [x] Added `:core:contracts` as a dependency-light Android library module.
+- [x] Moved the shared `EditorProblem` model into the contracts module without introducing Sora, LSP4J, Compose, or runtime dependencies.
+- [x] Defined `EditorDiagnostics` as a read-only `StateFlow` contract.
+- [x] Updated `ClangdProjectSession` to implement the shared diagnostics contract.
+- [x] Kept the existing `feature.editor.EditorProblem` source name as a typealias for compatibility.
+- [x] Exposed `:core:contracts` through the editor module's public API dependency.
+- [ ] Verify Gradle configuration, editor compilation, and ARM32 release CI before migrating additional contracts.
+
+This is the first live contract migration. Do not move terminal, workspace, or runtime implementations until their public call sites and dependency graph have been inspected.
