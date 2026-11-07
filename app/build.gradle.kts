@@ -103,6 +103,7 @@ dependencies {
     implementation(project(":feature:editor"))
     implementation(project(":feature:terminal"))
     implementation(project(":workspace:impl"))
+    implementation(project(":workspace:ui"))
     implementation(project(":integrations:toolchain"))
     implementation(project(":integrations:linux-runtime"))
     implementation(platform(libs.androidx.compose.bom))
