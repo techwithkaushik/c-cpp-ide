@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withTimeout
 
 data class EditorLspStatus(
     val label: String,
@@ -185,19 +186,30 @@ class ClangdProjectSession(
 
     suspend fun connect(editor: LspEditor) {
         if (!available || editor.isConnected) return
-        mutableStatus.value = EditorLspStatus("Starting clangd…", "Starting the Ubuntu clangd process and initializing LSP.")
+        mutableStatus.value = EditorLspStatus(
+            "Starting clangd…",
+            "Launching clangd through Ubuntu/PRoot and waiting for the LSP initialize handshake."
+        )
         try {
-            editor.connectWithTimeout()
+            val connected = withTimeout(LSP_CONNECT_TIMEOUT_MS) { editor.connect() }
+            if (!connected || !editor.isConnected) {
+                throw IllegalStateException("clangd did not complete the LSP initialize handshake. Check the clangd executable, PRoot loader and runtime logs.")
+            }
             editor.isEnableInlayHint = true
             mutableStatus.value = EditorLspStatus(
                 "clangd connected",
-                "Completion, diagnostics, hover, signature help and code actions are available.",
+                "LSP initialized and the document was opened. Completion, diagnostics, hover and signature help are active.",
                 connected = true
             )
         } catch (error: Exception) {
+            val reason = generateSequence(error as Throwable?) { it.cause }
+                .mapNotNull { it.message?.takeIf(String::isNotBlank) }
+                .distinct()
+                .joinToString(" → ")
+                .ifBlank { error.javaClass.simpleName }
             mutableStatus.value = EditorLspStatus(
                 "clangd connection failed",
-                error.message ?: error.javaClass.simpleName,
+                reason,
                 error = true
             )
         }
@@ -212,6 +224,7 @@ class ClangdProjectSession(
     }
 
     private companion object {
+        const val LSP_CONNECT_TIMEOUT_MS = 45_000L
         const val GUEST_WORKSPACE = "/workspace"
         val CPP_EXTENSIONS = setOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
         val SUPPORTED_EXTENSIONS = CPP_EXTENSIONS + "c"
