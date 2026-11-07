@@ -152,7 +152,11 @@ private object LinuxTerminalSessions {
     private var nextId = 1
 
     fun select(id: Int) {
-        val tab = tabs.firstOrNull { it.id == id } ?: return
+        val tab = tabs.firstOrNull { it.id == id } ?: run {
+            DeveloperLog.warn("Terminal", "tab_select_failed_missing_tab; tabId=$id")
+            return
+        }
+        DeveloperLog.event("Terminal", "tab_selected", mapOf("tabId" to id, "title" to tab.title.value, "exited" to tab.exited.value))
         selectedId = id
         selectedTabIdForWorker = id
         // Snapshot construction is intentionally off the UI thread. The single
@@ -169,7 +173,10 @@ private object LinuxTerminalSessions {
     }
 
     fun resize(tab: LinuxTerminalTab, columns: Int, rows: Int) {
+        DeveloperLog.debug("Terminal", "viewport_resize_requested; tabId=${tab.id}; columns=$columns; rows=$rows")
         renderExecutor.execute {
+            runCatching { tab.resize(columns, rows) }
+                .onFailure { DeveloperLog.failure("Terminal", "session_resize_failed", it, mapOf("tabId" to tab.id, "columns" to columns, "rows" to rows)) }
             tab.screen.resize(columns, rows)
             val rendered = tab.screen.renderAnnotated()
             outputHandler.post {
@@ -194,8 +201,15 @@ private object LinuxTerminalSessions {
             send = { text ->
                 // Ignore late IME/key events racing with the reader's exit callback.
                 if (!ended.get()) {
-                    input.write(text.toByteArray(Charsets.UTF_8))
-                    input.flush()
+                    try {
+                        input.write(text.toByteArray(Charsets.UTF_8))
+                        input.flush()
+                    } catch (error: Exception) {
+                        DeveloperLog.failure("Terminal", "input_write_failed", error, mapOf("tabId" to nextId - 1, "inputCharacters" to text.length))
+                        throw error
+                    }
+                } else {
+                    DeveloperLog.debug("Terminal", "input_ignored_session_already_exited; tabId=${nextId - 1}")
                 }
             },
             interrupt = { if (!ended.get()) interrupt() },
@@ -208,13 +222,18 @@ private object LinuxTerminalSessions {
         activeTabIds.add(tab.id)
         selectedId = tab.id
         selectedTabIdForWorker = tab.id
+        DeveloperLog.event("Terminal", "tab_created", mapOf("tabId" to tab.id, "title" to title, "initialOutputCharacters" to initialOutput.length, "scrollbackLimit" to maxScrollbackLines, "tabCount" to tabs.size))
         return tab
     }
 
     fun markExited(tab: LinuxTerminalTab, code: Int, message: String) {
         // PTY reader callbacks are background-thread callbacks. Never inspect
         // Compose's snapshot-backed tab list or mutate tab state from here.
-        if (!activeTabIds.contains(tab.id) || !tab.ended.compareAndSet(false, true)) return
+        if (!activeTabIds.contains(tab.id) || !tab.ended.compareAndSet(false, true)) {
+            DeveloperLog.debug("Terminal", "exit_callback_ignored_duplicate_or_closed; tabId=${tab.id}; exitCode=$code")
+            return
+        }
+        DeveloperLog.event("Terminal", "tab_process_exited", mapOf("tabId" to tab.id, "title" to tab.title.value, "exitCode" to code, "messageCharacters" to message.length))
         outputHandler.post {
             if (activeTabIds.contains(tab.id)) tab.exited.value = code
         }
@@ -274,7 +293,11 @@ private object LinuxTerminalSessions {
 
     fun finish(tab: LinuxTerminalTab) {
         val index = tabs.indexOfFirst { it.id == tab.id }
-        if (index < 0) return
+        if (index < 0) {
+            DeveloperLog.debug("Terminal", "tab_finish_ignored_missing_tab; tabId=${tab.id}")
+            return
+        }
+        DeveloperLog.event("Terminal", "tab_close_started", mapOf("tabId" to tab.id, "title" to tab.title.value, "exited" to tab.exited.value))
         tabs.removeAt(index)
         activeTabIds.remove(tab.id)
         synchronized(outputLock) {
@@ -284,6 +307,8 @@ private object LinuxTerminalSessions {
             scheduledRenders.remove(tab.id)
         }
         runCatching { tab.session.close() }
+            .onSuccess { DeveloperLog.event("Terminal", "tab_session_closed", mapOf("tabId" to tab.id)) }
+            .onFailure { DeveloperLog.failure("Terminal", "tab_session_close_failed", it, mapOf("tabId" to tab.id)) }
         if (tabs.isEmpty()) {
             selectedId = 0
             selectedTabIdForWorker = 0
@@ -292,6 +317,7 @@ private object LinuxTerminalSessions {
             selectedId = tabs.getOrNull(index - 1)?.id ?: tabs.first().id
             selectedTabIdForWorker = selectedId
         }
+        DeveloperLog.event("Terminal", "tab_closed", mapOf("tabId" to tab.id, "remainingTabs" to tabs.size, "selectedTabId" to selectedId))
     }
 
     fun closeTab(id: Int) {
