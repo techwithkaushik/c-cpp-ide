@@ -3,8 +3,6 @@ package com.techwithkaushik.cppide.feature.terminal
 import com.techwithkaushik.cppide.core.jni.NativePtyProcess
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
-import com.techwithkaushik.cppide.integration.linuxruntime.HostResolverConfig
-import com.techwithkaushik.cppide.integration.linuxruntime.LinuxGuestCompatibility
 import java.io.File
 import java.io.OutputStream
 import java.io.InputStream
@@ -79,11 +77,11 @@ class LocalLinuxSession private constructor(private val pty: NativePtyProcess, p
             try {
             paths.ensureDirectories()
             if (!paths.hasRootfs()) throw IllegalStateException("Ubuntu rootfs is not installed or incomplete. ${paths.rootfsDiagnostic()}")
-            LinuxGuestCompatibility.ensureSupplementaryGroupNames(paths.ubuntuRoot)
+            paths.ensureGuestCompatibility()
             if (!paths.proot.isFile) throw IllegalStateException("App-owned PRoot is missing; Ubuntu cannot run until the Android PRoot runtime is installed.")
             val shell = if (File(paths.ubuntuRoot, "bin/bash").isFile) "/bin/bash" else "/bin/sh"
             val temp = paths.usrTmp.apply { if (!exists() && !mkdirs()) throw IllegalStateException("Cannot create PRoot temporary directory.") }
-            HostResolverConfig.prepare(temp, sessionId)
+            paths.prepareResolver(temp, sessionId)
             val pty = NativePtyProcess.launch(
                 proot = paths.proot.absolutePath, rootfs = paths.ubuntuRoot.absolutePath,
                 shell = shell, tempDirectory = temp.absolutePath
