@@ -1991,9 +1991,9 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
             IconButton(onClick = { searchExpanded = !searchExpanded; if (!searchExpanded) query = "" }, modifier = Modifier.size(32.dp)) { IdeIcon(if (searchExpanded) "close" else "search", IdeAccent, 18.dp) }
             if (searchExpanded) OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f).heightIn(min = 40.dp), singleLine = true, shape = androidx.compose.ui.graphics.RectangleShape, placeholder = { Text("Search files", fontSize = 12.sp) })
         }
-        ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
+        ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry)
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
-            if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
+            if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true }, onRenameEntry = onRenameEntry, onDeleteEntry = onDeleteEntry, onMoveEntry = onMoveEntry)
             else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, ((node.depth + 1) * 14).dp, { onOpenFile(node.path) }, onRenameEntry, onDeleteEntry, onMoveEntry)
         }
         if (nodes.isEmpty()) Text(if (query.isBlank()) "This folder is empty" else "No matching files", Modifier.fillMaxWidth().padding(18.dp), color = IdeMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
@@ -2018,8 +2018,12 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
 }
 
 @Composable
-private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: Boolean, expanded: Boolean, onClick: () -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit) {
+private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: Boolean, expanded: Boolean, onClick: () -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit, onRenameEntry: (String, String) -> Unit, onDeleteEntry: (String) -> Unit, onMoveEntry: (String, String) -> Unit) {
     var menu by remember(path) { mutableStateOf(false) }
+    var renameDialog by remember(path) { mutableStateOf(false) }
+    var renameValue by remember(path) { mutableStateOf(label) }
+    var moveDialog by remember(path) { mutableStateOf(false) }
+    var targetDirectory by remember(path) { mutableStateOf(".") }
     Box {
         Row(Modifier.fillMaxWidth().padding(start = (depth * 14).dp).background(if (root) IdeSurfaceRaised else Color.Transparent).combinedClickable(onClick = onClick, onLongClick = { menu = true }).height(28.dp).padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             IdeIcon(if (expanded) "chevronDown" else "chevronRight", IdeMuted, 13.dp); Spacer(Modifier.width(3.dp)); IdeIcon("folder", Color(0xFFE4BE79), 16.dp); Spacer(Modifier.width(7.dp))
@@ -2028,7 +2032,14 @@ private fun ExplorerDirectoryRow(label: String, path: String, depth: Int, root: 
         androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             androidx.compose.material3.DropdownMenuItem(text = { Text("New File") }, leadingIcon = { IdeIcon("add", IdeAccent, 16.dp) }, onClick = { menu = false; onCreateFile(path) })
             androidx.compose.material3.DropdownMenuItem(text = { Text("New Folder") }, leadingIcon = { IdeIcon("folder", IdeAccent, 16.dp) }, onClick = { menu = false; onCreateFolder(path) })
+            if (!root) {
+                DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renameDialog = true })
+                DropdownMenuItem(text = { Text("Move to folder") }, onClick = { menu = false; moveDialog = true })
+                DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDeleteEntry(path) })
+            }
         }
+        if (renameDialog) AlertDialog(onDismissRequest = { renameDialog = false }, title = { Text("Rename folder") }, text = { OutlinedTextField(value = renameValue, onValueChange = { renameValue = it }, singleLine = true) }, confirmButton = { TextButton(onClick = { renameDialog = false; onRenameEntry(path, renameValue.trim()) }) { Text("Rename") } }, dismissButton = { TextButton(onClick = { renameDialog = false }) { Text("Cancel") } })
+        if (moveDialog) AlertDialog(onDismissRequest = { moveDialog = false }, title = { Text("Move folder") }, text = { OutlinedTextField(value = targetDirectory, onValueChange = { targetDirectory = it }, singleLine = true, placeholder = { Text(". or src") }) }, confirmButton = { TextButton(onClick = { moveDialog = false; onMoveEntry(path, targetDirectory.trim()) }) { Text("Move") } }, dismissButton = { TextButton(onClick = { moveDialog = false }) { Text("Cancel") } })
     }
 }
 @Composable
