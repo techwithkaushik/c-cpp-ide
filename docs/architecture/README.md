@@ -21,8 +21,8 @@ The application is the composition root. Features communicate through stable con
 | `:ui:design-system` | Compose design tokens and theme primitives | `ui/design-system` |
 | `:editor` | Sora editor adapter, TextMate grammar and clangd integration | `editor` |
 | `:terminal` | Terminal UI, local PTY session, SSH shell session and terminal components | `terminal` |
-| `:integrations:toolchain` | Linux toolchain discovery and bootstrap artifact handling | `runtime:toolchains` |
-| `:integrations:linux-runtime` | PRoot, rootfs install/validation and guest compatibility | `runtime` |
+| `:runtime:toolchains` | Linux toolchain discovery and bootstrap artifact handling | `runtime:toolchains` |
+| `:runtime:linux` | PRoot, rootfs install/validation and guest compatibility | `runtime` |
 | `:workspace:api` | Workspace repository and project model contracts | `workspace/api` |
 | `:workspace:impl` | App-private project storage and safe file operations | `workspace/impl` |
 | `:workspace:ui` | Project file explorer UI | `workspace/explorer` |
@@ -203,7 +203,7 @@ This is the first live contract migration. Do not move terminal, workspace, or r
 
 ### Current dependency boundary
 
-The editor no longer imports `:integrations:linux-runtime` or `:integrations:toolchain`; those concrete modules are wired by `:app`. Workspace persistence now lives in `:workspace:impl` and is accessed through `:workspace:api`. Terminal/runtime separation is not yet complete and remains an explicit migration item.
+The editor no longer imports `:runtime:linux` or `:runtime:toolchains`; those concrete modules are wired by `:app`. Workspace persistence now lives in `:workspace:impl` and is accessed through `:workspace:api`. Terminal/runtime separation is not yet complete and remains an explicit migration item.
 
 
 ## 12. LSP and UI design-system ownership migration — 2026-11-07
@@ -219,10 +219,10 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 
 ## 13. Terminal session ownership migration — 2026-11-07
 
-- [x] Moved the real local PTY session implementation from `:integrations:linux-runtime` into `:terminal`.
+- [x] Moved the real local PTY session implementation from `:runtime:linux` into `:terminal`.
 - [x] Moved SSH host configuration, host-key pinning, and SSH shell session implementation into `:terminal`.
 - [x] Kept Android supplementary-group compatibility repair in the Linux runtime module and made terminal PTY startup consume that runtime-owned helper.
-- [x] Removed the JSch dependency from `:integrations:linux-runtime`; SSH dependency remains with the terminal module.
+- [x] Removed the JSch dependency from `:runtime:linux`; SSH dependency remains with the terminal module.
 - [ ] Verify terminal session relocation and ABI-specific release packaging with CI.
 - [ ] Replace terminal screens' direct construction of rootfs installers, PRoot validators, and runtime smoke tests with an app-provided runtime operations interface.
 - [ ] Move terminal UI and runtime setup UI into separate feature surfaces without changing current workflows.
@@ -230,7 +230,7 @@ The editor no longer imports `:integrations:linux-runtime` or `:integrations:too
 
 ## 14. Terminal/runtime ownership map correction
 
-The local PTY session and SSH shell/session implementation now belong to `:terminal`. PRoot, rootfs acquisition/extraction, executable validation, runtime smoke tests, and guest compatibility remain in `:integrations:linux-runtime`. The remaining direct calls from terminal UI into runtime installers are an adapter boundary still to be completed; this migration does not claim that separation is finished.
+The local PTY session and SSH shell/session implementation now belong to `:terminal`. PRoot, rootfs acquisition/extraction, executable validation, runtime smoke tests, and guest compatibility remain in `:runtime:linux`. The remaining direct calls from terminal UI into runtime installers are an adapter boundary still to be completed; this migration does not claim that separation is finished.
 
 
 ## 15. IPC module ownership migration
@@ -256,11 +256,11 @@ The local PTY session and SSH shell/session implementation now belong to `:termi
 ## 17. Terminal/runtime boundary completion — 2026-11-07
 
 - [x] Added `:core:contracts` runtime operations, environment, rootfs inspection/install, PRoot validation, download, and smoke-test contracts.
-- [x] Implemented the concrete runtime adapter in `:integrations:linux-runtime`.
+- [x] Implemented the concrete runtime adapter in `:runtime:linux`.
 - [x] Updated app composition to create the runtime adapter and inject it into terminal UI.
 - [x] Updated active and retained terminal/runtime setup panels to call the runtime operations contract rather than instantiate rootfs installers or PRoot validators.
 - [x] Moved resolver preparation and guest compatibility behind the runtime environment contract.
-- [x] Removed `:integrations:linux-runtime` from `:terminal` Gradle dependencies; terminal now depends on `:core:contracts` and its own terminal/native APIs.
+- [x] Removed `:runtime:linux` from `:terminal` Gradle dependencies; terminal now depends on `:core:contracts` and its own terminal/native APIs.
 - [ ] Verify terminal/runtime boundary changes in the ARM32 release workflow and fix any compile/test regressions before continuing.
 
 
@@ -272,3 +272,12 @@ The local PTY session and SSH shell/session implementation now belong to `:termi
 - [x] Updated Gradle settings and app dependencies to the new module paths.
 - [x] Preserved application ID and existing Kotlin packages to avoid app upgrade or source compatibility changes.
 - [ ] Validate the complete top-level module move in ARM32 CI.
+
+
+## 19. Runtime module ownership migration
+
+- [x] Promoted toolchain discovery/bootstrap code to `:runtime:toolchains`.
+- [x] Promoted PRoot, rootfs, runtime operations, guest compatibility, and validation code to `:runtime:linux`.
+- [x] Updated app composition dependencies and Gradle settings.
+- [x] Preserved existing Kotlin package names so this is a Gradle ownership migration, not an unrelated package rename.
+- [ ] Verify runtime module relocation, native packaging, and ARM32 release CI.
