@@ -511,7 +511,16 @@ class ClangdProjectSession(
         }
     }
 
-    private companion object {
+    companion object {
+        /** Sora editor disposal may close an LSP transport; never run it on Compose's UI thread. */
+        fun disposeEditorAsync(editor: LspEditor?) {
+            if (editor == null) return
+            SESSION_DISPOSER.execute {
+                runCatching { editor.dispose() }
+                    .onFailure { DeveloperLog.failure("ClangdLsp", "editor_dispose_failed", it, mapOf("file" to editor.uri.path)) }
+            }
+        }
+
         const val LSP_CONNECT_TIMEOUT_MS = 45_000L
         const val FEATURE_PROBE_TIMEOUT_MS = 12_000L
         const val GUEST_WORKSPACE = "/workspace"
