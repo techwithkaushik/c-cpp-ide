@@ -61,7 +61,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
-import com.techwithkaushik.cppide.core.designsystem.IdeDesignTokens
+import com.techwithkaushik.cppide.ui.designsystem.IdeDesignTokens
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
