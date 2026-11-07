@@ -309,10 +309,16 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
             DeveloperLog.debug(appContext, "ClangdLsp", "workspace_session_creation_skipped; screen=$screen; runtimeValidationComplete=$runtimeValidationComplete; workspaceExists=${workspaceDirectory != null}")
         }
     }
-    DisposableEffect(clangdSession) {
+    // Keep cleanup tied to the workspace/screen lifecycle, not to the session
+    // state itself. Keying DisposableEffect(clangdSession) disposes the freshly
+    // created session during the null -> session state transition.
+    val currentClangdSession by rememberUpdatedState(clangdSession)
+    DisposableEffect(workspaceDirectory?.absolutePath, screen) {
         onDispose {
-            DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_dispose_requested", mapOf("present" to (clangdSession != null)))
-            runCatching { clangdSession?.close() }.onFailure { DeveloperLog.failure("ClangdLsp", "workspace_session_dispose_failed", it) }
+            val sessionToDispose = currentClangdSession
+            DeveloperLog.event(appContext, "ClangdLsp", "workspace_session_dispose_requested", mapOf("present" to (sessionToDispose != null)))
+            runCatching { sessionToDispose?.close() }
+                .onFailure { DeveloperLog.failure("ClangdLsp", "workspace_session_dispose_failed", it) }
         }
     }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
