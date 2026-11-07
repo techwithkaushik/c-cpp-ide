@@ -1871,7 +1871,8 @@ private fun IdeMenuBar(
 }
 
 @Composable
-private fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: (String) -> Unit, onClose: () -> Unit, sidebarMode: Boolean = false) {
+private fun FileExplorerSheet(projectName: String, activeFile: String, files: List<String>, directories: List<String>, onOpenFile: (String) -> Unit, onCreateFile: (String) -> Unit, onCreateFolder: suspend (String) -> Unit, onClose: () -> Unit, sidebarMode: Boolean = false) {
+    val scope = rememberCoroutineScope()
     var query by rememberSaveable(projectName) { mutableStateOf("") }
     var fileDialog by rememberSaveable(projectName) { mutableStateOf(false) }
     var folderDialog by rememberSaveable(projectName) { mutableStateOf(false) }
@@ -1919,7 +1920,7 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
                     when {
                         name.isBlank() || name.contains("/") || name.contains("\\") || name == "." || name == ".." -> entryMessage = "Enter a valid name without path separators."
                         target in files || target in directories -> entryMessage = "An item with this name already exists."
-                        folder -> runCatching { onCreateFolder(target) }.onSuccess { expanded = expanded + createTarget + target; entryMessage = "Folder created." }.onFailure { entryMessage = it.message ?: "Unable to create folder." }
+                        folder -> scope.launch { runCatching { onCreateFolder(target) }.onSuccess { expanded = expanded + createTarget + target; entryMessage = "Folder created." }.onFailure { entryMessage = it.message ?: "Unable to create folder." } }
                         else -> { onCreateFile(target); entryMessage = "File created." }
                     }; fileDialog = false; folderDialog = false
                 }) { Text("Create", color = IdeAccent) } },
