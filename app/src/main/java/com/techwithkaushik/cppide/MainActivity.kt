@@ -1175,7 +1175,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                         }
                     }
-                    Row(Modifier.fillMaxWidth().clickable { createReadme = !createReadme }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { Text("Create README.md", Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp); Checkbox(checked = createReadme, onCheckedChange = { createReadme = it }) }
+                    if (!createEmptyProject) Row(Modifier.fillMaxWidth().clickable { createReadme = !createReadme }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { Text("Create README.md", Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp); Checkbox(checked = createReadme, onCheckedChange = { createReadme = it }) }
                     Row(Modifier.fillMaxWidth().clickable { initializeGit = !initializeGit }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { Text("Initialize Git repository", Modifier.weight(1f), color = Color(0xFFE8EDF5), fontSize = 12.sp); Checkbox(checked = initializeGit, onCheckedChange = { initializeGit = it }) }
                     Text(if (createEmptyProject) "The workspace will start with no source file. Optional README and Git metadata follow the selections above." else "A starter source file will be created.",
                         color = IdeMuted, fontSize = 11.sp, lineHeight = 15.sp)
@@ -1190,7 +1190,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     }
                     val entryFile = entryFileForLanguage(newProjectLanguage)
                     runCatching {
-                        if (createEmptyProject) projectStorage.createEmptyProject(name, newProjectLanguage, createReadme, initializeGit)
+                        if (createEmptyProject) projectStorage.createEmptyProject(name, newProjectLanguage, includeReadme = false, initializeGit = initializeGit)
                         else projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile), createReadme, initializeGit)
                     }.onSuccess { stored ->
                         projects.add(0, IdeProject(stored.name, stored.language, stored.path, "Just now"))
