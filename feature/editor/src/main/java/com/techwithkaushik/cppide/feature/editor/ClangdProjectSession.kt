@@ -387,19 +387,33 @@ class ClangdProjectSession(
 
     /** Notify clangd after the corresponding workspace file has been written successfully. */
     fun saveDocument(relativeFilePath: String) {
-        val safeFile = File(workspace, relativeFilePath).canonicalFile
-        if (!safeFile.toPath().startsWith(workspace.toPath())) return
+        val startedAt = System.nanoTime()
+        DeveloperLog.event("ClangdLsp", "document_save_requested", mapOf("file" to relativeFilePath, "sessionAvailable" to available))
+        val safeFile = runCatching { File(workspace, relativeFilePath).canonicalFile }
+            .onFailure { DeveloperLog.failure("ClangdLsp", "document_save_path_resolution_failed", it, mapOf("file" to relativeFilePath)) }
+            .getOrNull() ?: return
+        if (!safeFile.toPath().startsWith(workspace.toPath())) {
+            DeveloperLog.warn("ClangdLsp", "document_save_rejected_outside_workspace; file=$relativeFilePath")
+            return
+        }
         val guestPath = "$GUEST_WORKSPACE/${safeFile.relativeTo(workspace).invariantSeparatorsPath}"
         // New files and renamed source files need fresh compilation commands.
         // Refresh before didSave so clangd can pick up the updated database.
         runCatching { ensureFallbackCompilationDatabase(runtime.ubuntuRoot.canonicalFile) }
-            .onFailure { DeveloperLog.failure("ClangdLsp", "compile_commands_refresh_failed", it) }
-        val editor = project.getEditor(guestPath) ?: return
-        if (!editor.isConnected) return
+            .onFailure { DeveloperLog.failure("ClangdLsp", "compile_commands_refresh_failed", it, mapOf("file" to relativeFilePath)) }
+        val editor = project.getEditor(guestPath) ?: run {
+            DeveloperLog.debug("ClangdLsp", "document_save_skipped_editor_not_registered; file=$relativeFilePath")
+            return
+        }
+        if (!editor.isConnected) {
+            DeveloperLog.warn("ClangdLsp", "document_save_skipped_server_disconnected; file=$relativeFilePath")
+            return
+        }
         editor.coroutineScope.launch {
+            DeveloperLog.event("ClangdLsp", "did_save_sending", mapOf("file" to relativeFilePath, "uri" to editor.uri.path))
             runCatching { editor.saveDocument() }
                 .onSuccess {
-                    DeveloperLog.event("ClangdLsp", "document_saved", mapOf("file" to relativeFilePath))
+                    DeveloperLog.event("ClangdLsp", "did_save_sent", mapOf("file" to relativeFilePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
                 }
                 .onFailure { error ->
                     DeveloperLog.failure("ClangdLsp", "document_save_notification_failed", error, mapOf("file" to relativeFilePath))
