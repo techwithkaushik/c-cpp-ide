@@ -21,7 +21,7 @@ The application is the composition root. Features communicate through stable con
 | `:ui:design-system` | Compose design tokens and theme primitives | `ui/design-system` |
 | `:editor` | Sora editor adapter, TextMate grammar and clangd integration | `editor` |
 | `:terminal` | Terminal UI, local PTY session, SSH shell session and terminal components | `terminal` |
-| `:runtime:toolchains` | Linux toolchain discovery and bootstrap artifact handling | `runtime:toolchains` |
+| `:runtime:toolchains` | Toolchain discovery, catalog, preferences, and validation | `runtime/toolchains` |
 | `:runtime:linux` | PRoot, rootfs install/validation and guest compatibility | `runtime` |
 | `:workspace:api` | Workspace repository and project model contracts | `workspace/api` |
 | `:workspace:impl` | App-private project storage and safe file operations | `workspace/impl` |
@@ -281,3 +281,13 @@ The local PTY session and SSH shell/session implementation now belong to `:termi
 - [x] Updated app composition dependencies and Gradle settings.
 - [x] Preserved existing Kotlin package names so this is a Gradle ownership migration, not an unrelated package rename.
 - [ ] Verify runtime module relocation, native packaging, and ARM32 release CI.
+
+
+## 20. Toolchain and build-process ownership migration
+
+- [x] Moved language/tooling catalog, executable path preferences, and C/C++ toolchain inspection from app into `:runtime:toolchains`.
+- [x] Added `:runtime:process` for C/C++ build/run and clang-format process execution.
+- [x] Moved `EmbeddedCppBuildRunner` out of app and changed it to consume `:workspace:api` and `:core:contracts` interfaces.
+- [x] Moved `UbuntuClangFormatRunner` out of app and changed it to consume runtime/toolchain contracts.
+- [x] App now composes the build runner with workspace repository and runtime environment implementations.
+- [ ] Verify the runtime process module and full ARM32 release CI.
