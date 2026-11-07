@@ -10,6 +10,7 @@ import java.io.File
  */
 interface LinuxRuntimeEnvironment {
     val ubuntuRoot: File
+    val ubuntuArchitecture: String
     val proot: File
     val prootLoader: File
     val usrTmp: File
@@ -17,6 +18,8 @@ interface LinuxRuntimeEnvironment {
 
     fun ensureDirectories()
     fun hasRootfs(): Boolean
+    fun hasProot(): Boolean
+    fun rootfsDiagnostic(): String
     fun ready(): Boolean
 }
 
