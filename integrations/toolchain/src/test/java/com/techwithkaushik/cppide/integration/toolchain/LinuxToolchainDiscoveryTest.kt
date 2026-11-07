@@ -1,6 +1,8 @@
 package com.techwithkaushik.cppide.integration.toolchain
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -50,6 +52,41 @@ class LinuxToolchainDiscoveryTest {
     }
 
     @Test
+    fun resolvesAbsoluteDistroSymlinkAgainstRootfsInsteadOfAndroidHost() {
+        val root = createRoot()
+        val target = executable(root, "usr/lib/llvm-19/bin/clangd")
+        val link = File(root, "usr/bin/clangd")
+        link.parentFile.mkdirs()
+        try {
+            Files.createSymbolicLink(link.toPath(), Paths.get("/usr/lib/llvm-19/bin/clangd"))
+        } catch (_: Exception) {
+            return
+        }
+
+        val inventory = LinuxToolchainDiscovery().discover(root, "/usr/bin")
+
+        assertEquals(target.absolutePath, inventory.find("clangd")?.executable)
+    }
+
+    @Test
+    fun resolvesRelativeSymlinkChainsInsideRootfs() {
+        val root = createRoot()
+        val target = executable(root, "usr/lib/llvm-18/bin/clangd-18")
+        val versionedLink = File(root, "usr/bin/clangd-18")
+        val defaultLink = File(root, "usr/bin/clangd")
+        try {
+            Files.createSymbolicLink(versionedLink.toPath(), Paths.get("../lib/llvm-18/bin/clangd-18"))
+            Files.createSymbolicLink(defaultLink.toPath(), Paths.get("clangd-18"))
+        } catch (_: Exception) {
+            return
+        }
+
+        val inventory = LinuxToolchainDiscovery().discover(root, "/usr/bin")
+
+        assertEquals(target.absolutePath, inventory.find("clangd")?.executable)
+    }
+
+    @Test
     fun ignoresSymlinkThatEscapesRootfs() {
         val root = createRoot()
         val outside = File(root.parentFile, "outside-clang")
@@ -60,7 +97,6 @@ class LinuxToolchainDiscoveryTest {
         try {
             java.nio.file.Files.createSymbolicLink(link.toPath(), outside.toPath())
         } catch (_: Exception) {
-            // Symlink creation is not supported on every test filesystem.
             return
         }
 
