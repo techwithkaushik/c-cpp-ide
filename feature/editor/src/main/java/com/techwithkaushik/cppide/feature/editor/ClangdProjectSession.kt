@@ -180,6 +180,7 @@ class ClangdProjectSession(
     }
 
 
+    @Synchronized
     private fun ensureFallbackCompilationDatabase(root: File) {
         val database = File(workspace, "compile_commands.json")
         val marker = File(workspace, ".cppide-compile-commands.generated")
@@ -192,7 +193,13 @@ class ClangdProjectSession(
             return "/" + executable.relativeTo(root).invariantSeparatorsPath
         }
         val cc = guestCompiler("clang") ?: guestCompiler("gcc")
-            ?: throw IllegalStateException("Install clang or gcc in Ubuntu to enable C/C++ language services.")
+        // clangd has a built-in fallback command. A missing compiler must not
+        // prevent initialization, completion, hover and basic diagnostics.
+        if (cc == null) {
+            DeveloperLog.event("ClangdLsp", "fallback_compile_commands_skipped", mapOf("reason" to "compiler_missing"))
+            if (marker.exists()) { database.delete(); marker.delete() }
+            return
+        }
         val cxx = guestCompiler("clang++") ?: guestCompiler("g++") ?: cc
         val entries = JSONArray()
         workspace.walkTopDown()
@@ -231,6 +238,10 @@ class ClangdProjectSession(
         if (!source.toPath().startsWith(workspace.toPath()) || source == workspace || source.isDirectory) return null
         val extension = source.extension.lowercase()
         if (extension !in SUPPORTED_EXTENSIONS) return null
+        // New source files may be created after session startup. Refresh only
+        // IDE-generated compile commands; never overwrite user-managed databases.
+        runCatching { ensureFallbackCompilationDatabase(runtime.ubuntuRoot.canonicalFile) }
+            .onFailure { DeveloperLog.failure("ClangdLsp", "compile_commands_refresh_failed", it) }
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
         // Pass a filesystem path, not an already-encoded URI: FileUri.toUri() encodes it once.
         val guestPath = "$GUEST_WORKSPACE/$relative"
