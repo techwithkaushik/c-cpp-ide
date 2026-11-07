@@ -98,6 +98,29 @@ class LinuxToolchainDiscovery {
     }
 
     /**
+     * Resolve an absolute Linux guest executable path without following absolute
+     * symlinks on the Android host. Returns the physical file below rootfs only.
+     */
+    fun resolveExecutable(rootfs: File, guestPath: String): File? {
+        if (!guestPath.startsWith("/") || '\u0000' in guestPath) return null
+        val root = rootfs.canonicalFile.toPath()
+        val candidate = resolveInsideRootfs(root, root.resolve(guestPath.removePrefix("/")).normalize())
+            ?: return null
+        val executable = candidate.toFile()
+        return executable.takeIf { it.isFile && it.canExecute() }
+    }
+
+    /**
+     * Convert a physical rootfs file into its absolute Linux guest path.
+     */
+    fun toGuestPath(rootfs: File, executable: File): String? {
+        val root = rootfs.canonicalFile.toPath()
+        val file = executable.toPath().toAbsolutePath().normalize()
+        if (!file.startsWith(root)) return null
+        return "/" + root.relativize(file).joinToString("/") { it.toString() }
+    }
+
+    /**
      * Resolve symlinks as they would be interpreted inside a chroot. Java's
      * canonicalFile follows absolute symlinks on the Android host, which makes
      * valid distro links appear to escape (or disappear outside) the rootfs.
