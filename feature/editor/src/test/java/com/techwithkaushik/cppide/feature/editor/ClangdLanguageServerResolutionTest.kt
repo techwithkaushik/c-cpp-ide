@@ -36,6 +36,15 @@ class ClangdLanguageServerResolutionTest {
         cppExtensions.forEach { extension ->
             assertEquals("clangd-cpp", project.getServerDefinitions(extension).single().name)
         }
+
+        // Exercise the same LspEditor construction path used by the Android editor.
+        // This catches a definition that is registered but cannot actually resolve
+        // when Sora opens a document with that extension.
+        (listOf("c") + cppExtensions).forEach { extension ->
+            val editor = project.createEditor("/workspace/probe.$extension")
+            assertEquals(extension, editor.fileExt)
+            editor.dispose()
+        }
         project.dispose()
     }
 }
