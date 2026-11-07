@@ -3,6 +3,7 @@ package com.techwithkaushik.cppide.feature.editor
 import com.techwithkaushik.cppide.core.contracts.editor.EditorDiagnostics
 import com.techwithkaushik.cppide.core.contracts.runtime.LinuxRuntimeEnvironment
 import com.techwithkaushik.cppide.core.contracts.runtime.LinuxToolchainAccess
+import com.techwithkaushik.cppide.core.contracts.workspace.WorkspaceIdentity
 import com.techwithkaushik.cppide.core.logging.DeveloperLog
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
@@ -55,13 +56,13 @@ typealias EditorProblem = com.techwithkaushik.cppide.core.contracts.editor.Edito
  * No host shell, Termux service, TCP listener, or simulated completion provider is used.
  */
 class ClangdProjectSession(
-    workspaceDirectory: File,
+    workspaceIdentity: WorkspaceIdentity,
     private val runtime: LinuxRuntimeEnvironment,
     private val toolchains: LinuxToolchainAccess,
     configuredClangdGuestPath: String?
 ) : EditorDiagnostics, AutoCloseable {
 
-    private val workspace = workspaceDirectory.canonicalFile
+    private val workspace = workspaceIdentity.root.canonicalFile
     private val project = LspProject(GUEST_WORKSPACE)
     private var available = false
     private val disposed = AtomicBoolean(false)
