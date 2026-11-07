@@ -51,7 +51,14 @@ internal class ProjectStorage(context: Context) {
     }
 
     @Synchronized
-    fun createProject(name: String, language: String, starterName: String, starterContent: String): Project {
+    fun createEmptyProject(name: String, language: String): Project =
+        createProjectInternal(name, language, null, "")
+
+    @Synchronized
+    fun createProject(name: String, language: String, starterName: String, starterContent: String): Project =
+        createProjectInternal(name, language, starterName, starterContent)
+
+    private fun createProjectInternal(name: String, language: String, starterName: String?, starterContent: String): Project {
         val startedAt = System.nanoTime()
         DeveloperLog.event("ProjectStorage", "project_create_started", mapOf("name" to name, "language" to language, "starterFile" to starterName, "starterBytes" to starterContent.toByteArray().size))
         validateName(name)
@@ -65,8 +72,10 @@ internal class ProjectStorage(context: Context) {
         if (!staging.mkdir()) throw IOException("Unable to create project staging directory")
         try {
             File(staging, ".cppide-project").writeText("$language\n")
-            File(staging, starterName).writeText(starterContent)
-            File(staging, "README.md").writeText("# $name\n\nCreated with Code Studio.\n")
+            if (starterName != null) {
+                File(staging, starterName).writeText(starterContent)
+                File(staging, "README.md").writeText("# $name\n\nCreated with Code Studio.\n")
+            }
             if (!staging.renameTo(target)) throw IOException("Unable to finalize project directory")
         } catch (error: Throwable) {
             staging.deleteRecursively()
@@ -75,6 +84,14 @@ internal class ProjectStorage(context: Context) {
         return Project(name, language, target, target.lastModified()).also {
             DeveloperLog.event("ProjectStorage", "project_create_completed", mapOf("name" to name, "path" to target.absolutePath, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
         }
+    }
+
+    @Synchronized
+    fun deleteProject(projectName: String) {
+        val startedAt = System.nanoTime()
+        val directory = projectDirectory(projectName)
+        if (!directory.deleteRecursively()) throw IOException("Unable to delete project")
+        DeveloperLog.event("ProjectStorage", "project_deleted", mapOf("name" to projectName, "durationMs" to (System.nanoTime() - startedAt) / 1_000_000))
     }
 
     fun listFiles(projectName: String): List<String> {
