@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class EditorLspStatus(
     val label: String,
@@ -202,7 +202,8 @@ class ClangdProjectSession(
             "Launching clangd through Ubuntu/PRoot and waiting for the LSP initialize handshake."
         )
         try {
-            val connected = withTimeout(LSP_CONNECT_TIMEOUT_MS) { editor.connect() }
+            val connected = withTimeoutOrNull(LSP_CONNECT_TIMEOUT_MS) { editor.connect() }
+                ?: throw IllegalStateException("clangd did not respond to the LSP initialize request within 45 seconds.")
             if (!connected || !editor.isConnected) {
                 throw IllegalStateException("clangd did not complete the LSP initialize handshake. Check the clangd executable, PRoot loader and runtime logs.")
             }
