@@ -330,7 +330,13 @@ fun SoraCodeEditor(
                 if (lspEditor.editor !== editor || activeLspLanguage?.editor !== lspEditor) {
                     lspEditor.wrapperLanguage = textMateLanguage
                     lspEditor.editor = editor
-
+                    DeveloperLog.event("SoraEditor", "lsp_editor_reattached", mapOf(
+                        "file" to fileName,
+                        "language" to (editor.editorLanguage?.javaClass?.simpleName ?: "none")
+                    ))
+                    lspSession?.let { session ->
+                        lspEditor.coroutineScope.launch { session.connect(lspEditor) }
+                    }
                 } else {
                     activeLspLanguage.wrapperLanguage = textMateLanguage
                 }
@@ -342,22 +348,6 @@ fun SoraCodeEditor(
                 } finally {
                     suppressProgrammaticChanges.set(false)
                 }
-            }
-            if (lspEditor != null && lspEditor.editor === editor) {
-                DeveloperLog.event("SoraEditor", "lsp_editor_attached_update", mapOf(
-                    "file" to fileName,
-                    "editorAttached" to true,
-                    "language" to (editor.editorLanguage?.javaClass?.simpleName ?: "none")
-                ))
-                lspSession?.let { session ->
-                    lspEditor.coroutineScope.launch { session.connect(lspEditor) }
-                }
-            } else if (lspEditor != null) {
-                DeveloperLog.event("SoraEditor", "lsp_editor_not_attached", mapOf(
-                    "file" to fileName,
-                    "editorAttached" to false,
-                    "textMateAvailable" to (textMateLanguage != null)
-                ))
             }
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
