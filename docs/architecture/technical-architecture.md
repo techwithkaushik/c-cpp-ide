@@ -138,7 +138,7 @@ kcode/
 | `:editor` | Editor engine adapter and editor UI |
 | `:terminal` | Terminal emulator, local PTY and SSH sessions |
 | `:runtime:toolchains` | Runtime toolchain discovery |
-| `:runtime:linux` | PRoot, rootfs and runtime management |
+| `:runtime:linux` | PRoot, rootfs and runtime management |\n| `:runtime:process` | Build/run and formatter process orchestration |
 | `:workspace:api` | Workspace repository contracts |
 | `:workspace:impl` | Workspace storage implementation |\n| `:workspace:ui` | Workspace explorer UI adapter |
 | `:workspace:ui` | Workspace explorer UI |
