@@ -476,7 +476,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                             dirtyFiles.toList().forEach { file ->
                                                 val contents = if (file == activeFile) code else fileContents[file].orEmpty()
                                                 runCatching { projectStorage.writeFile(selectedProject, file, contents) }
-                                                    .onSuccess { dirtyFiles.remove(file) }
+                                                    .onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }
                                                     .onFailure { saveFailed = true }
                                             }
                                             if (saveFailed) {
@@ -517,7 +517,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             "Build" -> { selectedPanel = ToolPanel.Build; showToolPanel = true }
                             "Run", "Output" -> { selectedPanel = ToolPanel.Output; showToolPanel = true }
                             "Problems" -> { selectedPanel = ToolPanel.Problems; showToolPanel = true }
-                            "Save" -> runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
+                            "Save" -> runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }.onSuccess { dirtyFiles.remove(activeFile); fileContents[activeFile] = code; clangdSession?.saveDocument(activeFile) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                             "Format Document" -> editorController.format()
                             "Undo" -> editorController.undo()
                             "Redo" -> editorController.redo()
@@ -530,7 +530,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             "Find in Project" -> { searchInProject = true; searchQuery = ""; showSearch = true }
                             "Save All" -> {
                                 fileContents[activeFile] = code
-                                dirtyFiles.toList().forEach { file -> runCatching { projectStorage.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
+                                dirtyFiles.toList().forEach { file -> runCatching { projectStorage.writeFile(selectedProject, file, fileContents[file].orEmpty()) }.onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }.onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true } }
                             }
                             "Settings" -> { settingsReturnScreen = screen; screen = IdeScreen.Settings }
                             "File Explorer" -> { drawerDestination = "File Explorer"; scope.launch { drawerState.open() } }
@@ -599,7 +599,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                             "Save" -> {
                                                 fileContents[activeFile] = code
                                                 runCatching { projectStorage.writeFile(selectedProject, activeFile, code) }
-                                                    .onSuccess { dirtyFiles.remove(activeFile) }
+                                                    .onSuccess { dirtyFiles.remove(activeFile); clangdSession?.saveDocument(activeFile) }
                                                     .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                                             }
                                             "Save All" -> {
@@ -607,7 +607,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                                                 dirtyFiles.toList().forEach { file ->
                                                     val content = fileContents[file] ?: ""
                                                     runCatching { projectStorage.writeFile(selectedProject, file, content) }
-                                                        .onSuccess { dirtyFiles.remove(file) }
+                                                        .onSuccess { dirtyFiles.remove(file); clangdSession?.saveDocument(file) }
                                                         .onFailure { selectedPanel = ToolPanel.Problems; showToolPanel = true }
                                                 }
                                             }
