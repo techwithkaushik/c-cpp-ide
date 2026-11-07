@@ -30,11 +30,11 @@ class ClangdLanguageServerResolutionTest {
             }
         }
 
-        assertEquals("clangd-c-c", project.getServerDefinitions("c", "c").single().name)
+        assertEquals("clangd-c-c", project.getServerDefinitions("c").single().name)
         extensions.getValue("cpp").forEach { extension ->
             assertEquals(
                 "clangd-cpp-$extension",
-                project.getServerDefinitions(extension, "cpp").single().name
+                project.getServerDefinitions(extension).single().name
             )
         }
     }
