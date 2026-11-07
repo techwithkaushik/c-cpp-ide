@@ -1030,6 +1030,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                 newProjectDialog = false
                 newProjectName = ""
                 newProjectError = null
+                createEmptyProject = false
             },
             containerColor = IdeSurface,
             title = { Text("Create project", color = Color(0xFFE8EDF5), fontWeight = FontWeight.Bold) },
@@ -1054,6 +1055,17 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(IdeSurfaceRaised)
+                            .clickable { createEmptyProject = !createEmptyProject }.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Empty project", color = Color(0xFFE8EDF5), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Create without source files or README.md", color = IdeMuted, fontSize = 11.sp)
+                        }
+                        androidx.compose.material3.Switch(checked = createEmptyProject, onCheckedChange = { createEmptyProject = it })
+                    }
                     Text("PROJECT TYPE", color = IdeMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Column(verticalArrangement = Arrangement.spacedBy(IdeDesignTokens.Spacing.sm)) {
                         listOf(
@@ -1078,7 +1090,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                         }
                     }
-                    Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
+                    if (!createEmptyProject) Card(colors = CardDefaults.cardColors(containerColor = IdeSurfaceRaised), shape = RoundedCornerShape(IdeDesignTokens.Spacing.md)) {
                         Row(Modifier.fillMaxWidth().padding(IdeDesignTokens.Spacing.md), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             IdeIcon("code", IdeGreen, IdeDesignTokens.Spacing.xl)
@@ -1088,8 +1100,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                             }
                         }
                     }
-                    Text("Preview only: files are currently kept in this editor session. Disk-backed project storage is a separate integration step.",
-                        color = Color(0xFFE5B978), fontSize = 11.sp, lineHeight = 15.sp)
+                    Text(if (createEmptyProject) "The workspace will start with no files. Create files later from File Explorer." else "A starter source file and README.md will be created.",
+                        color = IdeMuted, fontSize = 11.sp, lineHeight = 15.sp)
                 }
             },
             confirmButton = {
@@ -1101,7 +1113,8 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     }
                     val entryFile = entryFileForLanguage(newProjectLanguage)
                     runCatching {
-                        projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile))
+                        if (createEmptyProject) projectStorage.createEmptyProject(name, newProjectLanguage)
+                        else projectStorage.createProject(name, newProjectLanguage, entryFile, sampleCode(entryFile))
                     }.onSuccess { stored ->
                         projects.add(0, IdeProject(stored.name, stored.language, stored.path, "Just now"))
                         selectedProject = name
@@ -1117,10 +1130,11 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                         }
                         openFiles.clear()
                         dirtyFiles.clear()
-                        activeFile = entryFile
-                        code = fileContents[entryFile] ?: sampleCode(entryFile)
-                        openFile(entryFile)
+                        activeFile = ""
+                        code = ""
+                        if (!createEmptyProject && entryFile in workspaceFiles) openFile(entryFile)
                         newProjectDialog = false
+                        createEmptyProject = false
                         newProjectName = ""
                         newProjectError = null
                         screen = IdeScreen.Workspace
@@ -1134,6 +1148,7 @@ private fun IdeUiPrototype(uiFontScale: Float, onUiFontScaleChange: (Float) -> U
                     newProjectDialog = false
                     newProjectName = ""
                     newProjectError = null
+                    createEmptyProject = false
                 }) { Text("Cancel") }
             }
         )
@@ -1737,14 +1752,24 @@ private fun WorkspaceScreen(
                 }
                 Text(
                     "＋",
-                    Modifier.clickable { onFile(if (activeFile == "README.md") ".gitignore" else "README.md") }
+                    Modifier.clickable { onFile("") }
                         .padding(horizontal = IdeDesignTokens.Spacing.md, vertical = IdeDesignTokens.Spacing.sm),
                     color = IdeAccent, fontSize = 20.sp
                 )
             }
             // The editor owns all remaining vertical space, like AndroidIDE's workspace.
             Box(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF0F1218))) {
-                SoraCodeEditor(
+                if (activeFile.isBlank()) {
+                    Column(
+                        Modifier.fillMaxSize().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("Open files from File Explorer", color = Color(0xFFE8EDF5), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Or create new file", color = IdeMuted, fontSize = 13.sp)
+                    }
+                } else SoraCodeEditor(
                     code = code,
                     onCodeChange = onCodeChange,
                     modifier = Modifier.fillMaxSize(),
