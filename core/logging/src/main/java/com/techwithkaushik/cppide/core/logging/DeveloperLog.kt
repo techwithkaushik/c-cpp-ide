@@ -68,6 +68,16 @@ object DeveloperLog {
         info(tag, if (fieldText.isBlank()) "event=$safeEvent" else "event=$safeEvent $fieldText")
     }
 
+    fun event(context: Context, tag: String, event: String, fields: Map<String, Any?> = emptyMap()) {
+        val safeEvent = event.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(80)
+        val fieldText = fields.toSortedMap().entries.joinToString(" ") { entry ->
+            val key = entry.key.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(64)
+            val value = (entry.value?.toString() ?: "null").replace(Regex("\\s+"), "_").replace("|", "_").take(512)
+            "$key=$value"
+        }
+        info(context, tag, if (fieldText.isBlank()) "event=$safeEvent" else "event=$safeEvent $fieldText")
+    }
+
     fun failure(tag: String, event: String, error: Throwable, fields: Map<String, Any?> = emptyMap()) {
         val safeEvent = event.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(80)
         val fieldText = fields.toSortedMap().entries.joinToString(" ") { entry ->
