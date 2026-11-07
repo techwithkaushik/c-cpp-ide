@@ -109,30 +109,47 @@ class ClangdProjectSession(
                 "clangd is missing or not executable at $selectedClangdPath. Install clangd in Ubuntu or correct its Language Settings path."
             }
 
+            val clangdConnectionProvider = CustomLanguageServerDefinition.ServerConnectProvider { _ ->
+                ProotClangdConnectionProvider(
+                    runtime = runtime,
+                    workspace = workspace,
+                    clangdGuestPath = selectedClangdPath,
+                    onUnexpectedExit = { exitCode, stderr ->
+                        mutableStatus.value = EditorLspStatus(
+                            "clangd stopped",
+                            buildString {
+                                append("clangd exited with code ")
+                                append(exitCode)
+                                if (stderr.isNotBlank()) append(": ").append(stderr.takeLast(1200))
+                            },
+                            error = true
+                        )
+                    }
+                )
+            }
+
+            // Sora 0.24.4 resolves a server by definition.ext OR languageId;
+            // extensionsOverride alone does not participate in LspEditorDelegate.refreshSessions().
+            // Register the C and C++ language IDs explicitly so .c and C++/header files
+            // all resolve to the real clangd process with the correct LSP languageId.
+            project.addServerDefinition(
+                CustomLanguageServerDefinition(
+                    "c",
+                    clangdConnectionProvider,
+                    "clangd-c",
+                    null,
+                    listOf("c"),
+                    "c"
+                )
+            )
             project.addServerDefinition(
                 CustomLanguageServerDefinition(
                     "cpp",
-                    CustomLanguageServerDefinition.ServerConnectProvider { _ ->
-                        ProotClangdConnectionProvider(
-                            runtime = runtime,
-                            workspace = workspace,
-                            clangdGuestPath = selectedClangdPath,
-                            onUnexpectedExit = { exitCode, stderr ->
-                                mutableStatus.value = EditorLspStatus(
-                                    "clangd stopped",
-                                    buildString {
-                                        append("clangd exited with code ")
-                                        append(exitCode)
-                                        if (stderr.isNotBlank()) append(": ").append(stderr.takeLast(1200))
-                                    },
-                                    error = true
-                                )
-                            }
-                        )
-                    },
-                    "clangd",
+                    clangdConnectionProvider,
+                    "clangd-cpp",
                     null,
-                    listOf("c", "cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx")
+                    listOf("cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx"),
+                    "cpp"
                 )
             )
             project.init()
@@ -160,7 +177,8 @@ class ClangdProjectSession(
         if (extension !in SUPPORTED_EXTENSIONS) return null
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
         val encodedGuestPath = Uri.encode("$GUEST_WORKSPACE/$relative", "/")
-        return project.getOrCreateEditor(encodedGuestPath).apply {
+        val languageId = if (extension == "c") "c" else "cpp"
+        return project.getOrCreateEditor(encodedGuestPath, languageId).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
