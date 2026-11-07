@@ -1922,7 +1922,7 @@ private fun FileExplorerSheet(projectName: String, activeFile: String, files: Li
         ExplorerDirectoryRow(projectName, ".", 0, true, expanded = "." in expanded, onClick = { expanded = if ("." in expanded) emptySet() else setOf(".") }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
         if ("." in expanded || query.isNotBlank()) nodes.forEach { node ->
             if (node.folder) ExplorerDirectoryRow(node.path.substringAfterLast("/"), node.path, node.depth + 1, false, expanded = node.path in expanded || query.isNotBlank(), onClick = { expanded = if (node.path in expanded) expanded - node.path else expanded + node.path }, onCreateFile = { createTarget = it; newEntryName = ""; fileDialog = true }, onCreateFolder = { createTarget = it; newEntryName = ""; folderDialog = true })
-            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, (14f * (node.depth + 1)).dp) { onOpenFile(node.path) }
+            else ExplorerFileRow(node.path.substringAfterLast("/"), node.path, activeFile == node.path, 14.dp * (node.depth + 1)) { onOpenFile(node.path) }
         }
         if (nodes.isEmpty()) Text(if (query.isBlank()) "This folder is empty" else "No matching files", Modifier.fillMaxWidth().padding(18.dp), color = IdeMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
         if (fileDialog || folderDialog) {
