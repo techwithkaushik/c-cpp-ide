@@ -1,5 +1,6 @@
 package com.techwithkaushik.cppide.feature.editor
 
+import android.net.Uri
 import com.techwithkaushik.cppide.integration.linuxruntime.LinuxRuntimePaths
 import com.techwithkaushik.cppide.integration.toolchain.LinuxToolchainDiscovery
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
@@ -62,7 +63,7 @@ class ClangdProjectSession(
 
         override fun handle(context: EventContext) {
             val editor = context.getOrNull<LspEditor>("lsp-editor") ?: return
-            val relativePath = editor.uri.path
+            val relativePath = Uri.decode(editor.uri.path)
                 .removePrefix("$GUEST_WORKSPACE/")
                 .takeIf { it.isNotBlank() && it != editor.uri.path }
                 ?: return
@@ -158,7 +159,8 @@ class ClangdProjectSession(
         val extension = source.extension.lowercase()
         if (extension !in SUPPORTED_EXTENSIONS) return null
         val relative = source.relativeTo(workspace).invariantSeparatorsPath
-        return project.getOrCreateEditor("$GUEST_WORKSPACE/$relative").apply {
+        val encodedGuestPath = Uri.encode("$GUEST_WORKSPACE/$relative", "/")
+        return project.getOrCreateEditor(encodedGuestPath).apply {
             completionTriggers.addAll(listOf(".", ":", ">", "#"))
             signatureHelpTriggers.addAll(listOf("(", ","))
             signatureHelpReTriggers.add(",")
