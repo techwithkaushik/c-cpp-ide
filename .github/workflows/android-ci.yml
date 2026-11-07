@@ -1,4 +1,4 @@
-name: Code Studio CI
+name: KCode CI
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: code-studio-ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: kcode-ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          snapshot_dir="$RUNNER_TEMP/code-studio-source"
+          snapshot_dir="$RUNNER_TEMP/kcode-source"
           mkdir -p "$snapshot_dir"
           git archive HEAD | tar -x -C "$snapshot_dir"
           {
@@ -42,13 +42,13 @@ jobs:
             echo "commit=$GITHUB_SHA"
             echo "repository=$GITHUB_REPOSITORY"
           } > "$snapshot_dir/BUILD_SOURCE_INFO.txt"
-          tar -czf "$RUNNER_TEMP/code-studio-source.tar.gz" -C "$snapshot_dir" .
+          tar -czf "$RUNNER_TEMP/kcode-source.tar.gz" -C "$snapshot_dir" .
 
       - name: Upload current branch source
         uses: actions/upload-artifact@v6
         with:
-          name: code-studio-source-${{ github.ref_name == 'feature/ubuntu-runtime-ssh' && 'feature-ubuntu-runtime-ssh' || github.ref_name }}-${{ github.sha }}
-          path: ${{ runner.temp }}/code-studio-source.tar.gz
+          name: kcode-source-${{ github.ref_name == 'feature/ubuntu-runtime-ssh' && 'feature-ubuntu-runtime-ssh' || github.ref_name }}-${{ github.sha }}
+          path: ${{ runner.temp }}/kcode-source.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -102,9 +102,6 @@ jobs:
               exit 1
             fi
 
-            # sdkmanager occasionally receives a truncated NDK archive on hosted
-            # runners. Retry from a clean package/cache state instead of accepting
-            # a half-created ndk/ directory as a successful installation.
             installed=false
             for attempt in 1 2 3; do
               echo "Installing Android NDK $NDK_VERSION (attempt $attempt/3)"
@@ -182,7 +179,7 @@ jobs:
       - name: Upload arm32 APK
         uses: actions/upload-artifact@v6
         with:
-          name: code-studio-release-apk-arm32
+          name: kcode-release-apk-arm32
           path: app/build/outputs/apk/arm32/release/*.apk
           if-no-files-found: error
           retention-days: 14
