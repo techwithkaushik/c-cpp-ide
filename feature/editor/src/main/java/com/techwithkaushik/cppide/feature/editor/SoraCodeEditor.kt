@@ -265,8 +265,11 @@ fun SoraCodeEditor(
     val lspEditor = remember(lspSession, fileName) { lspSession?.createEditor(fileName) }
 
     DisposableEffect(lspEditor) {
+        DeveloperLog.event("SoraEditor", "lsp_document_composition_started", mapOf("file" to fileName, "hasSession" to (lspSession != null), "hasLspEditor" to (lspEditor != null)))
         onDispose {
+            DeveloperLog.event("SoraEditor", "lsp_document_composition_disposed", mapOf("file" to fileName, "connected" to (lspEditor?.isConnected == true), "attached" to (lspEditor?.editor != null)))
             runCatching { lspEditor?.dispose() }
+                .onFailure { DeveloperLog.failure("SoraEditor", "lsp_editor_dispose_failed", it, mapOf("file" to fileName)) }
         }
     }
 
@@ -316,7 +319,11 @@ fun SoraCodeEditor(
                     }
                 }
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
-                    if (!suppressProgrammaticChanges.get()) currentOnCodeChange.value(text.toString())
+                    if (!suppressProgrammaticChanges.get()) {
+                        val currentTextLength = text.length
+                        DeveloperLog.debug("SoraEditor", "document_content_changed; file=$fileName; characters=$currentTextLength; lspEditorPresent=${lspEditor != null}; lspConnected=${lspEditor?.isConnected == true}")
+                        currentOnCodeChange.value(text.toString())
+                    }
                 }
                 subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
                     currentOnCursorPositionChange.value(event.left.line + 1, event.left.column + 1)
@@ -362,6 +369,7 @@ fun SoraCodeEditor(
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
         },
         onRelease = { editor ->
+            DeveloperLog.event("SoraEditor", "android_editor_view_released", mapOf("file" to fileName, "lspConnected" to (lspEditor?.isConnected == true), "textLength" to editor.text.length))
             controller?.detach(editor)
             CppTextMateSupport.detach(editor)
             editor.release()
