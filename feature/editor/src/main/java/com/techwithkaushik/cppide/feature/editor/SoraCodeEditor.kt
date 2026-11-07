@@ -324,9 +324,7 @@ fun SoraCodeEditor(
                 if (lspEditor.editor !== editor || activeLspLanguage?.editor !== lspEditor) {
                     lspEditor.wrapperLanguage = textMateLanguage
                     lspEditor.editor = editor
-                    lspSession?.let { session ->
-                        lspEditor.coroutineScope.launch { session.connect(lspEditor) }
-                    }
+
                 } else {
                     activeLspLanguage.wrapperLanguage = textMateLanguage
                 }
@@ -337,6 +335,11 @@ fun SoraCodeEditor(
                     editor.setText(code)
                 } finally {
                     suppressProgrammaticChanges.set(false)
+                }
+            }
+            if (lspEditor != null && lspEditor.editor === editor) {
+                lspSession?.let { session ->
+                    lspEditor.coroutineScope.launch { session.connect(lspEditor) }
                 }
             }
             currentOnCursorPositionChange.value(editor.cursor.leftLine + 1, editor.cursor.leftColumn + 1)
