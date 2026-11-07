@@ -263,19 +263,6 @@ fun SoraCodeEditor(
         }
     }
 
-    // Connect from the editor/session lifecycle. A snapshot flag written inside
-    // AndroidView.factory is not a reliable signal across Compose versions.
-    LaunchedEffect(lspSession, lspEditor) {
-        val session = lspSession
-        val languageEditor = lspEditor
-        if (session != null && languageEditor != null) {
-            if (languageEditor.editor == null) {
-                throw IllegalStateException("Sora did not attach the C/C++ document before LSP startup.")
-            }
-            session.connect(languageEditor)
-        }
-    }
-
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -296,6 +283,9 @@ fun SoraCodeEditor(
                         "A C/C++ language server cannot be attached to a non-C/C++ document."
                     }
                     languageEditor.editor = this
+                    lspSession?.let { session ->
+                        languageEditor.coroutineScope.launch { session.connect(languageEditor) }
+                    }
                 }
                 controller?.attach(this)
                 currentOnCursorPositionChange.value(cursor.leftLine + 1, cursor.leftColumn + 1)
